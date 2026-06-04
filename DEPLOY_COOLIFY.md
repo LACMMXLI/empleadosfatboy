@@ -62,6 +62,75 @@ prisma migrate deploy
 
 antes de iniciar NestJS.
 
+La migracion de nomina esta incluida en:
+
+```text
+apps/api/prisma/migrations/20260604225000_add_payroll_module/migration.sql
+```
+
+Esa migracion crea:
+
+- Campos laborales en `Employee`: `salaryAmount`, `salaryType`, `hireDate`.
+- Tablas `Payroll`, `PayrollItem`, `PayrollItemMovement`.
+- `Payroll.periodKey` unico para impedir nominas duplicadas por periodo.
+- `PayrollItemMovement.movementId` unico para impedir doble descuento de movimientos.
+
+## Arranque seguro de API
+
+El entrypoint de API ahora hace este orden:
+
+1. Valida `DATABASE_URL`.
+2. Valida `JWT_SECRET`.
+3. Espera a que PostgreSQL acepte conexiones.
+4. Ejecuta `prisma migrate deploy`.
+5. Inicia NestJS.
+
+Esto evita fallos intermitentes cuando Coolify levanta el contenedor de API antes de que la base externa este lista.
+
+Variable opcional:
+
+```env
+COOLIFY_DB_WAIT_TIMEOUT=60000
+```
+
+## Verificar migraciones
+
+Desde la consola del contenedor `api`:
+
+```bash
+npm run prisma:status --workspace apps/api
+```
+
+O desde el workspace `apps/api`:
+
+```bash
+npm run prisma:status
+```
+
+## Reset de base de datos
+
+Solo usar en una base de pruebas o cuando aceptes perder todos los datos.
+
+Desde la raiz del repo o contenedor:
+
+```bash
+CONFIRM_RESET=YES sh apps/api/scripts/coolify-reset-db.sh
+```
+
+Desde `apps/api`:
+
+```bash
+CONFIRM_RESET=YES sh scripts/coolify-reset-db.sh
+```
+
+El script espera la base de datos y ejecuta:
+
+```bash
+prisma migrate reset --force --skip-seed
+```
+
+No se ejecuta automaticamente en despliegue. En produccion normal se usa `migrate deploy`, no reset.
+
 ## Primer usuario
 
 Despues del primer despliegue, si necesitas cargar el seed inicial, entra al contenedor `api` y ejecuta:

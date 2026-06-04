@@ -10,6 +10,7 @@ services:
       DATABASE_URL: "${DATABASE_URL:?DATABASE_URL is required}"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required}"
       WEB_ORIGIN: "${WEB_ORIGIN:-}"
+      COOLIFY_DB_WAIT_TIMEOUT: "${COOLIFY_DB_WAIT_TIMEOUT:-60000}"
     expose:
       - "3001"
 

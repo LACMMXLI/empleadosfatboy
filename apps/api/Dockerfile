@@ -35,6 +35,7 @@ COPY --from=build /app/apps/api/prisma apps/api/prisma
 COPY --from=build /app/node_modules/.prisma node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma node_modules/@prisma
 COPY apps/api/docker-entrypoint.sh apps/api/docker-entrypoint.sh
+COPY apps/api/scripts apps/api/scripts
 
 EXPOSE 3001
 CMD ["sh", "apps/api/docker-entrypoint.sh"]

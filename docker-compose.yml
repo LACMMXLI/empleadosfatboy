@@ -32,6 +32,7 @@ services:
       DATABASE_URL: postgresql://postgres:${DATABASE_PASSWORD:-cacl691015}@db:5432/postgres?schema=public
       JWT_SECRET: ${JWT_SECRET:-change-this-secret-for-production-security}
       WEB_ORIGIN: ${WEB_ORIGIN:-}
+      COOLIFY_DB_WAIT_TIMEOUT: ${COOLIFY_DB_WAIT_TIMEOUT:-60000}
     expose:
       - "3001"
 
