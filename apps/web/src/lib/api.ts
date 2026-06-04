@@ -86,12 +86,21 @@ export const api = {
   dashboard() {
     return request<DashboardSummary>("/dashboard")
   },
-  employees(q?: string) {
-    const params = q ? `?q=${encodeURIComponent(q)}` : ""
-    return request<Employee[]>(`/employees${params}`)
+  employees(q?: string, includeInactive = false) {
+    const query = new URLSearchParams()
+    if (q) query.set("q", q)
+    if (includeInactive) query.set("includeInactive", "true")
+    const params = query.toString()
+    return request<Employee[]>(`/employees${params ? `?${params}` : ""}`)
   },
   createEmployee(payload: Record<string, unknown>) {
     return request<Employee>("/employees", { method: "POST", body: JSON.stringify(payload) })
+  },
+  updateEmployee(id: string, payload: Record<string, unknown>) {
+    return request<Employee>(`/employees/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
+  },
+  deactivateEmployee(id: string) {
+    return request<Employee>(`/employees/${id}`, { method: "DELETE" })
   },
   movements(params?: Record<string, string>) {
     const query = new URLSearchParams(params).toString()

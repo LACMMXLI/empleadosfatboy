@@ -9,7 +9,8 @@ type EmployeeWrite = {
   pin?: string
   position?: string
   branchId?: string
-  phone: string
+  phone?: string
+  active?: boolean
 }
 
 const balanceStatuses: MovementStatus[] = [
@@ -24,10 +25,10 @@ export class EmployeesService {
     private readonly audit: AuditService
   ) {}
 
-  list(filters: { q?: string; branchId?: string }) {
+  list(filters: { q?: string; branchId?: string; includeInactive?: boolean }) {
     return this.prisma.employee.findMany({
       where: {
-        active: true,
+        active: filters.includeInactive ? undefined : true,
         branchId: filters.branchId,
         OR: filters.q
           ? [
@@ -88,6 +89,7 @@ export class EmployeesService {
       fullName: dto.fullName,
       position: dto.position,
       phone: dto.phone,
+      active: dto.active,
       branch: dto.branchId ? { connect: { id: dto.branchId } } : undefined
     }
     if (dto.pin) data.pinHash = await bcrypt.hash(dto.pin, 12)

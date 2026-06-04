@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common"
-import { IsOptional, IsString, Length } from "class-validator"
+import { IsBoolean, IsOptional, IsString, Length } from "class-validator"
 import { Role } from "@prisma/client"
 import { Roles } from "../auth/roles.decorator"
 import type { RequestWithUser } from "../auth/auth.types"
@@ -44,6 +44,10 @@ class UpdateEmployeeDto {
   @IsOptional()
   @IsString()
   phone?: string
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean
 }
 
 @Controller("employees")
@@ -51,8 +55,8 @@ export class EmployeesController {
   constructor(private readonly employees: EmployeesService) {}
 
   @Get()
-  list(@Query("q") q?: string, @Query("branchId") branchId?: string) {
-    return this.employees.list({ q, branchId })
+  list(@Query("q") q?: string, @Query("branchId") branchId?: string, @Query("includeInactive") includeInactive?: string) {
+    return this.employees.list({ q, branchId, includeInactive: includeInactive === "true" })
   }
 
   @Get(":id")

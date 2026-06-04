@@ -59,6 +59,7 @@ export type Movement = {
   reason: string
   status: MovementStatus
   productName?: string
+  evidenceNote?: string
   requestIp?: string
   requestUserAgent?: string
   requestDevice?: string

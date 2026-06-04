@@ -84,9 +84,9 @@ const standardMovementKinds: MovementKind[] = [
 const administrativeKinds: MovementKind[] = [
   MovementKind.ADMIN_ADJUSTMENT,
   MovementKind.ADMIN_CHARGE,
+  MovementKind.INTERNAL_CONSUMPTION,
   MovementKind.SHORTAGE_DISCOUNT,
   MovementKind.DAMAGE_DISCOUNT,
-  MovementKind.CASH_OUT,
   MovementKind.BALANCE_CORRECTION,
 ]
 

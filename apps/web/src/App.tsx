@@ -8,11 +8,9 @@ import {
   Building2,
   CheckCircle2,
   ClipboardList,
-  Circle,
   KeyRound,
   LayoutDashboard,
   LogOut,
-  Search,
   Settings,
   ShieldCheck,
   UserRound,
@@ -20,7 +18,6 @@ import {
   UsersRound,
   X
 } from "lucide-react"
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { api, employeeSession, session } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,7 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import type { DashboardSummary, Employee, Movement, MovementKind, MovementSettlementTicket, MovementStatus, Role, User } from "@/types/domain"
+import type { Employee, Movement, MovementKind, MovementSettlementTicket, MovementStatus, Role, User } from "@/types/domain"
 import { syncEmployeePwa } from "@/pwa/employeePwa"
 import fatboyLogo from "@/assets/logo.png"
 
@@ -37,15 +34,15 @@ const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN
 const movementLabels: Record<MovementKind, string> = {
   SALARY_ADVANCE: "Adelanto",
   LOAN: "Prestamo",
-  INTERNAL_CONSUMPTION: "Consumo",
+  INTERNAL_CONSUMPTION: "Consumo interno",
   DRINK: "Bebida",
   FOOD: "Comida",
   CASH_OUT: "Salida efectivo",
-  ADMIN_ADJUSTMENT: "Ajuste",
-  ADMIN_CHARGE: "Cargo admin",
-  SHORTAGE_DISCOUNT: "Faltante",
-  DAMAGE_DISCOUNT: "Daño",
-  BALANCE_CORRECTION: "Corrección",
+  ADMIN_ADJUSTMENT: "Descuento administrativo",
+  ADMIN_CHARGE: "Ajuste manual",
+  SHORTAGE_DISCOUNT: "Cargo por faltante",
+  DAMAGE_DISCOUNT: "Penalización",
+  BALANCE_CORRECTION: "Corrección autorizada",
   ADMIN_SALARY_ADVANCE: "Adelanto admin",
   ADMIN_LOAN: "Préstamo admin"
 }
@@ -60,45 +57,22 @@ const statusLabels: Record<MovementStatus, string> = {
 }
 
 const viewTitles: Record<View, string> = {
-  dashboard: "Resumen",
-  registro: "Registrar",
-  pendientes: "Pendientes",
-  adminMovements: "Admin",
-  historial: "Historial",
+  dashboard: "Dashboard",
   empleados: "Empleados",
-  configuracion: "Config"
+  pendientes: "Aprobaciones",
+  adminMovements: "Movimientos Administrativos",
+  historial: "Historial",
+  configuracion: "Configuración"
 }
-
-const movementSchema = z.object({
-  employeeId: z.string().min(1, "Selecciona empleado"),
-  kind: z.enum(["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]),
-  amount: z.coerce.number().positive("Cantidad invalida"),
-  reason: z.string().optional(),
-  employeePin: z.string().length(6, "Código de 6 dígitos requerido"),
-  productName: z.string().optional(),
-  quantity: z.coerce.number().optional(),
-  unitPrice: z.coerce.number().optional(),
-  evidenceNote: z.string().optional()
-}).superRefine((data, ctx) => {
-  if (data.kind !== "DRINK" && (!data.reason || data.reason.trim().length < 3)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Motivo requerido",
-      path: ["reason"]
-    })
-  }
-})
-type MovementFormInput = z.input<typeof movementSchema>
-type MovementFormOutput = z.output<typeof movementSchema>
 
 const adminMovementSchema = z.object({
   employeeId: z.string().min(1, "Selecciona empleado"),
   kind: z.enum([
     "ADMIN_ADJUSTMENT",
     "ADMIN_CHARGE",
+    "INTERNAL_CONSUMPTION",
     "SHORTAGE_DISCOUNT",
     "DAMAGE_DISCOUNT",
-    "CASH_OUT",
     "BALANCE_CORRECTION"
   ]),
   amount: z.coerce.number().positive("Cantidad invalida"),
@@ -137,6 +111,15 @@ const employeeSchema = z.object({
   position: z.string().min(2),
   phone: z.string().min(10, "Teléfono a 10 dígitos requerido")
 })
+type EmployeeFormInput = z.infer<typeof employeeSchema>
+
+const employeeEditSchema = z.object({
+  fullName: z.string().min(3),
+  pin: z.string().optional().refine((value) => !value || value.length === 6, "PIN a 6 dígitos"),
+  position: z.string().min(2),
+  phone: z.string().min(10, "Teléfono a 10 dígitos requerido")
+})
+type EmployeeEditFormInput = z.infer<typeof employeeEditSchema>
 
 const ruleSchema = z.object({
   kind: z.string().optional(),
@@ -153,18 +136,17 @@ const configSchema = z.object({
 type ConfigFormInput = z.input<typeof configSchema>
 type ConfigFormOutput = z.output<typeof configSchema>
 
-type View = "dashboard" | "registro" | "pendientes" | "adminMovements" | "historial" | "empleados" | "configuracion"
+type View = "dashboard" | "empleados" | "pendientes" | "adminMovements" | "historial" | "configuracion"
 type PortalRoute = "home" | "admin" | "employee"
 
-const standardMovementKinds: MovementKind[] = ["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]
-const employeeRequestKinds: MovementKind[] = standardMovementKinds
+const employeeRequestKinds: MovementKind[] = ["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]
 const quickRequestReasons = ["Emergencia", "Transporte", "Familiar", "Médico", "Otro"]
 const administrativeMovementKinds: MovementKind[] = [
   "ADMIN_ADJUSTMENT",
-  "ADMIN_CHARGE",
   "SHORTAGE_DISCOUNT",
+  "INTERNAL_CONSUMPTION",
+  "ADMIN_CHARGE",
   "DAMAGE_DISCOUNT",
-  "CASH_OUT",
   "BALANCE_CORRECTION"
 ]
 
@@ -370,21 +352,20 @@ function Shell({
   const me = useQuery({ queryKey: ["me"], queryFn: api.me })
   const views = [
     { id: "dashboard" as const, label: "Dashboard", icon: LayoutDashboard },
-    { id: "registro" as const, label: "Registro", icon: Banknote },
-    { id: "pendientes" as const, label: "Pendientes", icon: ShieldCheck },
-    { id: "adminMovements" as const, label: "Admin", icon: Building2 },
-    { id: "historial" as const, label: "Historial", icon: ClipboardList },
     { id: "empleados" as const, label: "Empleados", icon: UsersRound },
-    { id: "configuracion" as const, label: "Config", icon: Settings }
+    { id: "pendientes" as const, label: "Aprobaciones", icon: ShieldCheck },
+    { id: "adminMovements" as const, label: "Movimientos", icon: Building2 },
+    { id: "historial" as const, label: "Historial", icon: ClipboardList },
+    { id: "configuracion" as const, label: "Configuración", icon: Settings }
   ]
 
   return (
     <main className="min-h-screen bg-background">
       <div className="flex min-h-screen">
-        <aside className="hidden w-60 border-r bg-card/60 p-3 lg:block">
+        <aside className="hidden w-64 border-r bg-card/60 p-3 lg:block">
           <div className="mb-4 px-2">
             <div className="text-sm font-semibold">Fatboy POS</div>
-            <div className="text-xs text-muted-foreground">Control empleados</div>
+              <div className="text-xs text-muted-foreground">Panel administrativo</div>
           </div>
           <nav className="space-y-1">
             {views.map((item) => (
@@ -420,11 +401,10 @@ function Shell({
           </header>
           <div className="mobile-page flex-1 p-3 lg:p-4">
             {activeView === "dashboard" && <Dashboard />}
-            {activeView === "registro" && <MovementRegister user={me.data} />}
+            {activeView === "empleados" && <Employees user={me.data} />}
             {activeView === "pendientes" && <PendingAuthorizations currentRole={me.data?.role} />}
             {activeView === "adminMovements" && <AdministrativeMovements user={me.data} />}
             {activeView === "historial" && <History />}
-            {activeView === "empleados" && <Employees user={me.data} />}
             {activeView === "configuracion" && <Configuration />}
           </div>
         </section>
@@ -445,7 +425,7 @@ function MobileBottomNav({
 }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-2xl backdrop-blur lg:hidden">
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-3 gap-1 sm:grid-cols-6">
         {views.map((item) => {
           const active = activeView === item.id
           return (
@@ -469,180 +449,64 @@ function MobileBottomNav({
 
 function Dashboard() {
   const { data, isLoading, error } = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard })
+  const periodStart = useMemo(() => startOfCurrentMonth(), [])
+  const periodMovements = useQuery({
+    queryKey: ["movements", "dashboard-period", periodStart],
+    queryFn: () => api.movements({ from: periodStart })
+  })
   if (isLoading) return <StatusText text="Cargando dashboard" />
   if (error) return <StatusText text={(error as Error).message} />
   if (!data) return null
 
+  const movements = periodMovements.data ?? []
+  const pendingRequests = movements.filter((movement) => movement.origin === "EMPLOYEE_REQUEST" && movement.status === "PENDING").length
+  const authorizedAdvances = movements
+    .filter((movement) => movement.kind === "SALARY_ADVANCE" && movement.status === "AUTHORIZED")
+    .reduce((total, movement) => total + Number(movement.amount), 0)
+  const administrativeMovements = movements.filter((movement) => movement.origin === "ADMINISTRATIVE_ACTION").length
   const cards = [
-    ["Adelantos hoy", data.cards.advancesToday],
-    ["Consumos hoy", data.cards.consumptionsToday],
-    ["Salidas hoy", data.cards.cashOutToday],
-    ["Por descontar", data.cards.pendingToDiscount],
-    ["Pendientes", data.cards.pendingMovements],
-    ["Autorizados", data.cards.authorizedMovements]
+    { label: "Solicitudes pendientes", value: String(periodMovements.data ? pendingRequests : data.cards.pendingMovements), tone: "primary" },
+    { label: "Adelantos autorizados", value: money.format(authorizedAdvances), tone: "accent" },
+    { label: "Movimientos administrativos del periodo", value: String(administrativeMovements), tone: "neutral" },
+    { label: "Total por descontar", value: money.format(data.cards.pendingToDiscount), tone: "strong" }
   ]
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="grid metric-grid gap-3">
-        {cards.map(([label, value]) => (
-          <Metric key={label} label={String(label)} value={typeof value === "number" && label !== "Pendientes" && label !== "Autorizados" ? money.format(value) : String(value)} />
+        {cards.map((card) => (
+          <Metric key={card.label} label={card.label} value={card.value} tone={card.tone} />
         ))}
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Adelantos recientes</CardTitle>
-        </CardHeader>
-        <CardContent className="h-72">
-          <Chart data={data} />
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="grid gap-3 p-4 text-sm md:grid-cols-4">
+          <DetailLine label="Periodo" value={`Desde ${formatDateLabel(periodStart)}`} />
+          <DetailLine label="Solicitudes totales" value={String(data.cards.pendingMovements)} />
+          <DetailLine label="Autorizados activos" value={String(data.cards.authorizedMovements)} />
+          <DetailLine label="Consulta" value={periodMovements.isLoading ? "Actualizando" : "Resumen administrativo"} />
         </CardContent>
       </Card>
     </div>
   )
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, tone = "neutral" }: { label: string; value: string; tone?: string }) {
+  const toneClass =
+    tone === "primary"
+      ? "border-primary/35 bg-primary/10"
+      : tone === "accent"
+        ? "border-accent/35 bg-accent/10"
+        : tone === "strong"
+          ? "border-emerald-500/30 bg-emerald-500/10"
+          : "bg-card"
+
   return (
-    <Card>
+    <Card className={toneClass}>
       <CardContent className="p-4">
         <div className="text-xs text-muted-foreground">{label}</div>
         <div className="mt-1 text-2xl font-semibold">{value}</div>
       </CardContent>
     </Card>
-  )
-}
-
-function Chart({ data }: { data: DashboardSummary }) {
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data.weeklyAdvances}>
-        <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-        <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-        <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-        <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-        <Area dataKey="amount" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.22)" />
-      </AreaChart>
-    </ResponsiveContainer>
-  )
-}
-
-function MovementRegister({ user }: { user?: User }) {
-  const queryClient = useQueryClient()
-  const [message, setMessage] = useState<string | null>(null)
-  const employees = useQuery({ queryKey: ["employees"], queryFn: () => api.employees() })
-  const config = useQuery({ queryKey: ["configuration"], queryFn: api.configuration })
-  const form = useForm<MovementFormInput, unknown, MovementFormOutput>({
-    resolver: zodResolver(movementSchema),
-    defaultValues: {
-      kind: "SALARY_ADVANCE",
-      amount: 0,
-      reason: "",
-      employeePin: ""
-    }
-  })
-  const mutation = useMutation({
-    mutationFn: (payload: MovementFormOutput) => api.createMovement(payload),
-    onSuccess: async (movement) => {
-      setMessage(`Movimiento ${movement.folio} registrado como pendiente`)
-      form.reset({ kind: "SALARY_ADVANCE", amount: 0, reason: "", employeePin: "" })
-      await queryClient.invalidateQueries()
-    },
-    onError: (err: Error) => setMessage(err.message)
-  })
-  const selectedEmployeeId = form.watch("employeeId")
-  const selectedKind = form.watch("kind")
-  const amount = Number(form.watch("amount") || 0)
-  const selectedEmployee = employees.data?.find((employee) => employee.id === selectedEmployeeId)
-  const beveragePrice = Number(config.data?.beveragePrice ?? 30)
-  const isDrink = selectedKind === "DRINK"
-
-  useEffect(() => {
-    if (selectedKind === "DRINK") {
-      form.setValue("amount", beveragePrice)
-      form.setValue("productName", "Bebida")
-      form.setValue("quantity", 1)
-      form.setValue("unitPrice", beveragePrice)
-    }
-  }, [beveragePrice, form, selectedKind])
-
-  const guideSteps = [
-    { label: "Empleado", done: Boolean(selectedEmployeeId) },
-    { label: "Monto", done: amount > 0 },
-    { label: "Motivo", done: Boolean(form.watch("reason")) },
-    { label: "PIN", done: Boolean(form.watch("employeePin")) }
-  ]
-
-  return (
-    <div className="grid gap-4 xl:grid-cols-[420px_1fr]">
-      <Card>
-        <CardHeader>
-          <CardTitle>Nuevo movimiento</CardTitle>
-          <div className="grid grid-cols-4 gap-2 pt-2 md:hidden">
-            {guideSteps.map((step) => (
-              <div
-                key={step.label}
-                className={`flex items-center justify-center gap-1 rounded-md border px-2 py-2 text-[11px] ${
-                  step.done ? "border-primary/60 bg-primary/15 text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                {step.done ? <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> : <Circle className="h-3.5 w-3.5" />}
-                <span className="truncate">{step.label}</span>
-              </div>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-3" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-            <GuidedBlock step="1" title="Empleado" detail={selectedEmployee ? `${selectedEmployee.phone} · ${selectedEmployee.position}` : "Busca y confirma a quien se le registra"}>
-              <Select className="h-11" {...form.register("employeeId")}>
-                <option value="">Seleccionar empleado</option>
-                {employees.data?.map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.phone} - {employee.fullName}
-                  </option>
-                ))}
-              </Select>
-            </GuidedBlock>
-
-            <GuidedBlock step="2" title="Movimiento" detail="El backend validara autorizacion y saldo">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Select className="h-11" {...form.register("kind")}>
-                  {standardMovementKinds.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {movementLabels[kind]}
-                    </option>
-                  ))}
-                </Select>
-                {isDrink ? (
-                  <div className="flex h-11 items-center rounded-md border bg-background px-3 text-sm font-semibold">
-                    {money.format(beveragePrice)}
-                  </div>
-                ) : (
-                  <Input className="h-11" type="number" step="0.01" placeholder="Cantidad" {...form.register("amount")} />
-                )}
-              </div>
-            </GuidedBlock>
-
-            <GuidedBlock step="3" title="Motivo y evidencia" detail="Deja contexto suficiente para auditoria">
-              <Textarea placeholder="Motivo" {...form.register("reason")} />
-              <Textarea placeholder="Evidencia / autorizacion verbal / referencia" {...form.register("evidenceNote")} />
-            </GuidedBlock>
-
-            <GuidedBlock step="4" title="Confirmacion" detail="El PIN confirma que el empleado reconoce el movimiento">
-              <Input className="h-11 text-center text-lg tracking-[0.35em]" type="password" inputMode="numeric" placeholder="PIN" {...form.register("employeePin")} />
-            </GuidedBlock>
-
-            <div className="sticky bottom-[84px] z-10 -mx-4 border-t bg-card/95 p-4 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
-              <Button className="h-12 w-full text-base" disabled={mutation.isPending}>
-              Registrar
-              </Button>
-            </div>
-            {message && <div className="rounded-md border p-2 text-sm text-muted-foreground">{message}</div>}
-          </form>
-        </CardContent>
-      </Card>
-      <PendingQueue currentRole={user?.role} />
-    </div>
   )
 }
 
@@ -739,18 +603,18 @@ function AdministrativeMovements({ user }: { user?: User }) {
   }
 
   return (
-    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
       <Card className="min-w-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
-            Movimiento administrativo
+            Movimientos Administrativos
           </CardTitle>
-          <p className="text-sm text-muted-foreground">No requiere PIN del empleado. Queda visible y auditado.</p>
+          <p className="text-sm text-muted-foreground">Formulario único para cargos, descuentos, consumos internos y correcciones autorizadas.</p>
         </CardHeader>
         <CardContent>
           <form className="space-y-3" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-            <GuidedBlock step="1" title="Empleado afectado" detail="Selecciona a quien se aplicará el cargo, ajuste o salida">
+            <GuidedBlock step="1" title="Empleado" detail="Selecciona a quien se aplicará el movimiento">
               <Select className="h-11" {...form.register("employeeId")}>
                 <option value="">Seleccionar empleado</option>
                 {employees.data?.map((employee) => (
@@ -760,7 +624,7 @@ function AdministrativeMovements({ user }: { user?: User }) {
                 ))}
               </Select>
             </GuidedBlock>
-            <GuidedBlock step="2" title="Tipo y monto" detail="La empresa genera este movimiento de forma directa">
+            <GuidedBlock step="2" title="Tipo y monto" detail="Registro administrativo directo, sin PIN de empleado">
               <div className="grid gap-3 sm:grid-cols-2">
                 <Select className="h-11" {...form.register("kind")}>
                   {administrativeMovementKinds.map((kind) => (
@@ -772,12 +636,18 @@ function AdministrativeMovements({ user }: { user?: User }) {
                 <Input className="h-11" type="number" step="0.01" placeholder="Monto" {...form.register("amount")} />
               </div>
             </GuidedBlock>
-            <GuidedBlock step="3" title="Motivo y evidencia" detail="El motivo es obligatorio para evitar disputas">
+            <GuidedBlock step="3" title="Motivo y evidencia" detail="El motivo es obligatorio para auditoría">
               <Textarea placeholder="Motivo obligatorio" {...form.register("reason")} />
-              <Textarea placeholder="Evidencia opcional / referencia / nota administrativa" {...form.register("evidenceNote")} />
+              <Textarea placeholder="Evidencia si aplica / referencia / nota administrativa" {...form.register("evidenceNote")} />
+            </GuidedBlock>
+            <GuidedBlock step="4" title="Autorización administrativa" detail="El backend registra el usuario responsable">
+              <div className="rounded-md border bg-background/45 p-3 text-sm">
+                <div className="text-[11px] uppercase text-muted-foreground">Responsable</div>
+                <div className="mt-1 font-medium">{user?.fullName ?? "Usuario administrativo"}</div>
+              </div>
             </GuidedBlock>
             <Button className="h-12 w-full text-base" disabled={mutation.isPending}>
-              Crear movimiento administrativo
+              Registrar movimiento administrativo
             </Button>
             {message && <div className="rounded-md border p-2 text-sm text-muted-foreground">{message}</div>}
           </form>
@@ -870,17 +740,10 @@ function AdministrativeMovements({ user }: { user?: User }) {
 
 function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
   const queryClient = useQueryClient()
-  const [expandedId, setExpandedId] = useState<string | null>(null)
   const pending = useQuery({ queryKey: ["movements", "pending-full"], queryFn: () => api.movements({ status: "PENDING" }) })
-  const audit = useQuery({
-    queryKey: ["movement-audit", expandedId],
-    queryFn: () => api.movementAudit(expandedId!),
-    enabled: Boolean(expandedId)
-  })
   const authorize = useMutation({
     mutationFn: (id: string) => api.authorizeMovement(id),
     onSuccess: async () => {
-      setExpandedId(null)
       await queryClient.invalidateQueries({ queryKey: ["movements"] })
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] })
     }
@@ -888,7 +751,6 @@ function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
   const reject = useMutation({
     mutationFn: (id: string) => api.rejectMovement(id),
     onSuccess: async () => {
-      setExpandedId(null)
       await queryClient.invalidateQueries({ queryKey: ["movements"] })
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] })
     }
@@ -898,36 +760,40 @@ function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Autorizaciones Pendientes</CardTitle>
-        <p className="text-sm text-muted-foreground">Solicitudes y movimientos pendientes con ruta clara de aprobación.</p>
+        <CardTitle>Aprobaciones</CardTitle>
+        <p className="text-sm text-muted-foreground">Solicitudes pendientes listas para aprobar o rechazar.</p>
       </CardHeader>
       <CardContent>
         {!pending.data?.length && <StatusText text="No hay movimientos pendientes." />}
         <div className="space-y-3">
           {pending.data?.map((movement) => {
-            const isExpanded = expandedId === movement.id
             return (
               <div key={movement.id} className="rounded-lg border bg-background/45 p-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs text-muted-foreground">{movement.folio}</span>
-                      <Badge>{statusLabels[movement.status]}</Badge>
-                      <Badge className={movement.origin === "EMPLOYEE_REQUEST" ? "border-primary/60 text-primary" : "border-accent/60 text-accent"}>
-                        {movement.origin === "EMPLOYEE_REQUEST" ? "Solicitud empleado" : "Movimiento administrativo"}
-                      </Badge>
+                  <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-[1.1fr_0.8fr_0.7fr_1.4fr_1fr]">
+                    <div className="min-w-0">
+                      <div className="text-[11px] uppercase text-muted-foreground">Empleado</div>
+                      <div className="truncate font-semibold">{movement.employee?.fullName ?? "Empleado"}</div>
+                      <div className="font-mono text-[11px] text-muted-foreground">{movement.folio}</div>
                     </div>
-                    <div className="font-semibold">{movement.employee?.fullName ?? "Empleado"}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {movement.employee?.phone ?? "Sin teléfono"} · {movementLabels[movement.kind]} · {money.format(Number(movement.amount))}
+                    <div>
+                      <div className="text-[11px] uppercase text-muted-foreground">Fecha</div>
+                      <div className="text-sm">{new Date(movement.createdAt).toLocaleString("es-MX")}</div>
                     </div>
-                    <div className="text-sm text-muted-foreground">{movement.reason}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(movement.createdAt).toLocaleString("es-MX")}</div>
+                    <div>
+                      <div className="text-[11px] uppercase text-muted-foreground">Monto solicitado</div>
+                      <div className="font-mono text-sm font-semibold">{money.format(Number(movement.amount))}</div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] uppercase text-muted-foreground">Motivo</div>
+                      <div className="text-sm text-muted-foreground">{movement.reason}</div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] uppercase text-muted-foreground">Evidencia</div>
+                      <div className="text-sm text-muted-foreground">{movement.evidenceNote || "Sin evidencia"}</div>
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => setExpandedId(isExpanded ? null : movement.id)}>
-                      {isExpanded ? "Ocultar" : "Ver detalle"}
-                    </Button>
                     {canProcess && (
                       <>
                         <Button size="sm" onClick={() => authorize.mutate(movement.id)} disabled={authorize.isPending}>
@@ -940,29 +806,6 @@ function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
                     )}
                   </div>
                 </div>
-                {isExpanded && (
-                  <div className="mt-3 grid gap-3 border-t pt-3 text-sm lg:grid-cols-2">
-                    <div className="space-y-2">
-                      <DetailLine label="Origen" value={movement.origin === "EMPLOYEE_REQUEST" ? "Solicitud creada por empleado" : "Movimiento creado por administración"} />
-                      <DetailLine label="Responsable" value={movement.registeredBy?.fullName ?? (movement.origin === "EMPLOYEE_REQUEST" ? "Empleado por portal" : "Administración")} />
-                      <DetailLine label="IP" value={movement.requestIp ?? "No registrado"} />
-                      <DetailLine label="Dispositivo" value={movement.requestDevice ?? "No registrado"} />
-                      <DetailLine label="Navegador" value={movement.requestUserAgent ?? "No registrado"} />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold uppercase text-muted-foreground">Historial de cambios</div>
-                      {!audit.data?.length && <div className="text-muted-foreground">Sin eventos adicionales.</div>}
-                      {audit.data?.map((entry) => (
-                        <div key={entry.id} className="rounded-md border p-2">
-                          <div className="font-medium">{entry.action}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(entry.createdAt).toLocaleString("es-MX")} · {entry.user?.fullName ?? "Sistema/Empleado"}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )
           })}
@@ -981,59 +824,70 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   )
 }
 
-function PendingQueue({ currentRole }: { currentRole?: Role }) {
-  const queryClient = useQueryClient()
-  const pending = useQuery({ queryKey: ["movements", "pending"], queryFn: () => api.movements({ status: "PENDING" }) })
-  const authorize = useMutation({
-    mutationFn: (id: string) => api.authorizeMovement(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["movements"] })
-  })
-  const reject = useMutation({
-    mutationFn: (id: string) => api.rejectMovement(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["movements"] })
-  })
+function startOfCurrentMonth() {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  return `${now.getFullYear()}-${month}-01`
+}
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Autorizaciones pendientes</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <MovementTable
-          movements={pending.data ?? []}
-          actions={(movement) =>
-            currentRole === "CAJERO" || currentRole === "EMPLEADO" ? null : (
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => authorize.mutate(movement.id)}>
-                  Autorizar
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => reject.mutate(movement.id)}>
-                  Rechazar
-                </Button>
-              </div>
-            )
-          }
-        />
-      </CardContent>
-    </Card>
-  )
+function formatDateLabel(value: string) {
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+function movementEventLabel(movement: Movement) {
+  if (movement.origin === "ADMINISTRATIVE_ACTION") return "Movimiento administrativo"
+  if (movement.status === "AUTHORIZED") return "Solicitud aprobada"
+  if (movement.status === "REJECTED") return "Solicitud rechazada"
+  return "Solicitud creada"
 }
 
 function History() {
-  const [q, setQ] = useState("")
+  const [employeeId, setEmployeeId] = useState("")
+  const [from, setFrom] = useState("")
+  const [to, setTo] = useState("")
+  const [kind, setKind] = useState("")
   const [status, setStatus] = useState("")
-  const params = useMemo(() => ({ ...(q ? { q } : {}), ...(status ? { status } : {}) }), [q, status])
+  const employees = useQuery({ queryKey: ["employees"], queryFn: () => api.employees() })
+  const params = useMemo(
+    () => ({
+      ...(employeeId ? { employeeId } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(kind ? { kind } : {}),
+      ...(status ? { status } : {})
+    }),
+    [employeeId, from, kind, status, to]
+  )
   const movements = useQuery({ queryKey: ["movements", params], queryFn: () => api.movements(params) })
 
   return (
     <Card>
-      <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <CardHeader>
         <CardTitle>Historial</CardTitle>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Buscar" value={q} onChange={(event) => setQ(event.target.value)} />
-          </div>
+        <p className="text-sm text-muted-foreground">Consulta y auditoría de solicitudes y movimientos administrativos.</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-5">
+          <Select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
+            <option value="">Empleado</option>
+            {employees.data?.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.fullName}
+              </option>
+            ))}
+          </Select>
+          <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+          <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+          <Select value={kind} onChange={(event) => setKind(event.target.value)}>
+            <option value="">Tipo</option>
+            {Object.entries(movementLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
           <Select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">Estado</option>
             {Object.entries(statusLabels).map(([value, label]) => (
@@ -1043,8 +897,6 @@ function History() {
             ))}
           </Select>
         </div>
-      </CardHeader>
-      <CardContent>
         <MovementTable movements={movements.data ?? []} />
       </CardContent>
     </Card>
@@ -1082,6 +934,7 @@ function MovementTable({
                 <div className="font-semibold">{money.format(Number(movement.amount))}</div>
               </div>
             </div>
+            <div className="mt-3 rounded-md border bg-background/45 p-2 text-xs">{movementEventLabel(movement)}</div>
             <div className="mt-3 text-xs text-muted-foreground">{new Date(movement.createdAt).toLocaleString("es-MX")}</div>
             {actions?.(movement) && <div className="mt-3">{actions(movement)}</div>}
           </div>
@@ -1096,6 +949,7 @@ function MovementTable({
             <th className="py-2 pr-3">Tipo</th>
             <th className="py-2 pr-3">Cantidad</th>
             <th className="py-2 pr-3">Estado</th>
+            <th className="py-2 pr-3">Evento</th>
             <th className="py-2 pr-3">Registro</th>
             <th className="py-2 pr-3">Accion</th>
           </tr>
@@ -1115,6 +969,7 @@ function MovementTable({
               <td className="py-2 pr-3">
                 <Badge>{statusLabels[movement.status]}</Badge>
               </td>
+              <td className="py-2 pr-3">{movementEventLabel(movement)}</td>
               <td className="py-2 pr-3 text-muted-foreground">{new Date(movement.createdAt).toLocaleString("es-MX")}</td>
               <td className="py-2 pr-3">{actions?.(movement)}</td>
             </tr>
@@ -1128,24 +983,56 @@ function MovementTable({
 
 function Employees({ user }: { user?: User }) {
   const queryClient = useQueryClient()
-  const employees = useQuery({ queryKey: ["employees"], queryFn: () => api.employees() })
-  const form = useForm<z.infer<typeof employeeSchema>>({ resolver: zodResolver(employeeSchema) })
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
+  const employees = useQuery({ queryKey: ["employees", "admin-all"], queryFn: () => api.employees(undefined, true) })
+  const selectedEmployee = employees.data?.find((employee) => employee.id === selectedEmployeeId)
+  const form = useForm<EmployeeFormInput>({ resolver: zodResolver(employeeSchema) })
+  const editForm = useForm<EmployeeEditFormInput>({
+    resolver: zodResolver(employeeEditSchema),
+    defaultValues: { fullName: "", position: "", phone: "", pin: "" }
+  })
   const create = useMutation({
-    mutationFn: (payload: z.infer<typeof employeeSchema>) =>
+    mutationFn: (payload: EmployeeFormInput) =>
       api.createEmployee({ ...payload, branchId: user?.branch?.id }),
     onSuccess: async () => {
       form.reset()
       await queryClient.invalidateQueries({ queryKey: ["employees"] })
     }
   })
+  const update = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: EmployeeEditFormInput }) =>
+      api.updateEmployee(id, { ...payload, pin: payload.pin || undefined }),
+    onSuccess: async (employee) => {
+      setSelectedEmployeeId(employee.id)
+      await queryClient.invalidateQueries({ queryKey: ["employees"] })
+    }
+  })
+  const toggleActive = useMutation({
+    mutationFn: (employee: Employee) => api.updateEmployee(employee.id, { active: !employee.active }),
+    onSuccess: async (employee) => {
+      setSelectedEmployeeId(employee.id)
+      await queryClient.invalidateQueries({ queryKey: ["employees"] })
+    }
+  })
+
+  useEffect(() => {
+    if (!selectedEmployee) return
+    editForm.reset({
+      fullName: selectedEmployee.fullName,
+      position: selectedEmployee.position,
+      phone: selectedEmployee.phone,
+      pin: ""
+    })
+  }, [editForm, selectedEmployee])
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+      <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserRoundPlus className="h-4 w-4" />
-            Empleado
+            Alta de empleado
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1163,16 +1050,68 @@ function Employees({ user }: { user?: User }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Directorio</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4" />
+            Edición y PIN
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!selectedEmployee && <StatusText text="Selecciona un empleado del directorio para editarlo." />}
+          {selectedEmployee && (
+            <form
+              className="space-y-3"
+              onSubmit={editForm.handleSubmit((values) => update.mutate({ id: selectedEmployee.id, payload: values }))}
+            >
+              <Input placeholder="Nombre completo" {...editForm.register("fullName")} />
+              <Input placeholder="Puesto" {...editForm.register("position")} />
+              <Input placeholder="Telefono" {...editForm.register("phone")} />
+              <Input type="password" placeholder="Nuevo PIN opcional" {...editForm.register("pin")} />
+              <div className="grid grid-cols-2 gap-2">
+                <Button className="w-full" disabled={update.isPending}>
+                  Guardar
+                </Button>
+                <Button
+                  className="w-full"
+                  type="button"
+                  variant={selectedEmployee.active ? "destructive" : "secondary"}
+                  disabled={toggleActive.isPending}
+                  onClick={() => toggleActive.mutate(selectedEmployee)}
+                >
+                  {selectedEmployee.active ? "Desactivar" : "Activar"}
+                </Button>
+              </div>
+              {update.error && <div className="rounded-md border p-2 text-sm">{update.error.message}</div>}
+              {toggleActive.error && <div className="rounded-md border p-2 text-sm">{toggleActive.error.message}</div>}
+            </form>
+          )}
+        </CardContent>
+      </Card>
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista de empleados</CardTitle>
+          <p className="text-sm text-muted-foreground">Información básica, estado y acceso rápido a edición.</p>
         </CardHeader>
         <CardContent>
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {employees.data?.map((employee: Employee) => (
-              <div key={employee.id} className="rounded-md border p-3">
-                <div className="font-medium">{employee.fullName}</div>
+              <button
+                key={employee.id}
+                className={`rounded-md border p-3 text-left transition hover:bg-secondary/60 ${
+                  selectedEmployeeId === employee.id ? "border-primary bg-primary/10" : "bg-background/45"
+                }`}
+                type="button"
+                onClick={() => setSelectedEmployeeId(employee.id)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 font-medium">{employee.fullName}</div>
+                  <Badge className={employee.active ? "border-emerald-500/40 text-emerald-400" : "border-destructive/50 text-destructive"}>
+                    {employee.active ? "Activo" : "Inactivo"}
+                  </Badge>
+                </div>
                 <div className="text-sm text-muted-foreground">{employee.phone} · {employee.position}</div>
                 <div className="mt-2 text-xs text-muted-foreground">{employee.branch.name}</div>
-              </div>
+              </button>
             ))}
           </div>
         </CardContent>
