@@ -1,4 +1,6 @@
 export type Role = "ADMINISTRADOR" | "GERENTE" | "ENCARGADO" | "CAJERO" | "EMPLEADO"
+export type SalaryType = "WEEKLY" | "BIWEEKLY" | "DAILY"
+export type PayrollStatus = "BORRADOR" | "GENERADA" | "PAGADA" | "CANCELADA"
 
 export type MovementKind =
   | "SALARY_ADVANCE"
@@ -46,6 +48,9 @@ export type Employee = {
   position: string
   phone: string
   active: boolean
+  salaryAmount: string | number
+  salaryType: SalaryType
+  hireDate?: string | null
   branch: Branch
 }
 
@@ -124,4 +129,56 @@ export type MovementSettlementTicket = {
   byKind: Array<{ kind: MovementKind; count: number; amount: number }>
   movements: Array<{ folio: string; kind: MovementKind; amount: number; reason?: string; createdAt?: string }>
   folios: string[]
+}
+
+export type PayrollItem = {
+  id?: string
+  employeeId: string
+  employeeName: string
+  position: string
+  salaryAmount?: number
+  salaryType?: SalaryType
+  baseSalary: number
+  totalAdvances: number
+  totalInternalConsumption: number
+  totalAdminCharges: number
+  totalPenalties: number
+  totalPositiveAdjustments: number
+  totalNegativeAdjustments: number
+  totalDeductions: number
+  netPay: number
+  movements: Array<{ id: string; folio: string; kind: MovementKind; amount: number; reason: string; createdAt: string }>
+}
+
+export type PayrollPreview = {
+  periodStart: string
+  periodEnd: string
+  periodKey: string
+  status: "BORRADOR"
+  totals: {
+    totalGross: number
+    totalDeductions: number
+    totalAdjustments: number
+    totalNet: number
+  }
+  items: PayrollItem[]
+}
+
+export type Payroll = {
+  id: string
+  periodStart: string
+  periodEnd: string
+  periodKey: string
+  status: PayrollStatus
+  totalGross: number
+  totalDeductions: number
+  totalAdjustments: number
+  totalNet: number
+  generatedAt: string
+  paidAt?: string | null
+  cancelledAt?: string | null
+  cancelReason?: string | null
+  generatedByAdmin?: Pick<User, "id" | "fullName" | "role">
+  itemCount?: number
+  items?: PayrollItem[]
 }

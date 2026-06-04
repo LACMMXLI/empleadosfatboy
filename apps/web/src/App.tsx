@@ -13,6 +13,7 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
+  WalletCards,
   UserRound,
   UserRoundPlus,
   UsersRound,
@@ -25,7 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import type { Employee, Movement, MovementKind, MovementSettlementTicket, MovementStatus, Role, User } from "@/types/domain"
+import type { Employee, Movement, MovementKind, MovementSettlementTicket, MovementStatus, Payroll, PayrollItem, Role, SalaryType, User } from "@/types/domain"
 import { syncEmployeePwa } from "@/pwa/employeePwa"
 import fatboyLogo from "@/assets/logo.png"
 
@@ -56,12 +57,26 @@ const statusLabels: Record<MovementStatus, string> = {
   PARTIALLY_DISCOUNTED: "Parcial"
 }
 
+const salaryTypeLabels: Record<SalaryType, string> = {
+  WEEKLY: "Semanal",
+  BIWEEKLY: "Quincenal",
+  DAILY: "Diario"
+}
+
+const payrollStatusLabels: Record<string, string> = {
+  BORRADOR: "Borrador",
+  GENERADA: "Generada",
+  PAGADA: "Pagada",
+  CANCELADA: "Cancelada"
+}
+
 const viewTitles: Record<View, string> = {
   dashboard: "Dashboard",
   empleados: "Empleados",
   pendientes: "Aprobaciones",
   adminMovements: "Movimientos Administrativos",
   historial: "Historial",
+  nomina: "Nómina",
   configuracion: "Configuración"
 }
 
@@ -109,17 +124,25 @@ const employeeSchema = z.object({
   fullName: z.string().min(3),
   pin: z.string().length(6),
   position: z.string().min(2),
-  phone: z.string().min(10, "Teléfono a 10 dígitos requerido")
+  phone: z.string().min(10, "Teléfono a 10 dígitos requerido"),
+  salaryAmount: z.coerce.number().min(0),
+  salaryType: z.enum(["WEEKLY", "BIWEEKLY", "DAILY"]),
+  hireDate: z.string().optional()
 })
-type EmployeeFormInput = z.infer<typeof employeeSchema>
+type EmployeeFormInput = z.input<typeof employeeSchema>
+type EmployeeFormOutput = z.output<typeof employeeSchema>
 
 const employeeEditSchema = z.object({
   fullName: z.string().min(3),
   pin: z.string().optional().refine((value) => !value || value.length === 6, "PIN a 6 dígitos"),
   position: z.string().min(2),
-  phone: z.string().min(10, "Teléfono a 10 dígitos requerido")
+  phone: z.string().min(10, "Teléfono a 10 dígitos requerido"),
+  salaryAmount: z.coerce.number().min(0),
+  salaryType: z.enum(["WEEKLY", "BIWEEKLY", "DAILY"]),
+  hireDate: z.string().optional()
 })
-type EmployeeEditFormInput = z.infer<typeof employeeEditSchema>
+type EmployeeEditFormInput = z.input<typeof employeeEditSchema>
+type EmployeeEditFormOutput = z.output<typeof employeeEditSchema>
 
 const ruleSchema = z.object({
   kind: z.string().optional(),
@@ -136,7 +159,7 @@ const configSchema = z.object({
 type ConfigFormInput = z.input<typeof configSchema>
 type ConfigFormOutput = z.output<typeof configSchema>
 
-type View = "dashboard" | "empleados" | "pendientes" | "adminMovements" | "historial" | "configuracion"
+type View = "dashboard" | "empleados" | "pendientes" | "adminMovements" | "historial" | "nomina" | "configuracion"
 type PortalRoute = "home" | "admin" | "employee"
 
 const employeeRequestKinds: MovementKind[] = ["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]
@@ -356,6 +379,7 @@ function Shell({
     { id: "pendientes" as const, label: "Aprobaciones", icon: ShieldCheck },
     { id: "adminMovements" as const, label: "Movimientos", icon: Building2 },
     { id: "historial" as const, label: "Historial", icon: ClipboardList },
+    { id: "nomina" as const, label: "Nómina", icon: WalletCards },
     { id: "configuracion" as const, label: "Configuración", icon: Settings }
   ]
 
@@ -405,6 +429,7 @@ function Shell({
             {activeView === "pendientes" && <PendingAuthorizations currentRole={me.data?.role} />}
             {activeView === "adminMovements" && <AdministrativeMovements user={me.data} />}
             {activeView === "historial" && <History />}
+            {activeView === "nomina" && <PayrollAdmin />}
             {activeView === "configuracion" && <Configuration />}
           </div>
         </section>
@@ -843,6 +868,38 @@ function movementEventLabel(movement: Movement) {
   return "Solicitud creada"
 }
 
+function defaultPeriodStart() {
+  const now = new Date()
+  const day = now.getDay()
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  now.setDate(now.getDate() + mondayOffset)
+  return toDateInput(now)
+}
+
+function defaultPeriodEnd() {
+  const start = new Date(`${defaultPeriodStart()}T00:00:00`)
+  start.setDate(start.getDate() + 6)
+  return toDateInput(start)
+}
+
+function toDateInput(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function formatDateTime(value?: string | Date | null) {
+  if (!value) return "Sin fecha"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleString("es-MX")
+}
+
+function formatPayrollPeriod(payroll: Pick<Payroll, "periodStart" | "periodEnd">) {
+  return `${formatDateLabel(String(payroll.periodStart).slice(0, 10))} a ${formatDateLabel(String(payroll.periodEnd).slice(0, 10))}`
+}
+
 function History() {
   const [employeeId, setEmployeeId] = useState("")
   const [from, setFrom] = useState("")
@@ -898,6 +955,262 @@ function History() {
           </Select>
         </div>
         <MovementTable movements={movements.data ?? []} />
+      </CardContent>
+    </Card>
+  )
+}
+
+function PayrollAdmin() {
+  const queryClient = useQueryClient()
+  const [periodStart, setPeriodStart] = useState(() => defaultPeriodStart())
+  const [periodEnd, setPeriodEnd] = useState(() => defaultPeriodEnd())
+  const [selectedItem, setSelectedItem] = useState<PayrollItem | null>(null)
+  const [selectedPayrollId, setSelectedPayrollId] = useState("")
+  const [cancelReason, setCancelReason] = useState("")
+  const payrolls = useQuery({ queryKey: ["payrolls"], queryFn: api.payrolls })
+  const payrollDetail = useQuery({
+    queryKey: ["payroll", selectedPayrollId],
+    queryFn: () => api.payroll(selectedPayrollId),
+    enabled: Boolean(selectedPayrollId)
+  })
+  const preview = useMutation({
+    mutationFn: () => api.payrollPreview(periodStart, periodEnd),
+    onSuccess: () => setSelectedItem(null)
+  })
+  const generate = useMutation({
+    mutationFn: () => api.generatePayroll({ period_start: periodStart, period_end: periodEnd }),
+    onSuccess: async (payroll) => {
+      setSelectedPayrollId(payroll.id)
+      await queryClient.invalidateQueries({ queryKey: ["payrolls"] })
+      await queryClient.invalidateQueries({ queryKey: ["movements"] })
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+    }
+  })
+  const markPaid = useMutation({
+    mutationFn: (id: string) => api.markPayrollPaid(id),
+    onSuccess: async (payroll) => {
+      setSelectedPayrollId(payroll.id)
+      await queryClient.invalidateQueries({ queryKey: ["payrolls"] })
+      await queryClient.invalidateQueries({ queryKey: ["payroll", payroll.id] })
+    }
+  })
+  const cancel = useMutation({
+    mutationFn: (id: string) => api.cancelPayroll(id, cancelReason),
+    onSuccess: async (payroll) => {
+      setCancelReason("")
+      setSelectedPayrollId(payroll.id)
+      await queryClient.invalidateQueries({ queryKey: ["payrolls"] })
+      await queryClient.invalidateQueries({ queryKey: ["payroll", payroll.id] })
+    }
+  })
+
+  const detail = payrollDetail.data
+  const canGenerate = Boolean(preview.data?.items.length && !generate.isPending)
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <WalletCards className="h-4 w-4" />
+              Nómina
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Cálculo operativo interno con backend como única fuente de verdad.</p>
+          </div>
+          <Button onClick={() => preview.mutate()} disabled={preview.isPending}>
+            Nueva nómina
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-[160px_160px_auto_1fr]">
+            <Input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} />
+            <Input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} />
+            <Button type="button" variant="secondary" onClick={() => preview.mutate()} disabled={preview.isPending}>
+              Previsualizar
+            </Button>
+            <Button className="md:justify-self-end" type="button" disabled={!canGenerate} onClick={() => generate.mutate()}>
+              Generar nómina
+            </Button>
+          </div>
+          {preview.error && <StatusText text={preview.error.message} />}
+          {generate.error && <StatusText text={generate.error.message} />}
+          {preview.data && (
+            <>
+              <PayrollTotals
+                totalGross={preview.data.totals.totalGross}
+                totalDeductions={preview.data.totals.totalDeductions}
+                totalAdjustments={preview.data.totals.totalAdjustments}
+                totalNet={preview.data.totals.totalNet}
+              />
+              <PayrollItemsTable items={preview.data.items} onSelect={setSelectedItem} />
+            </>
+          )}
+          {!preview.data && <StatusText text="Selecciona un periodo y previsualiza para calcular la nómina desde el backend." />}
+        </CardContent>
+      </Card>
+
+      {selectedItem && (
+        <PayrollItemDetail title={`Detalle · ${selectedItem.employeeName}`} item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Historial de nóminas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!payrolls.data?.length && <StatusText text="Sin nóminas generadas." />}
+          <div className="space-y-2">
+            {payrolls.data?.map((payroll) => (
+              <div key={payroll.id} className="grid gap-3 rounded-md border bg-background/45 p-3 text-sm lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-center">
+                <div className="min-w-0">
+                  <div className="font-medium">{formatPayrollPeriod(payroll)}</div>
+                  <div className="text-xs text-muted-foreground">Generada: {formatDateTime(payroll.generatedAt)}</div>
+                </div>
+                <Badge>{payrollStatusLabels[payroll.status]}</Badge>
+                <div className="font-mono font-semibold">{money.format(payroll.totalNet)}</div>
+                <Button size="sm" variant="secondary" onClick={() => setSelectedPayrollId(payroll.id)}>
+                  Ver detalle
+                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" disabled={payroll.status !== "GENERADA" || markPaid.isPending} onClick={() => markPaid.mutate(payroll.id)}>
+                    Marcar pagada
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {detail && (
+        <Card>
+          <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle>Detalle de nómina</CardTitle>
+              <p className="text-sm text-muted-foreground">{formatPayrollPeriod(detail)} · {payrollStatusLabels[detail.status]}</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedPayrollId("")}>Cerrar</Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <PayrollTotals
+              totalGross={detail.totalGross}
+              totalDeductions={detail.totalDeductions}
+              totalAdjustments={detail.totalAdjustments}
+              totalNet={detail.totalNet}
+            />
+            <PayrollItemsTable items={detail.items ?? []} onSelect={setSelectedItem} />
+            {detail.status === "GENERADA" && (
+              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                <Input placeholder="Motivo de cancelación" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} />
+                <Button variant="destructive" disabled={!cancelReason.trim() || cancel.isPending} onClick={() => cancel.mutate(detail.id)}>
+                  Cancelar nómina
+                </Button>
+              </div>
+            )}
+            {cancel.error && <StatusText text={cancel.error.message} />}
+            {markPaid.error && <StatusText text={markPaid.error.message} />}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function PayrollTotals({
+  totalGross,
+  totalDeductions,
+  totalAdjustments,
+  totalNet
+}: {
+  totalGross: number
+  totalDeductions: number
+  totalAdjustments: number
+  totalNet: number
+}) {
+  return (
+    <div className="grid metric-grid gap-3">
+      <Metric label="Total sueldos" value={money.format(totalGross)} />
+      <Metric label="Total deducciones" value={money.format(totalDeductions)} tone="primary" />
+      <Metric label="Total ajustes" value={money.format(totalAdjustments)} tone="accent" />
+      <Metric label="Total neto a pagar" value={money.format(totalNet)} tone="strong" />
+    </div>
+  )
+}
+
+function PayrollItemsTable({ items, onSelect }: { items: PayrollItem[]; onSelect: (item: PayrollItem) => void }) {
+  if (!items.length) return <StatusText text="No hay empleados activos para este periodo." />
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[860px] text-left text-sm">
+        <thead className="text-xs text-muted-foreground">
+          <tr className="border-b">
+            <th className="py-2 pr-3">Empleado</th>
+            <th className="py-2 pr-3">Sueldo base</th>
+            <th className="py-2 pr-3">Adelantos</th>
+            <th className="py-2 pr-3">Consumos</th>
+            <th className="py-2 pr-3">Cargos</th>
+            <th className="py-2 pr-3">Ajustes</th>
+            <th className="py-2 pr-3">Neto a pagar</th>
+            <th className="py-2 pr-3">Detalle</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.employeeId} className="border-b last:border-0">
+              <td className="py-2 pr-3">
+                <div className="font-medium">{item.employeeName}</div>
+                <div className="text-xs text-muted-foreground">{item.position}</div>
+              </td>
+              <td className="py-2 pr-3 font-mono">{money.format(item.baseSalary)}</td>
+              <td className="py-2 pr-3 font-mono">{money.format(item.totalAdvances)}</td>
+              <td className="py-2 pr-3 font-mono">{money.format(item.totalInternalConsumption)}</td>
+              <td className="py-2 pr-3 font-mono">{money.format(item.totalAdminCharges + item.totalPenalties)}</td>
+              <td className="py-2 pr-3 font-mono">{money.format(item.totalPositiveAdjustments - item.totalNegativeAdjustments)}</td>
+              <td className="py-2 pr-3 font-mono font-semibold">{money.format(item.netPay)}</td>
+              <td className="py-2 pr-3">
+                <Button size="sm" variant="secondary" onClick={() => onSelect(item)}>
+                  Ver detalle
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function PayrollItemDetail({ title, item, onClose }: { title: string; item: PayrollItem; onClose: () => void }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <div>
+          <CardTitle>{title}</CardTitle>
+          <p className="text-sm text-muted-foreground">{item.movements.length} movimiento(s) incluidos.</p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onClose}>Cerrar</Button>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-4">
+          <DetailLine label="Sueldo base" value={money.format(item.baseSalary)} />
+          <DetailLine label="Deducciones" value={money.format(item.totalDeductions)} />
+          <DetailLine label="Ajustes positivos" value={money.format(item.totalPositiveAdjustments)} />
+          <DetailLine label="Neto" value={money.format(item.netPay)} />
+        </div>
+        <div className="space-y-2">
+          {item.movements.map((movement) => (
+            <div key={movement.id} className="grid gap-2 rounded-md border bg-background/45 p-3 text-sm md:grid-cols-[130px_1fr_auto]">
+              <div className="font-mono text-xs text-muted-foreground">{movement.folio}</div>
+              <div>
+                <div className="font-medium">{movementLabels[movement.kind]}</div>
+                <div className="text-xs text-muted-foreground">{movement.reason}</div>
+              </div>
+              <div className="font-mono font-semibold">{money.format(movement.amount)}</div>
+            </div>
+          ))}
+          {!item.movements.length && <StatusText text="Sin movimientos incluidos para este empleado." />}
+        </div>
       </CardContent>
     </Card>
   )
@@ -986,13 +1299,16 @@ function Employees({ user }: { user?: User }) {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
   const employees = useQuery({ queryKey: ["employees", "admin-all"], queryFn: () => api.employees(undefined, true) })
   const selectedEmployee = employees.data?.find((employee) => employee.id === selectedEmployeeId)
-  const form = useForm<EmployeeFormInput>({ resolver: zodResolver(employeeSchema) })
-  const editForm = useForm<EmployeeEditFormInput>({
+  const form = useForm<EmployeeFormInput, unknown, EmployeeFormOutput>({
+    resolver: zodResolver(employeeSchema),
+    defaultValues: { salaryAmount: 0, salaryType: "WEEKLY", hireDate: "" }
+  })
+  const editForm = useForm<EmployeeEditFormInput, unknown, EmployeeEditFormOutput>({
     resolver: zodResolver(employeeEditSchema),
-    defaultValues: { fullName: "", position: "", phone: "", pin: "" }
+    defaultValues: { fullName: "", position: "", phone: "", pin: "", salaryAmount: 0, salaryType: "WEEKLY", hireDate: "" }
   })
   const create = useMutation({
-    mutationFn: (payload: EmployeeFormInput) =>
+    mutationFn: (payload: EmployeeFormOutput) =>
       api.createEmployee({ ...payload, branchId: user?.branch?.id }),
     onSuccess: async () => {
       form.reset()
@@ -1000,7 +1316,7 @@ function Employees({ user }: { user?: User }) {
     }
   })
   const update = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: EmployeeEditFormInput }) =>
+    mutationFn: ({ id, payload }: { id: string; payload: EmployeeEditFormOutput }) =>
       api.updateEmployee(id, { ...payload, pin: payload.pin || undefined }),
     onSuccess: async (employee) => {
       setSelectedEmployeeId(employee.id)
@@ -1021,7 +1337,10 @@ function Employees({ user }: { user?: User }) {
       fullName: selectedEmployee.fullName,
       position: selectedEmployee.position,
       phone: selectedEmployee.phone,
-      pin: ""
+      pin: "",
+      salaryAmount: Number(selectedEmployee.salaryAmount ?? 0),
+      salaryType: selectedEmployee.salaryType ?? "WEEKLY",
+      hireDate: selectedEmployee.hireDate ? selectedEmployee.hireDate.slice(0, 10) : ""
     })
   }, [editForm, selectedEmployee])
 
@@ -1041,6 +1360,15 @@ function Employees({ user }: { user?: User }) {
             <Input placeholder="Puesto" {...form.register("position")} />
             <Input placeholder="Telefono" {...form.register("phone")} />
             <Input type="password" placeholder="PIN" {...form.register("pin")} />
+            <div className="grid grid-cols-2 gap-3">
+              <Input type="number" step="0.01" placeholder="Sueldo base" {...form.register("salaryAmount")} />
+              <Select {...form.register("salaryType")}>
+                {Object.entries(salaryTypeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </Select>
+            </div>
+            <Input type="date" {...form.register("hireDate")} />
             <Button className="w-full" disabled={create.isPending || !user?.branch?.id}>
               Crear
             </Button>
@@ -1066,6 +1394,15 @@ function Employees({ user }: { user?: User }) {
               <Input placeholder="Puesto" {...editForm.register("position")} />
               <Input placeholder="Telefono" {...editForm.register("phone")} />
               <Input type="password" placeholder="Nuevo PIN opcional" {...editForm.register("pin")} />
+              <div className="grid grid-cols-2 gap-3">
+                <Input type="number" step="0.01" placeholder="Sueldo base" {...editForm.register("salaryAmount")} />
+                <Select {...editForm.register("salaryType")}>
+                  {Object.entries(salaryTypeLabels).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </Select>
+              </div>
+              <Input type="date" {...editForm.register("hireDate")} />
               <div className="grid grid-cols-2 gap-2">
                 <Button className="w-full" disabled={update.isPending}>
                   Guardar
@@ -1110,7 +1447,9 @@ function Employees({ user }: { user?: User }) {
                   </Badge>
                 </div>
                 <div className="text-sm text-muted-foreground">{employee.phone} · {employee.position}</div>
-                <div className="mt-2 text-xs text-muted-foreground">{employee.branch.name}</div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {employee.branch.name} · {salaryTypeLabels[employee.salaryType ?? "WEEKLY"]} · {money.format(Number(employee.salaryAmount ?? 0))}
+                </div>
               </button>
             ))}
           </div>

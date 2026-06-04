@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common"
-import { IsBoolean, IsOptional, IsString, Length } from "class-validator"
-import { Role } from "@prisma/client"
+import { Type } from "class-transformer"
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Length, Min } from "class-validator"
+import { Role, SalaryType } from "@prisma/client"
 import { Roles } from "../auth/roles.decorator"
 import type { RequestWithUser } from "../auth/auth.types"
 import { EmployeesService } from "./employees.service"
@@ -21,6 +22,20 @@ class EmployeeDto {
 
   @IsString()
   phone!: string
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  salaryAmount?: number
+
+  @IsOptional()
+  @IsEnum(SalaryType)
+  salaryType?: SalaryType
+
+  @IsOptional()
+  @IsString()
+  hireDate?: string
 }
 
 class UpdateEmployeeDto {
@@ -48,6 +63,20 @@ class UpdateEmployeeDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  salaryAmount?: number
+
+  @IsOptional()
+  @IsEnum(SalaryType)
+  salaryType?: SalaryType
+
+  @IsOptional()
+  @IsString()
+  hireDate?: string
 }
 
 @Controller("employees")

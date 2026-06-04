@@ -45,6 +45,19 @@ enum MovementStatus {
   PARTIALLY_DISCOUNTED
 }
 
+enum SalaryType {
+  WEEKLY
+  BIWEEKLY
+  DAILY
+}
+
+enum PayrollStatus {
+  BORRADOR
+  GENERADA
+  PAGADA
+  CANCELADA
+}
+
 enum AuditAction {
   CREATE
   UPDATE
@@ -79,6 +92,7 @@ model User {
   employee      Employee?  @relation(fields: [employeeId], references: [id])
   registered    Movement[] @relation("RegisteredBy")
   authorized    Movement[] @relation("AuthorizedBy")
+  generatedPayrolls Payroll[]
   auditLogs     AuditLog[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -91,10 +105,14 @@ model Employee {
   position     String
   phone        String     @unique
   active       Boolean    @default(true)
+  salaryAmount Decimal    @default(0.00) @db.Decimal(12, 2)
+  salaryType   SalaryType @default(WEEKLY)
+  hireDate     DateTime?
   branchId     String
   branch       Branch     @relation(fields: [branchId], references: [id])
   user         User?
   movements    Movement[]
+  payrollItems PayrollItem[]
   auditLogs    AuditLog[]  @relation("AffectedEmployee")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -124,6 +142,7 @@ model Movement {
   branch          Branch         @relation(fields: [branchId], references: [id])
   registeredBy    User?          @relation("RegisteredBy", fields: [registeredById], references: [id])
   authorizedBy    User?          @relation("AuthorizedBy", fields: [authorizedById], references: [id])
+  payrollLinks    PayrollItemMovement[]
   authorizedAt    DateTime?
   canceledAt      DateTime?
   createdAt       DateTime       @default(now())
@@ -133,6 +152,65 @@ model Movement {
   @@index([employeeId, origin])
   @@index([branchId, createdAt])
   @@index([kind, status])
+}
+
+model Payroll {
+  id                 String                @id @default(cuid())
+  periodStart        DateTime
+  periodEnd          DateTime
+  periodKey          String                @unique
+  status             PayrollStatus         @default(GENERADA)
+  totalGross         Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalDeductions    Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalAdjustments   Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalNet           Decimal               @default(0.00) @db.Decimal(12, 2)
+  generatedByAdminId String
+  generatedByAdmin   User                  @relation(fields: [generatedByAdminId], references: [id])
+  generatedAt        DateTime              @default(now())
+  paidAt             DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  items              PayrollItem[]
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([periodStart, periodEnd])
+  @@index([status])
+}
+
+model PayrollItem {
+  id                       String                @id @default(cuid())
+  payrollId                String
+  employeeId               String
+  baseSalary               Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalAdvances            Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalInternalConsumption Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalAdminCharges        Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalPenalties           Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalPositiveAdjustments Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalNegativeAdjustments Decimal               @default(0.00) @db.Decimal(12, 2)
+  totalDeductions          Decimal               @default(0.00) @db.Decimal(12, 2)
+  netPay                   Decimal               @default(0.00) @db.Decimal(12, 2)
+  payroll                  Payroll               @relation(fields: [payrollId], references: [id])
+  employee                 Employee              @relation(fields: [employeeId], references: [id])
+  movements                PayrollItemMovement[]
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+
+  @@unique([payrollId, employeeId])
+  @@index([employeeId])
+}
+
+model PayrollItemMovement {
+  id            String      @id @default(cuid())
+  payrollItemId String
+  movementId    String
+  payrollItem   PayrollItem @relation(fields: [payrollItemId], references: [id])
+  movement      Movement    @relation(fields: [movementId], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@unique([movementId])
+  @@index([payrollItemId])
 }
 
 model AuthorizationRule {

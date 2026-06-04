@@ -1,4 +1,4 @@
-import type { AppConfig, AuditLog, DashboardSummary, Employee, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Role, User } from "@/types/domain"
+import type { AppConfig, AuditLog, DashboardSummary, Employee, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -111,6 +111,25 @@ export const api = {
   },
   createAdministrativeMovement(payload: Record<string, unknown>) {
     return request<Movement>("/movements/administrative", { method: "POST", body: JSON.stringify(payload) })
+  },
+  payrollPreview(start: string, end: string) {
+    const query = new URLSearchParams({ start, end }).toString()
+    return request<PayrollPreview>(`/admin/payroll/preview?${query}`)
+  },
+  generatePayroll(payload: { period_start: string; period_end: string }) {
+    return request<Payroll>("/admin/payroll/generate", { method: "POST", body: JSON.stringify(payload) })
+  },
+  payrolls() {
+    return request<Payroll[]>("/admin/payroll")
+  },
+  payroll(id: string) {
+    return request<Payroll>(`/admin/payroll/${id}`)
+  },
+  markPayrollPaid(id: string) {
+    return request<Payroll>(`/admin/payroll/${id}/mark-paid`, { method: "POST" })
+  },
+  cancelPayroll(id: string, reason: string) {
+    return request<Payroll>(`/admin/payroll/${id}/cancel`, { method: "POST", body: JSON.stringify({ reason }) })
   },
   movementSettlementSummary(params: { employeeId: string; from?: string; to?: string }) {
     const query = new URLSearchParams(

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
-import { AuditAction, MovementStatus, Prisma } from "@prisma/client"
+import { AuditAction, MovementStatus, Prisma, SalaryType } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { PrismaService } from "../prisma/prisma.service"
 import { AuditService } from "../audit/audit.service"
@@ -11,6 +11,9 @@ type EmployeeWrite = {
   branchId?: string
   phone?: string
   active?: boolean
+  salaryAmount?: number
+  salaryType?: SalaryType
+  hireDate?: string
 }
 
 const balanceStatuses: MovementStatus[] = [
@@ -60,14 +63,21 @@ export class EmployeesService {
     return employee
   }
 
-  async create(dto: Required<Pick<EmployeeWrite, "fullName" | "pin" | "position" | "branchId" | "phone">>, userId: string, ipAddress?: string) {
+  async create(
+    dto: Required<Pick<EmployeeWrite, "fullName" | "pin" | "position" | "branchId" | "phone">> & EmployeeWrite,
+    userId: string,
+    ipAddress?: string
+  ) {
     const employee = await this.prisma.employee.create({
       data: {
         fullName: dto.fullName,
         pinHash: await bcrypt.hash(dto.pin, 12),
         position: dto.position,
         branchId: dto.branchId,
-        phone: dto.phone
+        phone: dto.phone,
+        salaryAmount: dto.salaryAmount ?? 0,
+        salaryType: dto.salaryType ?? SalaryType.WEEKLY,
+        hireDate: dto.hireDate ? this.parseDate(dto.hireDate) : undefined
       }
     })
     await this.audit.log({
@@ -90,6 +100,9 @@ export class EmployeesService {
       position: dto.position,
       phone: dto.phone,
       active: dto.active,
+      salaryAmount: typeof dto.salaryAmount === "number" ? dto.salaryAmount : undefined,
+      salaryType: dto.salaryType,
+      hireDate: dto.hireDate ? this.parseDate(dto.hireDate) : undefined,
       branch: dto.branchId ? { connect: { id: dto.branchId } } : undefined
     }
     if (dto.pin) data.pinHash = await bcrypt.hash(dto.pin, 12)
@@ -154,5 +167,10 @@ export class EmployeesService {
     const { pinHash, ...safe } = employee
     void pinHash
     return safe as Prisma.InputJsonObject
+  }
+
+  private parseDate(value: string) {
+    const date = new Date(`${value}T00:00:00`)
+    return Number.isNaN(date.getTime()) ? undefined : date
   }
 }
