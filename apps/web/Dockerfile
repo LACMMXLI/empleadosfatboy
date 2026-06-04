@@ -7,7 +7,7 @@ ENV VITE_API_URL=$VITE_API_URL
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
-RUN npm ci
+RUN npm ci --include=dev
 
 COPY apps/web apps/web
 RUN npm run build --workspace apps/web
