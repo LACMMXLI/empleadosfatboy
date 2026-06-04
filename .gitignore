@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.local
+coverage
+*.log
+apps/api/prisma/dev.db
+apps/web/dist
+.playwright-mcp
+output

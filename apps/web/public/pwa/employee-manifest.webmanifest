@@ -1,0 +1,43 @@
+{
+  "id": "/employee",
+  "name": "Fatboy Empleado",
+  "short_name": "Fatboy",
+  "description": "Portal del empleado Fatboy para consultar saldo, historial y solicitudes.",
+  "lang": "es-MX",
+  "start_url": "/employee",
+  "scope": "/employee",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#080a0f",
+  "theme_color": "#f97316",
+  "categories": ["business", "productivity", "food"],
+  "icons": [
+    {
+      "src": "/pwa/employee-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa/employee-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Solicitar",
+      "short_name": "Solicitar",
+      "description": "Abrir el portal del empleado para crear una solicitud.",
+      "url": "/employee"
+    },
+    {
+      "name": "Historial",
+      "short_name": "Historial",
+      "description": "Abrir el portal del empleado para revisar movimientos.",
+      "url": "/employee"
+    }
+  ]
+}

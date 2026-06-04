@@ -1,0 +1,250 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 223 39% 7%;
+    --foreground: 220 14% 96%;
+    --card: 225 28% 14%;
+    --card-foreground: 220 14% 96%;
+    --popover: 225 28% 14%;
+    --popover-foreground: 220 14% 96%;
+    --primary: 243 75% 67%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 225 20% 20%;
+    --secondary-foreground: 220 14% 96%;
+    --muted: 225 20% 20%;
+    --muted-foreground: 215 14% 65%;
+    --accent: 271 91% 65%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 225 20% 20%;
+    --input: 225 20% 20%;
+    --ring: 243 75% 67%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+}
+
+@layer components {
+  .login-scene {
+    position: relative;
+    min-height: 100vh;
+    overflow: hidden;
+    background:
+      linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(239, 68, 68, 0.12) 24%, transparent 44%),
+      linear-gradient(315deg, rgba(14, 165, 233, 0.2) 0%, rgba(34, 197, 94, 0.1) 24%, transparent 45%),
+      linear-gradient(180deg, #15110d 0%, #090b12 52%, #07080d 100%);
+    isolation: isolate;
+  }
+
+  .login-scene::before {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    z-index: 0;
+    background:
+      linear-gradient(105deg, transparent 0 24%, rgba(255, 210, 92, 0.16) 25%, transparent 36%),
+      linear-gradient(120deg, transparent 0 54%, rgba(239, 68, 68, 0.14) 55%, transparent 66%);
+    filter: blur(8px);
+    opacity: 0.9;
+    transform: translate3d(-3%, 0, 0);
+    animation: login-light-sweep 9s ease-in-out infinite alternate;
+  }
+
+  .login-scene::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 28%),
+      radial-gradient(ellipse at top, rgba(255, 255, 255, 0.08), transparent 52%);
+    pointer-events: none;
+  }
+
+  .login-scene-admin {
+    background:
+      linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(239, 68, 68, 0.1) 30%, transparent 48%),
+      linear-gradient(315deg, rgba(250, 204, 21, 0.16) 0%, rgba(249, 115, 22, 0.1) 28%, transparent 46%),
+      linear-gradient(180deg, #16130f 0%, #0b1020 54%, #07080d 100%);
+  }
+
+  .login-grid {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(to bottom, transparent, black 18%, black 72%, transparent);
+    opacity: 0.28;
+  }
+
+  .login-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    border-color: rgba(255, 255, 255, 0.14);
+    background:
+      linear-gradient(180deg, rgba(35, 28, 29, 0.94), rgba(13, 19, 26, 0.96)),
+      rgba(15, 20, 30, 0.96);
+    box-shadow:
+      0 26px 70px rgba(0, 0, 0, 0.45),
+      0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+      0 0 55px rgba(249, 115, 22, 0.14);
+    backdrop-filter: blur(18px);
+    animation: login-card-enter 520ms ease-out both;
+  }
+
+  .login-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 0 18%, rgba(255, 255, 255, 0.11) 28%, transparent 42%);
+    z-index: 0;
+    opacity: 0.32;
+    pointer-events: none;
+  }
+
+  .login-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .login-logo::before {
+    content: "";
+    position: absolute;
+    inset: 22% 8% 8%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.45), rgba(250, 204, 21, 0.38), rgba(14, 165, 233, 0.35));
+    filter: blur(22px);
+    opacity: 0.85;
+    animation: login-logo-glow 2.8s ease-in-out infinite alternate;
+  }
+
+  .login-logo img {
+    animation: login-logo-float 3.8s ease-in-out infinite;
+  }
+
+  .login-input {
+    border-radius: 1rem;
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(5, 9, 16, 0.74);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      transform 160ms ease;
+  }
+
+  .login-input:focus-visible {
+    border-color: rgba(250, 204, 21, 0.62);
+    box-shadow:
+      0 0 0 1px rgba(250, 204, 21, 0.28),
+      0 0 28px rgba(249, 115, 22, 0.2);
+    transform: translateY(-1px);
+  }
+
+  .login-primary {
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #ef4444, #f97316 44%, #facc15);
+    color: #120d08;
+    font-weight: 800;
+    box-shadow:
+      0 18px 38px rgba(249, 115, 22, 0.34),
+      0 1px 0 rgba(255, 255, 255, 0.35) inset;
+    transition:
+      filter 160ms ease,
+      box-shadow 160ms ease,
+      transform 160ms ease;
+  }
+
+  .login-primary:hover {
+    filter: saturate(1.12) brightness(1.04);
+    box-shadow:
+      0 20px 42px rgba(249, 115, 22, 0.36),
+      0 1px 0 rgba(255, 255, 255, 0.45) inset;
+    transform: translateY(-1px);
+  }
+
+  .login-primary:active {
+    transform: translateY(0);
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .mobile-page {
+    padding-bottom: calc(6.25rem + env(safe-area-inset-bottom));
+  }
+
+  @screen lg {
+    .mobile-page {
+      padding-bottom: 1rem;
+    }
+  }
+}
+
+@keyframes login-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes login-light-sweep {
+  from {
+    transform: translate3d(-4%, -1%, 0) rotate(-1deg);
+  }
+  to {
+    transform: translate3d(4%, 1%, 0) rotate(1deg);
+  }
+}
+
+@keyframes login-logo-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes login-logo-glow {
+  from {
+    opacity: 0.58;
+    transform: scaleX(0.92);
+  }
+  to {
+    opacity: 0.95;
+    transform: scaleX(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-scene::before,
+  .login-card,
+  .login-logo::before,
+  .login-logo img {
+    animation: none;
+  }
+}

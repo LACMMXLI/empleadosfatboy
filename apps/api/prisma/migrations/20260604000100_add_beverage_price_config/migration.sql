@@ -1,0 +1,2 @@
+ALTER TABLE "SystemConfig"
+ADD COLUMN "beveragePrice" DECIMAL(12, 2) NOT NULL DEFAULT 30.00;
