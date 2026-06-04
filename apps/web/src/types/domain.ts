@@ -98,3 +98,12 @@ export type AppConfig = {
   beveragePrice: string | number
   receiptLegalText: string
 }
+
+export type MovementSettlementSummary = {
+  employeeId: string
+  from?: string
+  to?: string
+  count: number
+  total: number
+  byKind?: Array<{ kind: MovementKind; count: number; amount: number }>
+}

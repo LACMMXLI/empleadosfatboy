@@ -102,6 +102,32 @@ class ListMovementQuery {
   q?: string
 }
 
+class SettlementQuery {
+  @IsString()
+  employeeId!: string
+
+  @IsOptional()
+  @IsString()
+  from?: string
+
+  @IsOptional()
+  @IsString()
+  to?: string
+}
+
+class SettleMovementsDto {
+  @IsString()
+  employeeId!: string
+
+  @IsOptional()
+  @IsString()
+  from?: string
+
+  @IsOptional()
+  @IsString()
+  to?: string
+}
+
 @Controller("movements")
 export class MovementsController {
   constructor(private readonly movements: MovementsService) {}
@@ -109,6 +135,18 @@ export class MovementsController {
   @Get()
   list(@Query() query: ListMovementQuery, @Req() request: RequestWithUser) {
     return this.movements.list(query, request.user)
+  }
+
+  @Roles(Role.GERENTE)
+  @Get("settlement-summary")
+  settlementSummary(@Query() query: SettlementQuery, @Req() request: RequestWithUser) {
+    return this.movements.settlementSummary(query, request.user)
+  }
+
+  @Roles(Role.GERENTE)
+  @Patch("settlements")
+  settleEmployeeRange(@Body() dto: SettleMovementsDto, @Req() request: RequestWithUser) {
+    return this.movements.settleEmployeeRange(dto, request.user, request.ip)
   }
 
   @Get(":id")

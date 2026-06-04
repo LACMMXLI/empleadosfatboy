@@ -1,0 +1,58 @@
+- main [ref=e19]:
+  - generic [ref=e20]:
+    - complementary [ref=e21]:
+      - generic [ref=e22]:
+        - generic [ref=e23]: Fatboy POS
+        - generic [ref=e24]: Control empleados
+      - navigation [ref=e25]:
+        - button "Dashboard" [ref=e26] [cursor=pointer]:
+          - img [ref=e27]
+          - text: Dashboard
+        - button "Registro" [ref=e32] [cursor=pointer]:
+          - img [ref=e33]
+          - text: Registro
+        - button "Pendientes" [ref=e36] [cursor=pointer]:
+          - img [ref=e37]
+          - text: Pendientes
+        - button "Admin" [ref=e40] [cursor=pointer]:
+          - img [ref=e41]
+          - text: Admin
+        - button "Historial" [ref=e45] [cursor=pointer]:
+          - img [ref=e46]
+          - text: Historial
+        - button "Empleados" [ref=e49] [cursor=pointer]:
+          - img [ref=e50]
+          - text: Empleados
+        - button "Config" [ref=e54] [cursor=pointer]:
+          - img [ref=e55]
+          - text: Config
+    - generic [ref=e58]:
+      - generic [ref=e59]:
+        - generic [ref=e60]:
+          - generic [ref=e61]: Administrador Fatboy
+          - generic [ref=e62]: ADMINISTRADOR
+        - button [ref=e63] [cursor=pointer]:
+          - img [ref=e64]
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: Adelantos hoy
+            - generic [ref=e73]: $0.00
+          - generic [ref=e75]:
+            - generic [ref=e76]: Consumos hoy
+            - generic [ref=e77]: $120.00
+          - generic [ref=e79]:
+            - generic [ref=e80]: Salidas hoy
+            - generic [ref=e81]: $0.00
+          - generic [ref=e83]:
+            - generic [ref=e84]: Por descontar
+            - generic [ref=e85]: $620.00
+          - generic [ref=e87]:
+            - generic [ref=e88]: Pendientes
+            - generic [ref=e89]: "0"
+          - generic [ref=e91]:
+            - generic [ref=e92]: Autorizados
+            - generic [ref=e93]: "5"
+        - generic [ref=e94]:
+          - heading "Adelantos recientes" [level=3] [ref=e96]
+          - application [ref=e100]

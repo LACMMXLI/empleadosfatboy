@@ -1,4 +1,4 @@
-import type { AppConfig, AuditLog, DashboardSummary, Employee, Movement, MovementKind, Role, User } from "@/types/domain"
+import type { AppConfig, AuditLog, DashboardSummary, Employee, Movement, MovementKind, MovementSettlementSummary, Role, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -102,6 +102,18 @@ export const api = {
   },
   createAdministrativeMovement(payload: Record<string, unknown>) {
     return request<Movement>("/movements/administrative", { method: "POST", body: JSON.stringify(payload) })
+  },
+  movementSettlementSummary(params: { employeeId: string; from?: string; to?: string }) {
+    const query = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, value]) => Boolean(value))) as Record<string, string>
+    ).toString()
+    return request<MovementSettlementSummary>(`/movements/settlement-summary?${query}`)
+  },
+  settleMovements(payload: { employeeId: string; from?: string; to?: string }) {
+    return request<MovementSettlementSummary>("/movements/settlements", {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    })
   },
   authorizeMovement(id: string) {
     return request<Movement>(`/movements/${id}/authorize`, { method: "PATCH" })

@@ -99,9 +99,7 @@ const adminMovementSchema = z.object({
     "SHORTAGE_DISCOUNT",
     "DAMAGE_DISCOUNT",
     "CASH_OUT",
-    "BALANCE_CORRECTION",
-    "ADMIN_SALARY_ADVANCE",
-    "ADMIN_LOAN"
+    "BALANCE_CORRECTION"
   ]),
   amount: z.coerce.number().positive("Cantidad invalida"),
   reason: z.string().min(3, "Motivo requerido"),
@@ -162,9 +160,7 @@ const administrativeMovementKinds: MovementKind[] = [
   "SHORTAGE_DISCOUNT",
   "DAMAGE_DISCOUNT",
   "CASH_OUT",
-  "BALANCE_CORRECTION",
-  "ADMIN_SALARY_ADVANCE",
-  "ADMIN_LOAN"
+  "BALANCE_CORRECTION"
 ]
 
 function LoginLogo({ className = "" }: { className?: string }) {
@@ -675,8 +671,23 @@ function GuidedBlock({
 function AdministrativeMovements({ user }: { user?: User }) {
   const queryClient = useQueryClient()
   const [message, setMessage] = useState<string | null>(null)
+  const [settlementMessage, setSettlementMessage] = useState<string | null>(null)
+  const [settlementEmployeeId, setSettlementEmployeeId] = useState("")
+  const [settlementFrom, setSettlementFrom] = useState("")
+  const [settlementTo, setSettlementTo] = useState("")
   const employees = useQuery({ queryKey: ["employees"], queryFn: () => api.employees() })
   const allowed = user?.role === "ADMINISTRADOR" || user?.role === "GERENTE"
+  const selectedSettlementEmployee = employees.data?.find((employee) => employee.id === settlementEmployeeId)
+  const settlementSummary = useQuery({
+    queryKey: ["movement-settlement-summary", settlementEmployeeId, settlementFrom, settlementTo],
+    queryFn: () =>
+      api.movementSettlementSummary({
+        employeeId: settlementEmployeeId,
+        from: settlementFrom || undefined,
+        to: settlementTo || undefined
+      }),
+    enabled: Boolean(settlementEmployeeId)
+  })
   const form = useForm<AdminMovementFormInput, unknown, AdminMovementFormOutput>({
     resolver: zodResolver(adminMovementSchema),
     defaultValues: {
@@ -694,14 +705,37 @@ function AdministrativeMovements({ user }: { user?: User }) {
     },
     onError: (err: Error) => setMessage(err.message)
   })
+  const settle = useMutation({
+    mutationFn: () =>
+      api.settleMovements({
+        employeeId: settlementEmployeeId,
+        from: settlementFrom,
+        to: settlementTo
+      }),
+    onSuccess: async (result) => {
+      setSettlementMessage(`${result.count} movimiento(s) liquidados por ${money.format(result.total)}`)
+      await queryClient.invalidateQueries({ queryKey: ["movements"] })
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      await queryClient.invalidateQueries({ queryKey: ["movement-settlement-summary"] })
+      await queryClient.invalidateQueries({ queryKey: ["employeePortal"] })
+    },
+    onError: (err: Error) => setSettlementMessage(err.message)
+  })
+  const canSettle = Boolean(
+    settlementEmployeeId &&
+      settlementFrom &&
+      settlementTo &&
+      (settlementSummary.data?.count ?? 0) > 0 &&
+      !settle.isPending
+  )
 
   if (!allowed) {
     return <StatusText text="Esta sección solo está disponible para GERENTE o ADMINISTRADOR." />
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[420px_1fr]">
-      <Card>
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+      <Card className="min-w-0">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
@@ -744,14 +778,85 @@ function AdministrativeMovements({ user }: { user?: User }) {
           </form>
         </CardContent>
       </Card>
-      <Card>
+      <Card className="min-w-0">
         <CardHeader>
-          <CardTitle>Qué registra</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" />
+            Liquidar por empleado
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">Marca como pagado un rango ya cubierto para que deje de sumar al saldo pendiente.</p>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <div className="rounded-md border p-3">Origen: <span className="text-foreground">ADMINISTRATIVE_ACTION</span></div>
-          <div className="rounded-md border p-3">Responsable: <span className="text-foreground">{user?.fullName}</span></div>
-          <div className="rounded-md border p-3">Estado inicial: <span className="text-foreground">Pendiente</span></div>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(130px,0.55fr)_minmax(130px,0.55fr)]">
+            <Select
+              className="h-11 min-w-0"
+              value={settlementEmployeeId}
+              onChange={(event) => {
+                setSettlementEmployeeId(event.target.value)
+                setSettlementMessage(null)
+              }}
+            >
+              <option value="">Seleccionar empleado</option>
+              {employees.data?.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.phone} - {employee.fullName}
+                </option>
+              ))}
+            </Select>
+            <Input
+              className="h-11 min-w-0"
+              type="date"
+              value={settlementFrom}
+              onChange={(event) => {
+                setSettlementFrom(event.target.value)
+                setSettlementMessage(null)
+              }}
+            />
+            <Input
+              className="h-11 min-w-0"
+              type="date"
+              value={settlementTo}
+              onChange={(event) => {
+                setSettlementTo(event.target.value)
+                setSettlementMessage(null)
+              }}
+            />
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
+              <div className="text-[11px] uppercase text-muted-foreground">Empleado</div>
+              <div className="mt-1 truncate text-sm font-semibold">{selectedSettlementEmployee?.fullName ?? "Sin seleccionar"}</div>
+            </div>
+            <div className="rounded-md border border-accent/30 bg-accent/10 p-3">
+              <div className="text-[11px] uppercase text-muted-foreground">Total</div>
+              <div className="mt-1 font-mono text-xl font-semibold">{money.format(settlementSummary.data?.total ?? 0)}</div>
+            </div>
+            <div className="rounded-md border p-3">
+              <div className="text-[11px] uppercase text-muted-foreground">Movimientos</div>
+              <div className="mt-1 font-mono text-xl font-semibold">{settlementSummary.data?.count ?? 0}</div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {(settlementSummary.data?.byKind ?? []).map((item) => (
+              <div key={item.kind} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background/45 p-3 text-sm">
+                <span className="min-w-0 truncate">{movementLabels[item.kind]}</span>
+                <span className="font-mono">{item.count} · {money.format(item.amount)}</span>
+              </div>
+            ))}
+            {settlementEmployeeId && !settlementSummary.isLoading && !settlementSummary.data?.count && (
+              <StatusText text="No hay movimientos autorizados por liquidar en este filtro." />
+            )}
+          </div>
+
+          <Button className="h-12 w-full text-base" disabled={!canSettle} onClick={() => settle.mutate()}>
+            Marcar rango como liquidado
+          </Button>
+          {settlementMessage && <div className="rounded-md border p-2 text-sm text-muted-foreground">{settlementMessage}</div>}
+          <div className="rounded-md border p-3 text-sm text-muted-foreground">
+            Responsable: <span className="text-foreground">{user?.fullName}</span>
+          </div>
         </CardContent>
       </Card>
     </div>

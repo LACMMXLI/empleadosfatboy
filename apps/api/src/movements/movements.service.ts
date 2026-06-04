@@ -54,6 +54,12 @@ type MovementFilters = {
   q?: string
 }
 
+type SettlementRangeInput = {
+  employeeId: string
+  from?: string
+  to?: string
+}
+
 const employeeVisibleStatuses = [
   MovementStatus.PENDING,
   MovementStatus.AUTHORIZED,
@@ -82,8 +88,11 @@ const administrativeKinds: MovementKind[] = [
   MovementKind.DAMAGE_DISCOUNT,
   MovementKind.CASH_OUT,
   MovementKind.BALANCE_CORRECTION,
-  MovementKind.ADMIN_SALARY_ADVANCE,
-  MovementKind.ADMIN_LOAN
+]
+
+const settlementStatuses: MovementStatus[] = [
+  MovementStatus.AUTHORIZED,
+  MovementStatus.PARTIALLY_DISCOUNTED
 ]
 
 @Injectable()
@@ -381,6 +390,95 @@ export class MovementsService {
     return this.changeStatus(id, MovementStatus.DISCOUNTED, AuditAction.STATUS_CHANGE, user, ipAddress)
   }
 
+  async settlementSummary(input: SettlementRangeInput, user: AuthUser) {
+    await this.ensureEmployeeVisible(input.employeeId, user)
+    const where = this.buildSettlementWhere(input, user)
+    const [movements, total] = await Promise.all([
+      this.prisma.movement.groupBy({
+        by: ["kind"],
+        where,
+        _count: { _all: true },
+        _sum: { amount: true }
+      }),
+      this.prisma.movement.aggregate({
+        where,
+        _sum: { amount: true },
+        _count: { _all: true }
+      })
+    ])
+
+    return {
+      employeeId: input.employeeId,
+      from: input.from,
+      to: input.to,
+      count: total._count._all,
+      total: Number(total._sum.amount ?? 0),
+      byKind: movements.map((row) => ({
+        kind: row.kind,
+        count: row._count._all,
+        amount: Number(row._sum.amount ?? 0)
+      }))
+    }
+  }
+
+  async settleEmployeeRange(input: SettlementRangeInput, user: AuthUser, ipAddress?: string) {
+    if (!input.from || !input.to) {
+      throw new BadRequestException("Rango de fechas requerido para liquidar")
+    }
+    await this.ensureEmployeeVisible(input.employeeId, user)
+    const where = this.buildSettlementWhere(input, user)
+    const movements = await this.prisma.movement.findMany({
+      where,
+      select: { id: true, folio: true, employeeId: true, amount: true, status: true }
+    })
+
+    if (!movements.length) {
+      return {
+        employeeId: input.employeeId,
+        from: input.from,
+        to: input.to,
+        count: 0,
+        total: 0
+      }
+    }
+
+    const ids = movements.map((movement) => movement.id)
+    const total = movements.reduce((sum, movement) => sum + Number(movement.amount), 0)
+
+    await this.prisma.$transaction([
+      this.prisma.movement.updateMany({
+        where: { id: { in: ids } },
+        data: { status: MovementStatus.DISCOUNTED }
+      }),
+      this.prisma.auditLog.create({
+        data: {
+          userId: user.sub,
+          action: AuditAction.STATUS_CHANGE,
+          entity: "MovementSettlement",
+          entityId: input.employeeId,
+          affectedEmployeeId: input.employeeId,
+          newValue: this.toJson({
+            from: input.from,
+            to: input.to,
+            status: MovementStatus.DISCOUNTED,
+            movementIds: ids,
+            folios: movements.map((movement) => movement.folio),
+            total
+          }),
+          ipAddress
+        }
+      })
+    ])
+
+    return {
+      employeeId: input.employeeId,
+      from: input.from,
+      to: input.to,
+      count: movements.length,
+      total
+    }
+  }
+
   private async changeStatus(
     id: string,
     status: MovementStatus,
@@ -487,6 +585,51 @@ export class MovementsService {
           ]
         : undefined
     }
+  }
+
+  private buildSettlementWhere(input: SettlementRangeInput, user: AuthUser): Prisma.MovementWhereInput {
+    const range = this.dateRange(input.from, input.to)
+    return {
+      ...this.scopeForUser(user),
+      employeeId: input.employeeId,
+      status: { in: settlementStatuses },
+      createdAt: range
+    }
+  }
+
+  private async ensureEmployeeVisible(employeeId: string, user: AuthUser) {
+    const employee = await this.prisma.employee.findFirst({
+      where: {
+        id: employeeId,
+        active: true,
+        ...(user.role === Role.CAJERO || user.role === Role.ENCARGADO
+          ? { branchId: user.branchId ?? "__none__" }
+          : {}),
+        ...(user.role === Role.EMPLEADO ? { id: user.employeeId ?? "__none__" } : {})
+      },
+      select: { id: true }
+    })
+    if (!employee) throw new NotFoundException("Empleado no encontrado o fuera de alcance")
+  }
+
+  private dateRange(from?: string, to?: string): Prisma.DateTimeFilter | undefined {
+    if (!from && !to) return undefined
+    const range: Prisma.DateTimeFilter = {}
+    if (from) range.gte = this.startOfDay(from)
+    if (to) range.lt = this.nextDay(to)
+    return range
+  }
+
+  private startOfDay(value: string) {
+    const date = new Date(value)
+    date.setHours(0, 0, 0, 0)
+    return date
+  }
+
+  private nextDay(value: string) {
+    const date = this.startOfDay(value)
+    date.setDate(date.getDate() + 1)
+    return date
   }
 
   private scopeForUser(user: AuthUser): Prisma.MovementWhereInput {
