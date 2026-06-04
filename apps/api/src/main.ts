@@ -21,8 +21,9 @@ async function bootstrap() {
       legacyHeaders: false
     })
   )
+  const webOrigin = config.get<string>("WEB_ORIGIN")?.trim()
   app.enableCors({
-    origin: config.get<string>("WEB_ORIGIN") ?? true,
+    origin: webOrigin || true,
     credentials: true
   })
   app.useGlobalPipes(
