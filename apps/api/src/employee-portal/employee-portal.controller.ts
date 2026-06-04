@@ -88,6 +88,11 @@ export class EmployeePortalController {
     return this.portal.movements(authorization)
   }
 
+  @Get("settlement-tickets")
+  settlementTickets(@Headers("authorization") authorization?: string) {
+    return this.portal.settlementTickets(authorization)
+  }
+
   @Get("movements/:id")
   movementDetail(@Param("id") id: string, @Headers("authorization") authorization?: string) {
     return this.portal.movementDetail(id, authorization)

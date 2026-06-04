@@ -20,7 +20,7 @@ export class DashboardService {
           ? { employeeId: user.employeeId ?? "__none__" }
           : { branchId: user.branchId ?? undefined }
 
-    const todayWhere = { ...scope, createdAt: { gte: start, lt: end } }
+    const todayWhere = { ...scope, status: { not: MovementStatus.DISCOUNTED }, createdAt: { gte: start, lt: end } }
     const [todayByKind, pending, authorized, debt, weekly] = await Promise.all([
       this.prisma.movement.groupBy({
         by: ["kind"],
@@ -40,6 +40,7 @@ export class DashboardService {
         where: {
           ...scope,
           kind: MovementKind.SALARY_ADVANCE,
+          status: { not: MovementStatus.DISCOUNTED },
           createdAt: { gte: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000) }
         },
         select: { createdAt: true, amount: true, employee: { select: { fullName: true } } },

@@ -1,0 +1,12 @@
+- main [ref=e3]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - img "Fatboy" [ref=e9]
+      - generic [ref=e10]:
+        - heading "Empleado" [level=3] [ref=e11]
+        - paragraph [ref=e12]: Acceso con teléfono y código privado
+    - generic [ref=e14]:
+      - textbox "Teléfono" [ref=e15]
+      - textbox "Código de 6 dígitos" [ref=e16]
+      - button "Entrar" [ref=e17] [cursor=pointer]
+      - button "Volver" [ref=e18] [cursor=pointer]

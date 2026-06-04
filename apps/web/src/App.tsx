@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import type { DashboardSummary, Employee, Movement, MovementKind, MovementStatus, Role, User } from "@/types/domain"
+import type { DashboardSummary, Employee, Movement, MovementKind, MovementSettlementTicket, MovementStatus, Role, User } from "@/types/domain"
 import { syncEmployeePwa } from "@/pwa/employeePwa"
 import fatboyLogo from "@/assets/logo.png"
 
@@ -718,7 +718,7 @@ function AdministrativeMovements({ user }: { user?: User }) {
         to: settlementTo
       }),
     onSuccess: async (result) => {
-      setSettlementMessage(`${result.count} movimiento(s) liquidados por ${money.format(result.total)}`)
+      setSettlementMessage(`${result.ticketNumber ?? "Ticket"} · ${result.count} movimiento(s) liquidados por ${money.format(result.total)}`)
       await queryClient.invalidateQueries({ queryKey: ["movements"] })
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       await queryClient.invalidateQueries({ queryKey: ["movement-settlement-summary"] })
@@ -1292,6 +1292,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const me = useQuery({ queryKey: ["employeePortal", "me"], queryFn: api.employeePortal.me })
   const balance = useQuery({ queryKey: ["employeePortal", "balance"], queryFn: api.employeePortal.balance })
   const movements = useQuery({ queryKey: ["employeePortal", "movements"], queryFn: api.employeePortal.movements })
+  const settlementTickets = useQuery({ queryKey: ["employeePortal", "settlementTickets"], queryFn: api.employeePortal.settlementTickets })
   const options = useQuery({ queryKey: ["employeePortal", "options"], queryFn: api.employeePortal.options })
   const form = useForm<EmployeeRequestFormInput, unknown, EmployeeRequestFormOutput>({
     resolver: zodResolver(employeeRequestSchema),
@@ -1382,9 +1383,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
     },
     onError: (err: Error) => setCodeMessage(err.message)
   })
-  const employeeRequests = (movements.data ?? []).filter((movement) => movement.origin === "EMPLOYEE_REQUEST")
-  const adminMovements = (movements.data ?? []).filter((movement) => movement.origin === "ADMINISTRATIVE_ACTION")
-  const recentMovements = (movements.data ?? []).slice(0, 4)
+  const recentMovements = (movements.data ?? []).filter((movement) => movement.status !== "DISCOUNTED").slice(0, 4)
   return (
     <main className="min-h-screen bg-[#080a0f] text-[#f7efe3]">
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[#080a0f]/90 p-4 backdrop-blur-xl">
@@ -1605,10 +1604,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
         )}
 
         {activeTab === "history" && (
-          <>
-            <PortalMovementList title="Solicitudes" movements={employeeRequests} />
-            <PortalMovementList title="Administración" movements={adminMovements} admin />
-          </>
+          <PortalSettlementTicketList tickets={settlementTickets.data ?? []} />
         )}
       </div>
       <EmployeeBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
@@ -1651,6 +1647,99 @@ function EmployeeBottomNav({
       </div>
     </nav>
   )
+}
+
+function PortalSettlementTicketList({ tickets }: { tickets: MovementSettlementTicket[] }) {
+  return (
+    <Card className="rounded-3xl border-white/10 bg-[#10151d] shadow-2xl shadow-black/20">
+      <CardHeader>
+        <CardTitle>Tickets de descuento</CardTitle>
+        <p className="text-sm text-muted-foreground">Comprobantes digitales de periodos ya liquidados.</p>
+      </CardHeader>
+      <CardContent>
+        {!tickets.length && <StatusText text="Sin tickets de descuento" />}
+        <div className="space-y-3">
+          {tickets.map((ticket) => (
+            <section key={ticket.id} className="overflow-hidden rounded-3xl border border-primary/25 bg-[#0d1118]">
+              <div className="border-b border-dashed border-white/15 bg-primary/10 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-semibold uppercase text-primary/80">Ticket de descuento</div>
+                    <div className="mt-1 truncate font-mono text-sm font-semibold">{ticket.ticketNumber}</div>
+                  </div>
+                  <Badge className="border-primary/40 bg-primary/10 text-primary">Liquidado</Badge>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className="text-[11px] uppercase text-muted-foreground">Periodo</div>
+                    <div className="mt-1 font-medium">{formatTicketPeriod(ticket.from, ticket.to)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] uppercase text-muted-foreground">Fecha</div>
+                    <div className="mt-1 font-medium">{formatTicketDate(ticket.settledAt)}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] uppercase text-muted-foreground">Movimientos</div>
+                    <div className="mt-1 font-mono text-xl font-semibold">{ticket.count}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] uppercase text-muted-foreground">Total descontado</div>
+                    <div className="mt-1 font-mono text-2xl font-semibold text-primary">{money.format(ticket.total)}</div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {ticket.byKind.map((item) => (
+                    <div key={item.kind} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm">
+                      <span className="min-w-0 truncate">{movementLabels[item.kind]}</span>
+                      <span className="font-mono">{item.count} · {money.format(item.amount)}</span>
+                    </div>
+                  ))}
+                  {!ticket.byKind.length && ticket.folios.length > 0 && (
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-muted-foreground">
+                      {ticket.folios.length} folio(s) liquidados
+                    </div>
+                  )}
+                </div>
+
+                {ticket.movements.length > 0 && (
+                  <div className="space-y-2 border-t border-dashed border-white/15 pt-3">
+                    {ticket.movements.map((movement) => (
+                      <div key={movement.folio} className="grid grid-cols-[1fr_auto] gap-3 text-sm">
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{movementLabels[movement.kind]}</div>
+                          <div className="truncate font-mono text-[11px] text-muted-foreground">{movement.folio}</div>
+                        </div>
+                        <div className="font-mono font-semibold">{money.format(movement.amount)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function formatTicketPeriod(from?: string, to?: string) {
+  if (!from && !to) return "Sin periodo"
+  if (from && to) return `${formatTicketDate(from)} a ${formatTicketDate(to)}`
+  return formatTicketDate(from ?? to ?? "")
+}
+
+function formatTicketDate(value?: string) {
+  if (!value) return "Sin fecha"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
 }
 
 function PortalMovementList({ title, movements, admin = false }: { title: string; movements: Movement[]; admin?: boolean }) {

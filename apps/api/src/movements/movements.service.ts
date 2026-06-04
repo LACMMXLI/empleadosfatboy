@@ -387,7 +387,76 @@ export class MovementsService {
   }
 
   async markDiscounted(id: string, user: AuthUser, ipAddress?: string) {
-    return this.changeStatus(id, MovementStatus.DISCOUNTED, AuditAction.STATUS_CHANGE, user, ipAddress)
+    const movement = await this.prisma.movement.findUnique({
+      where: { id },
+      select: { id: true, folio: true, employeeId: true, kind: true, amount: true, reason: true, status: true, createdAt: true }
+    })
+    if (!movement) throw new NotFoundException("Movimiento no encontrado")
+    if (movement.status === MovementStatus.DISCOUNTED) {
+      return this.prisma.movement.findUniqueOrThrow({ where: { id } })
+    }
+
+    const ticketNumber = await this.nextSettlementTicketNumber()
+    const total = Number(movement.amount)
+    const byKind = this.summarizeMovementsByKind([movement])
+    const movementDate = movement.createdAt.toISOString().slice(0, 10)
+    const settledAt = new Date()
+    const ticket = {
+      ticketNumber,
+      employeeId: movement.employeeId,
+      from: movementDate,
+      to: movementDate,
+      settledAt,
+      status: MovementStatus.DISCOUNTED,
+      count: 1,
+      total,
+      byKind,
+      movements: [{
+        id: movement.id,
+        folio: movement.folio,
+        kind: movement.kind,
+        amount: total,
+        reason: movement.reason,
+        createdAt: movement.createdAt
+      }]
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const discounted = await tx.movement.update({
+        where: { id },
+        data: { status: MovementStatus.DISCOUNTED }
+      })
+      await tx.auditLog.create({
+        data: {
+          userId: user.sub,
+          action: AuditAction.STATUS_CHANGE,
+          entity: "Movement",
+          entityId: id,
+          affectedEmployeeId: movement.employeeId,
+          oldValue: this.toJson(movement),
+          newValue: this.toJson(discounted),
+          ipAddress
+        }
+      })
+      await tx.auditLog.create({
+        data: {
+          userId: user.sub,
+          action: AuditAction.STATUS_CHANGE,
+          entity: "MovementSettlement",
+          entityId: movement.employeeId,
+          affectedEmployeeId: movement.employeeId,
+          newValue: this.toJson({
+            ...ticket,
+            movementIds: [movement.id],
+            folios: [movement.folio]
+          }),
+          ipAddress
+        }
+      })
+      return discounted
+    })
+
+    return updated
   }
 
   async settlementSummary(input: SettlementRangeInput, user: AuthUser) {
@@ -429,7 +498,7 @@ export class MovementsService {
     const where = this.buildSettlementWhere(input, user)
     const movements = await this.prisma.movement.findMany({
       where,
-      select: { id: true, folio: true, employeeId: true, amount: true, status: true }
+      select: { id: true, folio: true, employeeId: true, kind: true, amount: true, reason: true, status: true, createdAt: true }
     })
 
     if (!movements.length) {
@@ -444,6 +513,28 @@ export class MovementsService {
 
     const ids = movements.map((movement) => movement.id)
     const total = movements.reduce((sum, movement) => sum + Number(movement.amount), 0)
+    const byKind = this.summarizeMovementsByKind(movements)
+    const ticketNumber = await this.nextSettlementTicketNumber()
+    const settledAt = new Date()
+    const ticket = {
+      ticketNumber,
+      employeeId: input.employeeId,
+      from: input.from,
+      to: input.to,
+      settledAt,
+      status: MovementStatus.DISCOUNTED,
+      count: movements.length,
+      total,
+      byKind,
+      movements: movements.map((movement) => ({
+        id: movement.id,
+        folio: movement.folio,
+        kind: movement.kind,
+        amount: Number(movement.amount),
+        reason: movement.reason,
+        createdAt: movement.createdAt
+      }))
+    }
 
     await this.prisma.$transaction([
       this.prisma.movement.updateMany({
@@ -458,12 +549,9 @@ export class MovementsService {
           entityId: input.employeeId,
           affectedEmployeeId: input.employeeId,
           newValue: this.toJson({
-            from: input.from,
-            to: input.to,
-            status: MovementStatus.DISCOUNTED,
+            ...ticket,
             movementIds: ids,
-            folios: movements.map((movement) => movement.folio),
-            total
+            folios: movements.map((movement) => movement.folio)
           }),
           ipAddress
         }
@@ -474,8 +562,12 @@ export class MovementsService {
       employeeId: input.employeeId,
       from: input.from,
       to: input.to,
+      ticketNumber,
+      settledAt,
       count: movements.length,
-      total
+      total,
+      byKind,
+      movements: ticket.movements
     }
   }
 
@@ -514,6 +606,35 @@ export class MovementsService {
       }
     })
     return `${prefix}-${String(count + 1).padStart(4, "0")}`
+  }
+
+  private async nextSettlementTicketNumber() {
+    const now = new Date()
+    const prefix = `LIQ-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
+    const count = await this.prisma.auditLog.count({
+      where: {
+        entity: "MovementSettlement",
+        createdAt: {
+          gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+          lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+        }
+      }
+    })
+    return `${prefix}-${String(count + 1).padStart(4, "0")}`
+  }
+
+  private summarizeMovementsByKind(movements: Array<{ kind: MovementKind; amount: Prisma.Decimal | number }>) {
+    const summary = new Map<MovementKind, { kind: MovementKind; count: number; amount: number }>()
+    for (const movement of movements) {
+      const current = summary.get(movement.kind) ?? { kind: movement.kind, count: 0, amount: 0 }
+      current.count += 1
+      current.amount += Number(movement.amount)
+      summary.set(movement.kind, current)
+    }
+    return Array.from(summary.values()).map((item) => ({
+      ...item,
+      amount: Number(item.amount.toFixed(2))
+    }))
   }
 
   private resolveAmount(
@@ -568,7 +689,7 @@ export class MovementsService {
       employeeId: filters.employeeId,
       branchId: filters.branchId,
       kind: filters.kind,
-      status: filters.status,
+      status: filters.status ?? { not: MovementStatus.DISCOUNTED },
       createdAt:
         filters.from || filters.to
           ? {

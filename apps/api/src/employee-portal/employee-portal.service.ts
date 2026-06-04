@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
-import { AuditAction, MovementOrigin, MovementStatus, Prisma } from "@prisma/client"
+import { AuditAction, MovementKind, MovementOrigin, MovementStatus, Prisma } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { AuditService } from "../audit/audit.service"
@@ -154,7 +154,7 @@ export class EmployeePortalService {
   async movements(authorization?: string) {
     const employee = await this.currentEmployee(authorization)
     return this.prisma.movement.findMany({
-      where: { employeeId: employee.id },
+      where: { employeeId: employee.id, status: { not: MovementStatus.DISCOUNTED } },
       include: {
         registeredBy: { select: { id: true, fullName: true, role: true } },
         authorizedBy: { select: { id: true, fullName: true, role: true } }
@@ -164,10 +164,24 @@ export class EmployeePortalService {
     })
   }
 
+  async settlementTickets(authorization?: string) {
+    const employee = await this.currentEmployee(authorization)
+    const tickets = await this.prisma.auditLog.findMany({
+      where: {
+        entity: "MovementSettlement",
+        affectedEmployeeId: employee.id
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50
+    })
+
+    return tickets.map((ticket) => this.toSettlementTicket(ticket))
+  }
+
   async movementDetail(id: string, authorization?: string) {
     const employee = await this.currentEmployee(authorization)
     const movement = await this.prisma.movement.findFirst({
-      where: { id, employeeId: employee.id },
+      where: { id, employeeId: employee.id, status: { not: MovementStatus.DISCOUNTED } },
       include: {
         registeredBy: { select: { id: true, fullName: true, role: true } },
         authorizedBy: { select: { id: true, fullName: true, role: true } }
@@ -204,6 +218,64 @@ export class EmployeePortalService {
     } catch {
       throw new UnauthorizedException("Token de empleado invalido")
     }
+  }
+
+  private toSettlementTicket(ticket: {
+    id: string
+    createdAt: Date
+    newValue: Prisma.JsonValue | null
+  }) {
+    const value = this.jsonObject(ticket.newValue)
+    const movementSummaries = this.jsonArray(value.movements)
+    const folios = this.jsonArray(value.folios).map((folio) => String(folio))
+    const byKind = this.jsonArray(value.byKind).map((item) => {
+      const row = this.jsonObject(item)
+      return {
+        kind: this.asMovementKind(row.kind),
+        count: this.asNumber(row.count),
+        amount: this.asNumber(row.amount)
+      }
+    })
+
+    return {
+      id: ticket.id,
+      ticketNumber: String(value.ticketNumber ?? `LIQ-${ticket.createdAt.getTime()}`),
+      employeeId: String(value.employeeId ?? ""),
+      from: typeof value.from === "string" ? value.from : undefined,
+      to: typeof value.to === "string" ? value.to : undefined,
+      settledAt: typeof value.settledAt === "string" ? value.settledAt : ticket.createdAt.toISOString(),
+      count: this.asNumber(value.count || movementSummaries.length || folios.length),
+      total: this.asNumber(value.total),
+      byKind,
+      movements: movementSummaries.map((item) => {
+        const movement = this.jsonObject(item)
+        return {
+          folio: String(movement.folio ?? ""),
+          kind: this.asMovementKind(movement.kind),
+          amount: this.asNumber(movement.amount),
+          reason: String(movement.reason ?? ""),
+          createdAt: typeof movement.createdAt === "string" ? movement.createdAt : undefined
+        }
+      }),
+      folios
+    }
+  }
+
+  private jsonObject(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
+  }
+
+  private jsonArray(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : []
+  }
+
+  private asNumber(value: unknown) {
+    const numberValue = Number(value ?? 0)
+    return Number.isFinite(numberValue) ? numberValue : 0
+  }
+
+  private asMovementKind(value: unknown) {
+    return Object.values(MovementKind).includes(value as MovementKind) ? value as MovementKind : MovementKind.ADMIN_ADJUSTMENT
   }
 
   private toJson(value: unknown): Prisma.InputJsonValue {

@@ -103,7 +103,24 @@ export type MovementSettlementSummary = {
   employeeId: string
   from?: string
   to?: string
+  ticketNumber?: string
+  settledAt?: string
   count: number
   total: number
   byKind?: Array<{ kind: MovementKind; count: number; amount: number }>
+  movements?: Array<{ folio: string; kind: MovementKind; amount: number; reason?: string; createdAt?: string }>
+}
+
+export type MovementSettlementTicket = {
+  id: string
+  ticketNumber: string
+  employeeId: string
+  from?: string
+  to?: string
+  settledAt: string
+  count: number
+  total: number
+  byKind: Array<{ kind: MovementKind; count: number; amount: number }>
+  movements: Array<{ folio: string; kind: MovementKind; amount: number; reason?: string; createdAt?: string }>
+  folios: string[]
 }

@@ -1,4 +1,4 @@
-import type { AppConfig, AuditLog, DashboardSummary, Employee, Movement, MovementKind, MovementSettlementSummary, Role, User } from "@/types/domain"
+import type { AppConfig, AuditLog, DashboardSummary, Employee, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Role, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -167,6 +167,9 @@ export const api = {
     },
     movements() {
       return employeeRequest<Movement[]>("/employee-portal/movements")
+    },
+    settlementTickets() {
+      return employeeRequest<MovementSettlementTicket[]>("/employee-portal/settlement-tickets")
     },
     options() {
       return employeeRequest<{ beveragePrice: number; requestKinds: MovementKind[] }>("/employee-portal/options")
