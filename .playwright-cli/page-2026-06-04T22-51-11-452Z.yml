@@ -1,0 +1,59 @@
+- main [ref=e19]:
+  - generic [ref=e20]:
+    - complementary [ref=e21]:
+      - generic [ref=e22]:
+        - generic [ref=e23]: Fatboy POS
+        - generic [ref=e24]: Panel administrativo
+      - navigation [ref=e25]:
+        - button "Dashboard" [ref=e26] [cursor=pointer]:
+          - img [ref=e27]
+          - text: Dashboard
+        - button "Empleados" [ref=e32] [cursor=pointer]:
+          - img [ref=e33]
+          - text: Empleados
+        - button "Aprobaciones" [ref=e37] [cursor=pointer]:
+          - img [ref=e38]
+          - text: Aprobaciones
+        - button "Movimientos" [ref=e41] [cursor=pointer]:
+          - img [ref=e42]
+          - text: Movimientos
+        - button "Historial" [ref=e46] [cursor=pointer]:
+          - img [ref=e47]
+          - text: Historial
+        - button "Configuración" [ref=e50] [cursor=pointer]:
+          - img [ref=e51]
+          - text: Configuración
+    - generic [ref=e54]:
+      - generic [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]: Administrador Fatboy
+          - generic [ref=e58]: ADMINISTRADOR
+        - button [ref=e59] [cursor=pointer]:
+          - img [ref=e60]
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e67]:
+            - generic [ref=e68]: Solicitudes pendientes
+            - generic [ref=e69]: "0"
+          - generic [ref=e71]:
+            - generic [ref=e72]: Adelantos autorizados
+            - generic [ref=e73]: $500.00
+          - generic [ref=e75]:
+            - generic [ref=e76]: Movimientos administrativos del periodo
+            - generic [ref=e77]: "0"
+          - generic [ref=e79]:
+            - generic [ref=e80]: Total por descontar
+            - generic [ref=e81]: $530.00
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - generic [ref=e85]: Periodo
+            - generic [ref=e86]: Desde 01 jun 2026
+          - generic [ref=e87]:
+            - generic [ref=e88]: Solicitudes totales
+            - generic [ref=e89]: "0"
+          - generic [ref=e90]:
+            - generic [ref=e91]: Autorizados activos
+            - generic [ref=e92]: "2"
+          - generic [ref=e93]:
+            - generic [ref=e94]: Consulta
+            - generic [ref=e95]: Resumen administrativo

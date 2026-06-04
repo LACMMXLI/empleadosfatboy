@@ -1,0 +1,37 @@
+- main [ref=e19]:
+  - generic [ref=e20]:
+    - complementary [ref=e21]:
+      - generic [ref=e22]:
+        - generic [ref=e23]: Fatboy POS
+        - generic [ref=e24]: Panel administrativo
+      - navigation [ref=e25]:
+        - button "Dashboard" [ref=e26] [cursor=pointer]:
+          - img [ref=e27]
+          - text: Dashboard
+        - button "Empleados" [ref=e32] [cursor=pointer]:
+          - img [ref=e33]
+          - text: Empleados
+        - button "Aprobaciones" [active] [ref=e37] [cursor=pointer]:
+          - img [ref=e38]
+          - text: Aprobaciones
+        - button "Movimientos" [ref=e41] [cursor=pointer]:
+          - img [ref=e42]
+          - text: Movimientos
+        - button "Historial" [ref=e46] [cursor=pointer]:
+          - img [ref=e47]
+          - text: Historial
+        - button "Configuración" [ref=e50] [cursor=pointer]:
+          - img [ref=e51]
+          - text: Configuración
+    - generic [ref=e54]:
+      - generic [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]: Administrador Fatboy
+          - generic [ref=e58]: ADMINISTRADOR
+        - button [ref=e59] [cursor=pointer]:
+          - img [ref=e60]
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - heading "Aprobaciones" [level=3] [ref=e139]
+          - paragraph [ref=e140]: Solicitudes pendientes listas para aprobar o rechazar.
+        - generic [ref=e142]: No hay movimientos pendientes.
