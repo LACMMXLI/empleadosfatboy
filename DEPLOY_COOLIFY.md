@@ -1,10 +1,11 @@
 # Despliegue en Linux con Coolify
 
-Esta configuracion despliega tres servicios en el mismo servidor:
+Esta configuracion despliega dos servicios en el mismo servidor:
 
 - `web`: frontend React compilado y servido por Nginx.
 - `api`: backend NestJS.
-- `postgres`: base de datos PostgreSQL persistente.
+
+La base de datos PostgreSQL se usa como servicio externo mediante `DATABASE_URL`.
 
 El navegador usa `VITE_API_URL=/api`. Nginx recibe `/api/*` y lo envia internamente al servicio `api:3001`, por lo que no necesitas exponer el backend como dominio separado.
 
@@ -22,9 +23,7 @@ El navegador usa `VITE_API_URL=/api`. Nginx recibe `/api/*` y lo envia intername
 Crea estas variables en el proyecto/compose de Coolify:
 
 ```env
-POSTGRES_DB=fatboy_employee_ledger
-POSTGRES_USER=fatboy
-POSTGRES_PASSWORD=usa-una-clave-fuerte
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB?schema=public
 JWT_SECRET=usa-un-secreto-largo-y-unico
 VITE_API_URL=/api
 WEB_PORT=80
@@ -49,10 +48,10 @@ docker-compose.coolify.yml
 
 ## Base de datos
 
-El servicio `postgres` queda en la misma red interna del compose. El backend usa:
+El backend usa la variable `DATABASE_URL`. Para este despliegue debe apuntar a tu PostgreSQL externo:
 
 ```text
-postgresql://USER:PASSWORD@postgres:5432/DB?schema=public
+postgresql://USER:PASSWORD@HOST:5432/DB?schema=public
 ```
 
 El contenedor de API ejecuta automaticamente:
