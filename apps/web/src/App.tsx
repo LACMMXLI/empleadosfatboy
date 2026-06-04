@@ -110,16 +110,20 @@ type AdminMovementFormOutput = z.output<typeof adminMovementSchema>
 
 const employeeRequestSchema = z.object({
   kind: z.enum(["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]),
-  amount: z.coerce.number().positive("Cantidad invalida"),
+  amount: z.preprocess((value) => {
+    if (value === "" || value === null || typeof value === "undefined") return 0
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  }, z.number().positive("El monto debe ser mayor a $0")),
   reason: z.string().optional(),
   productName: z.string().optional(),
   quantity: z.coerce.number().optional(),
   unitPrice: z.coerce.number().optional()
 }).superRefine((data, ctx) => {
-  if (data.kind !== "DRINK" && (!data.reason || data.reason.trim().length < 3)) {
+  if (!data.reason || data.reason.trim().length === 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Motivo requerido",
+      message: "Agrega un motivo para continuar",
       path: ["reason"]
     })
   }
@@ -154,6 +158,7 @@ type PortalRoute = "home" | "admin" | "employee"
 
 const standardMovementKinds: MovementKind[] = ["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]
 const employeeRequestKinds: MovementKind[] = standardMovementKinds
+const quickRequestReasons = ["Emergencia", "Transporte", "Familiar", "Médico", "Otro"]
 const administrativeMovementKinds: MovementKind[] = [
   "ADMIN_ADJUSTMENT",
   "ADMIN_CHARGE",
@@ -1281,6 +1286,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<"home" | "request" | "history">("home")
   const [accountOpen, setAccountOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [requestError, setRequestError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [codeMessage, setCodeMessage] = useState<string | null>(null)
   const me = useQuery({ queryKey: ["employeePortal", "me"], queryFn: api.employeePortal.me })
@@ -1296,6 +1302,8 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const values = form.watch()
   const beveragePrice = Number(options.data?.beveragePrice ?? 30)
   const isDrink = selectedKind === "DRINK"
+  const requestAmount = isDrink ? beveragePrice : Number(values.amount || 0)
+  const requestReason = values.reason?.trim() ?? ""
 
   useEffect(() => {
     if (selectedKind === "DRINK") {
@@ -1307,6 +1315,45 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
     }
   }, [beveragePrice, form, selectedKind])
 
+  const handleInvalidRequest = (errors: Record<string, unknown>) => {
+    setConfirming(false)
+    if ("amount" in errors) {
+      setRequestError("El monto debe ser mayor a $0")
+      return
+    }
+    if ("reason" in errors) {
+      setRequestError("Agrega un motivo para continuar")
+      return
+    }
+    setRequestError("Revisa los datos de la solicitud")
+  }
+
+  const prepareRequestConfirmation = (payload: EmployeeRequestFormOutput) => {
+    if (payload.amount <= 0) {
+      setRequestError("El monto debe ser mayor a $0")
+      return
+    }
+    if (!payload.reason?.trim()) {
+      setRequestError("Agrega un motivo para continuar")
+      return
+    }
+    setMessage(null)
+    setRequestError(null)
+    setConfirming(true)
+  }
+
+  const appendQuickReason = (reason: string) => {
+    const currentReason = form.getValues("reason")?.trim()
+    const nextReason = currentReason
+      ? currentReason.toLowerCase().includes(reason.toLowerCase())
+        ? currentReason
+        : `${currentReason}, ${reason}`
+      : reason
+    form.setValue("reason", nextReason, { shouldDirty: true, shouldValidate: true })
+    setConfirming(false)
+    setRequestError(null)
+  }
+
   const create = useMutation({
     mutationFn: (payload: EmployeeRequestFormOutput) =>
       api.employeePortal.createRequest(
@@ -1317,10 +1364,14 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
     onSuccess: async (movement) => {
       setMessage(`Solicitud ${movement.folio} enviada`)
       setConfirming(false)
+      setRequestError(null)
       form.reset({ kind: "SALARY_ADVANCE", amount: 0, reason: "" })
       await queryClient.invalidateQueries({ queryKey: ["employeePortal"] })
     },
-    onError: (err: Error) => setMessage(err.message)
+    onError: (err: Error) => {
+      setConfirming(false)
+      setMessage(err.message)
+    }
   })
   const changeCode = useMutation({
     mutationFn: ({ currentCode, newCode }: { currentCode: string; newCode: string }) =>
@@ -1445,18 +1496,13 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
             <CardContent>
               <form
                 className="space-y-3"
-                onSubmit={form.handleSubmit((payload) => {
-                  if (!confirming) {
-                    setConfirming(true)
-                    return
-                  }
-                  create.mutate(payload)
-                })}
+                onSubmit={form.handleSubmit(prepareRequestConfirmation, handleInvalidRequest)}
               >
                 <GuidedBlock step="1" title="Tipo" detail="Selecciona una opción">
                   <Select className="h-12 rounded-2xl border-white/10 bg-black/20" {...form.register("kind")} onChange={(event) => {
                     form.setValue("kind", event.target.value as EmployeeRequestFormInput["kind"])
                     setConfirming(false)
+                    setRequestError(null)
                   }}>
                     {employeeRequestKinds.map((kind) => (
                       <option key={kind} value={kind}>
@@ -1472,27 +1518,89 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                       <span className="font-mono text-lg font-semibold">{money.format(beveragePrice)}</span>
                     </div>
                   ) : (
-                    <Input className="h-12 rounded-2xl border-white/10 bg-black/20" type="number" step="0.01" placeholder="Monto" {...form.register("amount", { onChange: () => setConfirming(false) })} />
+                    <Input
+                      className="h-12 rounded-2xl border-white/10 bg-black/20"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="Monto"
+                      {...form.register("amount", {
+                        onChange: () => {
+                          setConfirming(false)
+                          setRequestError(null)
+                        }
+                      })}
+                    />
                   )}
+                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm">
+                    <span className="text-muted-foreground">Monto capturado</span>
+                    <span className="font-mono text-base font-semibold text-primary">{money.format(Number.isFinite(requestAmount) ? requestAmount : 0)}</span>
+                  </div>
                 </GuidedBlock>
                 <GuidedBlock step="3" title="Motivo" detail="Describe brevemente la razón">
-                  <Textarea className="rounded-2xl border-white/10 bg-black/20" placeholder="Motivo" {...form.register("reason", { onChange: () => setConfirming(false) })} />
-                </GuidedBlock>
-                {confirming && (
-                  <div className="rounded-xl border border-primary/50 bg-primary/10 p-3 text-sm">
-                    <div className="font-semibold">Confirmar solicitud</div>
-                    <div className="mt-1 text-muted-foreground">
-                      {movementLabels[values.kind as MovementKind]} · {money.format(Number(values.amount || 0))}
-                    </div>
+                  <div className="flex flex-wrap gap-2">
+                    {quickRequestReasons.map((reason) => (
+                      <button
+                        key={reason}
+                        className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition active:bg-primary/20"
+                        type="button"
+                        onClick={() => appendQuickReason(reason)}
+                      >
+                        {reason}
+                      </button>
+                    ))}
                   </div>
-                )}
+                  <Textarea
+                    className="rounded-2xl border-white/10 bg-black/20"
+                    placeholder="Motivo"
+                    {...form.register("reason", {
+                      onChange: () => {
+                        setConfirming(false)
+                        setRequestError(null)
+                      }
+                    })}
+                  />
+                </GuidedBlock>
+                {requestError && <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-3 text-sm">{requestError}</div>}
                 <Button className="h-12 w-full rounded-2xl text-base shadow-lg shadow-primary/10" disabled={create.isPending}>
-                  {confirming ? "Enviar solicitud" : "Continuar"}
+                  Continuar
                 </Button>
+                <p className="px-1 text-center text-xs text-muted-foreground">Las solicitudes quedan sujetas a revisión y autorización administrativa.</p>
                 {message && <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-muted-foreground">{message}</div>}
               </form>
             </CardContent>
           </Card>
+        )}
+        {confirming && activeTab === "request" && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" onClick={() => setConfirming(false)}>
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#10151d] p-4 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
+              <div className="space-y-1">
+                <div className="text-lg font-semibold">Confirmar solicitud</div>
+                <p className="text-sm text-muted-foreground">Revisa los datos antes de enviar tu solicitud.</p>
+              </div>
+              <div className="mt-4 space-y-2 rounded-3xl border border-white/10 bg-white/[0.04] p-4 text-sm">
+                <DetailLine label="Tipo de solicitud" value={movementLabels[values.kind as MovementKind]} />
+                <DetailLine label="Monto" value={money.format(Number.isFinite(requestAmount) ? requestAmount : 0)} />
+                <DetailLine label="Motivo" value={requestReason || "Sin motivo"} />
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Button className="h-12 rounded-2xl hover:bg-white/10" type="button" variant="ghost" onClick={() => setConfirming(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="h-12 rounded-2xl"
+                  type="button"
+                  disabled={create.isPending}
+                  onClick={form.handleSubmit((payload) => {
+                    setRequestError(null)
+                    create.mutate(payload)
+                  }, handleInvalidRequest)}
+                >
+                  Confirmar solicitud
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === "history" && (
