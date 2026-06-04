@@ -8,6 +8,8 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+RUN npm config set fetch-retries 10 \
+  && npm config set fetch-retry-maxtimeout 120000
 RUN npm ci --include=dev
 
 FROM deps AS build
