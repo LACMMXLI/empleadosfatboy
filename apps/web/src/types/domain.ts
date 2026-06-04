@@ -32,6 +32,9 @@ export type User = {
   fullName: string
   email: string
   role: Role
+  active?: boolean
+  createdAt?: string
+  updatedAt?: string
   branch?: Branch | null
   employee?: Employee | null
 }

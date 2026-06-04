@@ -159,6 +159,24 @@ const configSchema = z.object({
 type ConfigFormInput = z.input<typeof configSchema>
 type ConfigFormOutput = z.output<typeof configSchema>
 
+const adminUserSchema = z.object({
+  fullName: z.string().min(3, "Nombre requerido"),
+  email: z.string().email("Correo invalido"),
+  password: z.string().min(8, "Mínimo 8 caracteres"),
+  role: z.enum(["ADMINISTRADOR", "GERENTE", "ENCARGADO", "CAJERO"])
+})
+type AdminUserFormInput = z.input<typeof adminUserSchema>
+type AdminUserFormOutput = z.output<typeof adminUserSchema>
+
+const adminUserEditSchema = z.object({
+  fullName: z.string().min(3, "Nombre requerido"),
+  email: z.string().email("Correo invalido"),
+  password: z.string().optional().refine((value) => !value || value.length >= 8, "Mínimo 8 caracteres"),
+  role: z.enum(["ADMINISTRADOR", "GERENTE", "ENCARGADO", "CAJERO"])
+})
+type AdminUserEditFormInput = z.input<typeof adminUserEditSchema>
+type AdminUserEditFormOutput = z.output<typeof adminUserEditSchema>
+
 type View = "dashboard" | "empleados" | "pendientes" | "adminMovements" | "historial" | "nomina" | "configuracion"
 type PortalRoute = "home" | "admin" | "employee"
 
@@ -1461,8 +1479,11 @@ function Employees({ user }: { user?: User }) {
 
 function Configuration() {
   const queryClient = useQueryClient()
+  const [selectedUserId, setSelectedUserId] = useState("")
   const configuration = useQuery({ queryKey: ["configuration"], queryFn: api.configuration })
   const rules = useQuery({ queryKey: ["rules"], queryFn: api.rules })
+  const adminUsers = useQuery({ queryKey: ["admin-users"], queryFn: api.adminUsers })
+  const selectedUser = adminUsers.data?.find((user) => user.id === selectedUserId)
   const configForm = useForm<ConfigFormInput, unknown, ConfigFormOutput>({
     resolver: zodResolver(configSchema),
     defaultValues: { beveragePrice: 30 }
@@ -1471,11 +1492,28 @@ function Configuration() {
     resolver: zodResolver(ruleSchema),
     defaultValues: { requiredRole: "ENCARGADO", minAmount: 0 }
   })
+  const userForm = useForm<AdminUserFormInput, unknown, AdminUserFormOutput>({
+    resolver: zodResolver(adminUserSchema),
+    defaultValues: { role: "ENCARGADO" }
+  })
+  const userEditForm = useForm<AdminUserEditFormInput, unknown, AdminUserEditFormOutput>({
+    resolver: zodResolver(adminUserEditSchema),
+    defaultValues: { fullName: "", email: "", password: "", role: "ENCARGADO" }
+  })
   useEffect(() => {
     if (configuration.data) {
       configForm.reset({ beveragePrice: Number(configuration.data.beveragePrice ?? 30) })
     }
   }, [configForm, configuration.data])
+  useEffect(() => {
+    if (!selectedUser) return
+    userEditForm.reset({
+      fullName: selectedUser.fullName,
+      email: selectedUser.email,
+      password: "",
+      role: selectedUser.role as AdminUserEditFormInput["role"]
+    })
+  }, [selectedUser, userEditForm])
   const updateConfig = useMutation({
     mutationFn: (values: ConfigFormOutput) => api.updateConfiguration({ beveragePrice: values.beveragePrice }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["configuration"] })
@@ -1484,6 +1522,28 @@ function Configuration() {
     mutationFn: (values: RuleFormOutput) =>
       api.createRule({ ...values, kind: values.kind || undefined, maxAmount: values.maxAmount || undefined }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["rules"] })
+  })
+  const createUser = useMutation({
+    mutationFn: (values: AdminUserFormOutput) => api.createAdminUser(values),
+    onSuccess: async () => {
+      userForm.reset({ role: "ENCARGADO", fullName: "", email: "", password: "" })
+      await queryClient.invalidateQueries({ queryKey: ["admin-users"] })
+    }
+  })
+  const updateUser = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: AdminUserEditFormOutput }) =>
+      api.updateAdminUser(id, { ...values, password: values.password || undefined }),
+    onSuccess: async (user) => {
+      setSelectedUserId(user.id)
+      await queryClient.invalidateQueries({ queryKey: ["admin-users"] })
+    }
+  })
+  const toggleUser = useMutation({
+    mutationFn: (user: User) => api.updateAdminUser(user.id, { active: !user.active }),
+    onSuccess: async (user) => {
+      setSelectedUserId(user.id)
+      await queryClient.invalidateQueries({ queryKey: ["admin-users"] })
+    }
   })
 
   return (
@@ -1538,23 +1598,120 @@ function Configuration() {
             </form>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UsersRound className="h-4 w-4" />
+              Nuevo usuario administrativo
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Crea accesos para encargado, gerente, cajero o administrador.</p>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-3" onSubmit={userForm.handleSubmit((values) => createUser.mutate(values))}>
+              <Input placeholder="Nombre completo" {...userForm.register("fullName")} />
+              <Input placeholder="Correo" type="email" {...userForm.register("email")} />
+              <Input placeholder="Contraseña temporal" type="password" {...userForm.register("password")} />
+              <Select {...userForm.register("role")}>
+                {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </Select>
+              <Button className="w-full" disabled={createUser.isPending}>
+                Crear usuario
+              </Button>
+              {createUser.error && <div className="rounded-md border p-2 text-sm text-muted-foreground">{createUser.error.message}</div>}
+            </form>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4" />
+              Editar acceso
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!selectedUser && <StatusText text="Selecciona un usuario administrativo de la lista." />}
+            {selectedUser && (
+              <form
+                className="space-y-3"
+                onSubmit={userEditForm.handleSubmit((values) => updateUser.mutate({ id: selectedUser.id, values }))}
+              >
+                <Input placeholder="Nombre completo" {...userEditForm.register("fullName")} />
+                <Input placeholder="Correo" type="email" {...userEditForm.register("email")} />
+                <Input placeholder="Nueva contraseña opcional" type="password" {...userEditForm.register("password")} />
+                <Select {...userEditForm.register("role")}>
+                  {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </Select>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button disabled={updateUser.isPending}>Guardar</Button>
+                  <Button
+                    type="button"
+                    variant={selectedUser.active ? "destructive" : "secondary"}
+                    disabled={toggleUser.isPending}
+                    onClick={() => toggleUser.mutate(selectedUser)}
+                  >
+                    {selectedUser.active ? "Desactivar" : "Activar"}
+                  </Button>
+                </div>
+                {updateUser.error && <div className="rounded-md border p-2 text-sm text-muted-foreground">{updateUser.error.message}</div>}
+                {toggleUser.error && <div className="rounded-md border p-2 text-sm text-muted-foreground">{toggleUser.error.message}</div>}
+              </form>
+            )}
+          </CardContent>
+        </Card>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Reglas activas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {rules.data?.map((rule) => (
-              <div key={rule.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
-                <span>{rule.kind ? movementLabels[rule.kind as MovementKind] : "Todos"}</span>
-                <span>{money.format(Number(rule.minAmount))} - {rule.maxAmount ? money.format(Number(rule.maxAmount)) : "sin limite"}</span>
-                <Badge>{rule.requiredRole}</Badge>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Usuarios administrativos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2 md:grid-cols-2">
+              {adminUsers.data?.map((user) => (
+                <button
+                  key={user.id}
+                  className={`rounded-md border p-3 text-left transition hover:bg-secondary/60 ${
+                    selectedUserId === user.id ? "border-primary bg-primary/10" : "bg-background/45"
+                  }`}
+                  type="button"
+                  onClick={() => setSelectedUserId(user.id)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{user.fullName}</div>
+                      <div className="truncate text-sm text-muted-foreground">{user.email}</div>
+                    </div>
+                    <Badge className={user.active ? "border-emerald-500/40 text-emerald-400" : "border-destructive/50 text-destructive"}>
+                      {user.active ? "Activo" : "Inactivo"}
+                    </Badge>
+                  </div>
+                  <div className="mt-2 text-xs text-muted-foreground">{user.role} · {user.branch?.name ?? "Sin sucursal"}</div>
+                </button>
+              ))}
+              {!adminUsers.data?.length && <StatusText text="Sin usuarios administrativos." />}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Reglas activas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {rules.data?.map((rule) => (
+                <div key={rule.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
+                  <span>{rule.kind ? movementLabels[rule.kind as MovementKind] : "Todos"}</span>
+                  <span>{money.format(Number(rule.minAmount))} - {rule.maxAmount ? money.format(Number(rule.maxAmount)) : "sin limite"}</span>
+                  <Badge>{rule.requiredRole}</Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

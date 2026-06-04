@@ -10,6 +10,7 @@ import { ConfigurationModule } from "./configuration/configuration.module"
 import { AuditModule } from "./audit/audit.module"
 import { EmployeePortalModule } from "./employee-portal/employee-portal.module"
 import { PayrollModule } from "./payroll/payroll.module"
+import { AdminUsersModule } from "./admin-users/admin-users.module"
 import { JwtAuthGuard } from "./auth/jwt-auth.guard"
 import { RolesGuard } from "./auth/roles.guard"
 
@@ -24,7 +25,8 @@ import { RolesGuard } from "./auth/roles.guard"
     EmployeePortalModule,
     DashboardModule,
     ConfigurationModule,
-    PayrollModule
+    PayrollModule,
+    AdminUsersModule
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

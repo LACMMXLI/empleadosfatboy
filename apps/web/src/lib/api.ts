@@ -161,6 +161,15 @@ export const api = {
   updateConfiguration(payload: Partial<AppConfig>) {
     return request<AppConfig>("/configuration", { method: "PATCH", body: JSON.stringify(payload) })
   },
+  adminUsers() {
+    return request<User[]>("/admin/users")
+  },
+  createAdminUser(payload: Record<string, unknown>) {
+    return request<User>("/admin/users", { method: "POST", body: JSON.stringify(payload) })
+  },
+  updateAdminUser(id: string, payload: Record<string, unknown>) {
+    return request<User>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
+  },
   rules() {
     return request<
       Array<{ id: string; kind?: string; minAmount: string; maxAmount?: string; requiredRole: string }>
