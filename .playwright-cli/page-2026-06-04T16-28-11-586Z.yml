@@ -1,0 +1,46 @@
+- main [ref=e19]:
+  - generic [ref=e20]:
+    - generic [ref=e21]:
+      - generic [ref=e22]: Mi cuenta
+      - generic [ref=e23]: Empleado Demo
+    - button "Abrir cuenta" [ref=e24] [cursor=pointer]:
+      - img [ref=e25]
+  - generic [ref=e28]:
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]: Empleado Demo
+        - generic [ref=e33]:
+          - img [ref=e34]
+          - text: Cocina
+        - generic [ref=e37]:
+          - img [ref=e38]
+          - text: Sucursal Matriz
+      - generic [ref=e42]: Activo
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - img [ref=e45]
+        - text: Saldo pendiente
+      - generic [ref=e48]: $30.00
+    - img
+    - generic [ref=e49]:
+      - heading "Recientes" [level=3] [ref=e51]
+      - generic [ref=e54]:
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - generic [ref=e57]: MOV-20260604-0002
+            - generic [ref=e58]: Bebida
+          - generic [ref=e59]: Autorizado
+        - generic [ref=e60]:
+          - generic [ref=e61]: 4/6/2026, 8:41:42 a.m.
+          - generic [ref=e62]: $30.00
+  - navigation [ref=e63]:
+    - generic [ref=e64]:
+      - button "Inicio" [ref=e65] [cursor=pointer]:
+        - img [ref=e66]
+        - text: Inicio
+      - button "Solicitar" [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+        - text: Solicitar
+      - button "Historial" [ref=e75] [cursor=pointer]:
+        - img [ref=e76]
+        - text: Historial

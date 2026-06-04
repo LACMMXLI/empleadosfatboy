@@ -1496,6 +1496,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
             <CardContent>
               <form
                 className="space-y-3"
+                noValidate
                 onSubmit={form.handleSubmit(prepareRequestConfirmation, handleInvalidRequest)}
               >
                 <GuidedBlock step="1" title="Tipo" detail="Selecciona una opción">
