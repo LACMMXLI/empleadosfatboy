@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-cacl691015}
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:${DATABASE_PASSWORD:-cacl691015}@db:5432/postgres?schema=public
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-for-production-security}
+      WEB_ORIGIN: ${WEB_ORIGIN:-}
+    expose:
+      - "3001"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:

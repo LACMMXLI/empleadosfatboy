@@ -10,7 +10,7 @@ type CreateMovementInput = {
   employeeId: string
   kind: MovementKind
   amount: number
-  reason: string
+  reason?: string
   employeePin: string
   productName?: string
   quantity?: number
@@ -22,7 +22,7 @@ type CreateAdministrativeMovementInput = {
   employeeId: string
   kind: MovementKind
   amount: number
-  reason: string
+  reason?: string
   productName?: string
   quantity?: number
   unitPrice?: number
@@ -32,7 +32,7 @@ type CreateAdministrativeMovementInput = {
 export type CreateEmployeeRequestInput = {
   kind: MovementKind
   amount: number
-  reason: string
+  reason?: string
   productName?: string
   quantity?: number
   unitPrice?: number
@@ -166,8 +166,17 @@ export class MovementsService {
     const validPin = await bcrypt.compare(dto.employeePin, employee.pinHash)
     if (!validPin) throw new BadRequestException("PIN del empleado invalido")
 
+    if (dto.kind !== MovementKind.DRINK && (!dto.reason || dto.reason.trim().length === 0)) {
+      throw new BadRequestException("El motivo es requerido")
+    }
+
     const config = await this.getConfig()
     const amount = this.resolveAmount(dto, config)
+    const isAdvance = dto.kind === MovementKind.SALARY_ADVANCE || dto.kind === MovementKind.ADMIN_SALARY_ADVANCE
+    const status = isAdvance ? MovementStatus.PENDING : MovementStatus.AUTHORIZED
+    const authorizedById = status === MovementStatus.AUTHORIZED ? user.sub : null
+    const authorizedAt = status === MovementStatus.AUTHORIZED ? new Date() : null
+
     const movement = await this.prisma.movement.create({
       data: {
         folio: await this.nextFolio(),
@@ -176,7 +185,10 @@ export class MovementsService {
         kind: dto.kind,
         origin: MovementOrigin.ADMINISTRATIVE_ACTION,
         amount,
-        reason: dto.reason,
+        reason: dto.kind === MovementKind.DRINK ? (dto.reason?.trim() || "Bebida") : dto.reason!,
+        status,
+        authorizedById,
+        authorizedAt,
         productName: dto.kind === MovementKind.DRINK ? "Bebida" : dto.productName,
         quantity: dto.kind === MovementKind.DRINK ? 1 : dto.quantity,
         unitPrice: dto.kind === MovementKind.DRINK ? config.beveragePrice : dto.unitPrice,
@@ -208,8 +220,17 @@ export class MovementsService {
     const employee = await this.prisma.employee.findUnique({ where: { id: dto.employeeId } })
     if (!employee?.active) throw new NotFoundException("Empleado no encontrado o inactivo")
 
+    if (dto.kind !== MovementKind.DRINK && (!dto.reason || dto.reason.trim().length === 0)) {
+      throw new BadRequestException("El motivo es requerido")
+    }
+
     const config = await this.getConfig()
     const amount = this.resolveAmount(dto, config)
+    const isAdvance = dto.kind === MovementKind.SALARY_ADVANCE || dto.kind === MovementKind.ADMIN_SALARY_ADVANCE
+    const status = isAdvance ? MovementStatus.PENDING : MovementStatus.AUTHORIZED
+    const authorizedById = status === MovementStatus.AUTHORIZED ? user.sub : null
+    const authorizedAt = status === MovementStatus.AUTHORIZED ? new Date() : null
+
     const movement = await this.prisma.movement.create({
       data: {
         folio: await this.nextFolio(),
@@ -218,7 +239,10 @@ export class MovementsService {
         kind: dto.kind,
         origin: MovementOrigin.ADMINISTRATIVE_ACTION,
         amount,
-        reason: dto.reason,
+        reason: dto.kind === MovementKind.DRINK ? (dto.reason?.trim() || "Bebida") : dto.reason!,
+        status,
+        authorizedById,
+        authorizedAt,
         productName: dto.productName,
         quantity: dto.quantity,
         unitPrice: dto.unitPrice,
@@ -247,8 +271,16 @@ export class MovementsService {
       throw new BadRequestException("Tipo de solicitud no permitido para empleado")
     }
 
+    if (dto.kind !== MovementKind.DRINK && (!dto.reason || dto.reason.trim().length === 0)) {
+      throw new BadRequestException("El motivo es requerido")
+    }
+
     const config = await this.getConfig()
     const amount = this.resolveAmount(dto, config)
+    const isAdvance = dto.kind === MovementKind.SALARY_ADVANCE
+    const status = isAdvance ? MovementStatus.PENDING : MovementStatus.AUTHORIZED
+    const authorizedAt = status === MovementStatus.AUTHORIZED ? new Date() : null
+
     const movement = await this.prisma.movement.create({
       data: {
         folio: await this.nextFolio(),
@@ -257,7 +289,9 @@ export class MovementsService {
         kind: dto.kind,
         origin: MovementOrigin.EMPLOYEE_REQUEST,
         amount,
-        reason: dto.reason,
+        reason: dto.kind === MovementKind.DRINK ? (dto.reason?.trim() || "Bebida") : dto.reason!,
+        status,
+        authorizedAt,
         productName: dto.kind === MovementKind.DRINK ? "Bebida" : dto.productName,
         quantity: dto.kind === MovementKind.DRINK ? 1 : dto.quantity,
         unitPrice: dto.kind === MovementKind.DRINK ? config.beveragePrice : dto.unitPrice,

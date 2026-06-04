@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req } from "@nestjs/common"
-import { IsEnum, IsNumber, IsOptional, IsString, Length, Min } from "class-validator"
+import { IsEnum, IsNumber, IsOptional, IsString, Length, Min, ValidateIf } from "class-validator"
 import { MovementKind, MovementStatus, Role } from "@prisma/client"
 import { Roles } from "../auth/roles.decorator"
 import type { RequestWithUser } from "../auth/auth.types"
@@ -16,8 +16,9 @@ class CreateMovementDto {
   @Min(0.01)
   amount!: number
 
+  @ValidateIf((o) => o.kind !== MovementKind.DRINK)
   @IsString()
-  reason!: string
+  reason?: string
 
   @IsString()
   @Length(6, 6)

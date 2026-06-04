@@ -73,12 +73,20 @@ const movementSchema = z.object({
   employeeId: z.string().min(1, "Selecciona empleado"),
   kind: z.enum(["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]),
   amount: z.coerce.number().positive("Cantidad invalida"),
-  reason: z.string().min(3, "Motivo requerido"),
+  reason: z.string().optional(),
   employeePin: z.string().length(6, "Código de 6 dígitos requerido"),
   productName: z.string().optional(),
   quantity: z.coerce.number().optional(),
   unitPrice: z.coerce.number().optional(),
   evidenceNote: z.string().optional()
+}).superRefine((data, ctx) => {
+  if (data.kind !== "DRINK" && (!data.reason || data.reason.trim().length < 3)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Motivo requerido",
+      path: ["reason"]
+    })
+  }
 })
 type MovementFormInput = z.input<typeof movementSchema>
 type MovementFormOutput = z.output<typeof movementSchema>
@@ -105,10 +113,18 @@ type AdminMovementFormOutput = z.output<typeof adminMovementSchema>
 const employeeRequestSchema = z.object({
   kind: z.enum(["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]),
   amount: z.coerce.number().positive("Cantidad invalida"),
-  reason: z.string().min(3, "Motivo requerido"),
+  reason: z.string().optional(),
   productName: z.string().optional(),
   quantity: z.coerce.number().optional(),
   unitPrice: z.coerce.number().optional()
+}).superRefine((data, ctx) => {
+  if (data.kind !== "DRINK" && (!data.reason || data.reason.trim().length < 3)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Motivo requerido",
+      path: ["reason"]
+    })
+  }
 })
 type EmployeeRequestFormInput = z.input<typeof employeeRequestSchema>
 type EmployeeRequestFormOutput = z.output<typeof employeeRequestSchema>

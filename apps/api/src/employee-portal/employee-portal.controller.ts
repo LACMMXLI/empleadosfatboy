@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Headers, Param, Patch, Post, Req } from "@nestjs/common"
-import { IsEnum, IsNumber, IsOptional, IsString, Length, Min } from "class-validator"
+import { IsEnum, IsNumber, IsOptional, IsString, Length, Min, ValidateIf } from "class-validator"
 import { MovementKind } from "@prisma/client"
 import type { Request } from "express"
 import { Public } from "../auth/public.decorator"
@@ -22,8 +22,9 @@ class EmployeeRequestDto {
   @Min(0.01)
   amount!: number
 
+  @ValidateIf((o) => o.kind !== MovementKind.DRINK)
   @IsString()
-  reason!: string
+  reason?: string
 
   @IsOptional()
   @IsString()
