@@ -18,7 +18,8 @@ import {
   UserRoundPlus,
   UsersRound,
   X,
-  Phone
+  Phone,
+  Download
 } from "lucide-react"
 import { api, employeeSession, session } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -278,6 +279,62 @@ function useScrollDirection() {
   return { scrollDir, isNearTop }
 }
 
+function usePWAInstall() {
+  const [promptEvent, setPromptEvent] = useState<any>(null)
+  const [isInstalled, setIsInstalled] = useState(false)
+  const [showIOSInstructions, setShowIOSInstructions] = useState(false)
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setPromptEvent(e)
+    }
+
+    const handleAppInstalled = () => {
+      setPromptEvent(null)
+      setIsInstalled(true)
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+    window.addEventListener("appinstalled", handleAppInstalled)
+
+    // Check display mode
+    if (window.matchMedia("(display-mode: standalone)").matches || (window.navigator as any).standalone) {
+      setIsInstalled(true)
+    }
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+      window.removeEventListener("appinstalled", handleAppInstalled)
+    }
+  }, [])
+
+  const install = async () => {
+    if (promptEvent) {
+      promptEvent.prompt()
+      const { outcome } = await promptEvent.userChoice
+      if (outcome === "accepted") {
+        setPromptEvent(null)
+      }
+    } else {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+      if (isIOS) {
+        setShowIOSInstructions(true)
+      } else {
+        alert("Para instalar esta aplicación, haz clic en el icono de instalación (pantalla con flecha hacia abajo) en la barra de direcciones de tu navegador (Chrome/Edge).")
+      }
+    }
+  }
+
+  return {
+    isInstallable: !!promptEvent,
+    isInstalled,
+    install,
+    showIOSInstructions,
+    setShowIOSInstructions
+  }
+}
+
 function App() {
   const [tokenState, setTokenState] = useState(session.token)
   const [employeeTokenState, setEmployeeTokenState] = useState(employeeSession.token)
@@ -398,6 +455,8 @@ function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void }) {
     onError: (err: Error) => setError(err.message)
   })
 
+  const { isInstalled, install, showIOSInstructions, setShowIOSInstructions } = usePWAInstall()
+
   return (
     <LoginFrame variant="admin">
       <Card className="login-card w-full max-w-sm">
@@ -413,9 +472,34 @@ function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void }) {
             <Input className="login-input h-12" placeholder="Email" {...form.register("email")} />
             <Input className="login-input h-12" placeholder="Password" type="password" {...form.register("password")} />
             {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-sm">{error}</div>}
-            <Button className="login-primary h-12 w-full" disabled={login.isPending}>
+            <Button className="login-primary h-12 w-full text-base font-semibold" disabled={login.isPending} type="submit">
               Entrar a administración
             </Button>
+            
+            {!isInstalled && (
+              <Button 
+                className="w-full h-11 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center gap-2 mt-2 transition-all font-semibold"
+                onClick={install}
+                type="button"
+              >
+                <Download className="h-4 w-4" />
+                Instalar App Administrativa
+              </Button>
+            )}
+
+            {showIOSInstructions && (
+              <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3 text-xs text-cyan-300 mt-2 space-y-1 text-left">
+                <p className="font-semibold">Instrucciones para iOS:</p>
+                <ol className="list-decimal pl-4 space-y-0.5">
+                  <li>Pulsa el botón <strong>Compartir</strong> en Safari (abajo en el centro).</li>
+                  <li>Selecciona <strong>Agregar a inicio</strong> en la lista de opciones.</li>
+                </ol>
+                <button className="text-cyan-400 font-bold block pt-1 hover:underline text-left" onClick={() => setShowIOSInstructions(false)} type="button">
+                  Entendido, cerrar
+                </button>
+              </div>
+            )}
+
             <Button className="h-11 w-full rounded-xl hover:bg-white/10" type="button" variant="ghost" onClick={() => goToPortal("home", () => window.location.reload())}>
               Volver
             </Button>
@@ -439,6 +523,8 @@ function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void }) 
     onError: (err: Error) => setEmployeeError(err.message)
   })
 
+  const { isInstalled, install, showIOSInstructions, setShowIOSInstructions } = usePWAInstall()
+
   return (
     <LoginFrame variant="employee">
       <Card className="login-card w-full max-w-sm text-[#f7efe3]">
@@ -460,9 +546,33 @@ function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void }) 
               <input className="form-input login-input h-12 pl-12" placeholder="PIN de 6 dígitos" type="password" inputMode="numeric" maxLength={6} {...employeeForm.register("pin")} />
             </div>
             {employeeError && <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-center">{employeeError}</div>}
-            <button className="login-primary h-12 w-full text-base" disabled={employeeLogin.isPending} type="submit">
+            <button className="login-primary h-12 w-full text-base font-semibold" disabled={employeeLogin.isPending} type="submit">
               {employeeLogin.isPending ? "Ingresando..." : "Ingresar"}
             </button>
+
+            {!isInstalled && (
+              <button
+                className="w-full mt-2 bg-[#f97316]/10 hover:bg-[#f97316]/20 text-[#f97316] border border-[#f97316]/30 rounded-2xl h-12 flex items-center justify-center gap-2 font-semibold transition-all"
+                onClick={install}
+                type="button"
+              >
+                <Download className="h-4 w-4" />
+                Instalar App Empleado
+              </button>
+            )}
+
+            {showIOSInstructions && (
+              <div className="rounded-2xl border border-[#f97316]/30 bg-[#f97316]/5 p-3 text-xs text-[#f97316] mt-2 space-y-1 text-left">
+                <p className="font-semibold">Instrucciones para iOS:</p>
+                <ol className="list-decimal pl-4 space-y-0.5">
+                  <li>Pulsa el botón <strong>Compartir</strong> en Safari (abajo en el centro).</li>
+                  <li>Selecciona <strong>Agregar a inicio</strong> en la lista de opciones.</li>
+                </ol>
+                <button className="text-[#f97316] font-bold block pt-1 hover:underline text-left" onClick={() => setShowIOSInstructions(false)} type="button">
+                  Entendido, cerrar
+                </button>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
