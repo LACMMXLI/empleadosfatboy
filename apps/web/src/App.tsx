@@ -17,7 +17,8 @@ import {
   UserRound,
   UserRoundPlus,
   UsersRound,
-  X
+  X,
+  Phone
 } from "lucide-react"
 import { api, employeeSession, session } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -234,6 +235,46 @@ function LoginFrame({ children, variant }: { children: ReactNode; variant: "admi
   )
 }
 
+function useScrollDirection() {
+  const [scrollDir, setScrollDir] = useState<"up" | "down">("up")
+  const [isNearTop, setIsNearTop] = useState(true)
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY
+    let ticking = false
+
+    const updateScrollDirection = () => {
+      const scrollY = window.scrollY
+      setIsNearTop(scrollY < 15)
+
+      if (Math.abs(scrollY - lastScrollY) < 5) {
+        ticking = false
+        return
+      }
+
+      if (scrollY > lastScrollY) {
+        setScrollDir("down")
+      } else {
+        setScrollDir("up")
+      }
+      lastScrollY = scrollY > 0 ? scrollY : 0
+      ticking = false
+    }
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateScrollDirection)
+        ticking = true
+      }
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  return { scrollDir, isNearTop }
+}
+
 function App() {
   const [tokenState, setTokenState] = useState(session.token)
   const [employeeTokenState, setEmployeeTokenState] = useState(employeeSession.token)
@@ -382,24 +423,30 @@ function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void }) 
   return (
     <LoginFrame variant="employee">
       <Card className="login-card w-full max-w-sm text-[#f7efe3]">
-        <CardHeader className="space-y-3 p-5">
-          <LoginLogo className="border-white/10" />
+        <CardHeader className="space-y-4 p-5 pb-3">
+          <LoginLogo />
           <div>
-            <CardTitle className="text-xl">Empleado</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">Acceso con teléfono y código privado</p>
+            <CardTitle className="text-xl text-center">Portal Empleado</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground text-center">Ingresa con tu teléfono y código PIN</p>
           </div>
         </CardHeader>
-        <CardContent className="p-5 pt-0">
-          <form className="space-y-3" onSubmit={employeeForm.handleSubmit((values) => employeeLogin.mutate(values))}>
-            <Input className="login-input h-12" placeholder="Teléfono" inputMode="tel" {...employeeForm.register("phone")} />
-            <Input className="login-input h-12" placeholder="Código de 6 dígitos" type="password" inputMode="numeric" maxLength={6} {...employeeForm.register("pin")} />
-            {employeeError && <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-3 text-sm">{employeeError}</div>}
-            <Button className="login-primary h-12 w-full text-base" disabled={employeeLogin.isPending}>
-              Entrar
-            </Button>
-            <Button className="h-11 w-full rounded-2xl" type="button" variant="ghost" onClick={() => goToPortal("home", () => window.location.reload())}>
+        <CardContent className="p-5 pt-2">
+          <form className="space-y-4" onSubmit={employeeForm.handleSubmit((values) => employeeLogin.mutate(values))}>
+            <div className="relative">
+              <Phone className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" style={{ color: 'hsl(var(--primary))' }} />
+              <input className="form-input login-input h-12 pl-12" placeholder="Teléfono" inputMode="tel" {...employeeForm.register("phone")} />
+            </div>
+            <div className="relative">
+              <KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" style={{ color: 'hsl(var(--accent))' }} />
+              <input className="form-input login-input h-12 pl-12" placeholder="PIN de 6 dígitos" type="password" inputMode="numeric" maxLength={6} {...employeeForm.register("pin")} />
+            </div>
+            {employeeError && <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-center">{employeeError}</div>}
+            <button className="login-primary h-12 w-full text-base" disabled={employeeLogin.isPending} type="submit">
+              {employeeLogin.isPending ? "Ingresando..." : "Ingresar"}
+            </button>
+            <button className="h-11 w-full rounded-2xl text-muted-foreground hover:bg-white/5 transition" type="button" onClick={() => goToPortal("home", () => window.location.reload())}>
               Volver
-            </Button>
+            </button>
           </form>
         </CardContent>
       </Card>
@@ -417,6 +464,9 @@ function Shell({
   onLogout: () => void
 }) {
   const me = useQuery({ queryKey: ["me"], queryFn: api.me })
+  const { scrollDir, isNearTop } = useScrollDirection()
+  const showNav = isNearTop || scrollDir === "up"
+
   const views = [
     { id: "pendientes" as const, label: "Aprobaciones", icon: ShieldCheck },
     { id: "historial" as const, label: "Historial", icon: ClipboardList },
@@ -466,15 +516,21 @@ function Shell({
 
         {/* === Main Content === */}
         <section className="flex min-w-0 flex-1 flex-col">
-          <header className="admin-header">
+          <header 
+            className="admin-header"
+            style={{ transform: showNav ? "translateY(0)" : "translateY(-100%)" }}
+          >
             <div className="flex items-center gap-3">
               <div className="lg:hidden">
                 <img src={fatboyLogo} alt="" className="h-6 w-auto opacity-80" />
               </div>
               <div className="admin-header-user">
                 <div className="admin-header-view lg:hidden">{viewTitles[activeView]}</div>
-                <div className="admin-header-name">{me.data?.fullName ?? "Usuario"}</div>
-                <div className="admin-header-role">{me.data?.role ?? ""}</div>
+                <div className="admin-header-name">
+                  {me.data?.fullName ?? "Usuario"}{" "}
+                  <span style={{ opacity: 0.4 }} className="mx-1">/</span>{" "}
+                  <span className="admin-header-role-inline">{me.data?.role ?? ""}</span>
+                </div>
               </div>
             </div>
             <button
@@ -499,7 +555,12 @@ function Shell({
       </div>
 
       {/* === Mobile Bottom Nav === */}
-      <MobileBottomNav activeView={activeView} views={views} onViewChange={onViewChange} />
+      <MobileBottomNav 
+        activeView={activeView} 
+        views={views} 
+        onViewChange={onViewChange} 
+        style={{ transform: showNav ? "translateY(0)" : "translateY(100%)" }}
+      />
     </main>
   )
 }
@@ -507,11 +568,13 @@ function Shell({
 function MobileBottomNav({
   activeView,
   views,
-  onViewChange
+  onViewChange,
+  style
 }: {
   activeView: View
   views: Array<{ id: View; label: string; icon: typeof LayoutDashboard }>
   onViewChange: (view: View) => void
+  style?: React.CSSProperties
 }) {
   const navLabels: Record<View, string> = {
     pendientes: "Aprobar",
@@ -523,7 +586,7 @@ function MobileBottomNav({
     configuracion: "Config"
   }
   return (
-    <nav className="bottom-nav lg:hidden">
+    <nav className="bottom-nav lg:hidden" style={style}>
       <div className="grid grid-cols-7 gap-0.5 max-w-lg mx-auto">
         {views.map((item) => {
           const active = activeView === item.id
@@ -2016,6 +2079,9 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const requestAmount = isDrink ? beveragePrice : Number(values.amount || 0)
   const requestReason = values.reason?.trim() ?? ""
 
+  const { scrollDir, isNearTop } = useScrollDirection()
+  const showNav = isNearTop || scrollDir === "up"
+
   useEffect(() => {
     if (selectedKind === "DRINK") {
       form.setValue("amount", beveragePrice)
@@ -2094,146 +2160,185 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
     onError: (err: Error) => setCodeMessage(err.message)
   })
   const recentMovements = (movements.data ?? []).filter((movement) => movement.status !== "DISCOUNTED").slice(0, 4)
+
   return (
-    <main className="min-h-screen bg-[#080a0f] text-[#f7efe3]">
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[#080a0f]/90 p-4 backdrop-blur-xl">
+    <main className="employee-shell min-h-screen">
+      {/* Employee Header */}
+      <header 
+        className="employee-header"
+        style={{ transform: showNav ? "translateY(0)" : "translateY(-100%)" }}
+      >
         <div>
-          <div className="text-[11px] font-medium uppercase text-primary/80">Mi cuenta</div>
-          <div className="text-base font-semibold">{me.data?.fullName ?? "Empleado"}</div>
+          <div className="employee-header-title">Mi Portal</div>
+          <div className="employee-header-name">{me.data?.fullName ?? "Empleado"}</div>
         </div>
-        <Button
-          variant="secondary"
-          size="icon"
-          className="h-11 w-11 rounded-full border border-white/10 bg-white/[0.08] text-[#f7efe3] hover:bg-white/[0.12]"
+        <button
+          className="btn-icon rounded-full border border-white/10 bg-white/[0.08] text-[#f7efe3] hover:bg-white/[0.12] w-10 h-10 flex items-center justify-center cursor-pointer"
           onClick={() => {
             setCodeMessage(null)
             setAccountOpen(true)
           }}
           aria-label="Abrir cuenta"
+          type="button"
         >
           <UserRound className="h-5 w-5" />
-        </Button>
+        </button>
       </header>
+
+      {/* Account Settings Modal */}
       {accountOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" onClick={() => setAccountOpen(false)}>
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#10151d] p-4 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1117] p-5 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <UserRound className="h-6 w-6" />
                 </div>
                 <div className="mt-3 truncate text-lg font-semibold">{me.data?.fullName ?? "Empleado"}</div>
-                <div className="text-sm text-muted-foreground">{me.data?.position ?? "Puesto"}</div>
+                <div className="text-xs text-muted-foreground mt-1">{me.data?.position ?? "Puesto"}</div>
               </div>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-white/10" onClick={() => setAccountOpen(false)} aria-label="Cerrar">
+              <button className="h-10 w-10 rounded-full hover:bg-white/10 flex items-center justify-center border-none bg-transparent cursor-pointer text-muted-foreground" onClick={() => setAccountOpen(false)} aria-label="Cerrar">
                 <X className="h-5 w-5" />
-              </Button>
+              </button>
             </div>
 
-            <form className="mt-5 space-y-3 rounded-3xl border border-white/10 bg-white/[0.04] p-4" onSubmit={codeForm.handleSubmit((values) => changeCode.mutate(values))}>
+            <form className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4" onSubmit={codeForm.handleSubmit((values) => changeCode.mutate(values))}>
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <KeyRound className="h-4 w-4 text-primary" />
-                Cambiar código privado
+                Cambiar PIN privado
               </div>
-              <Input className="h-12 rounded-2xl border-white/10 bg-black/20" placeholder="Código actual" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("currentCode")} />
-              <Input className="h-12 rounded-2xl border-white/10 bg-black/20" placeholder="Nuevo código" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("newCode")} />
-              <Button className="h-12 w-full rounded-2xl border border-white/10 bg-white/10 hover:bg-white/15" variant="secondary" disabled={changeCode.isPending}>
-                Actualizar código
-              </Button>
-              {codeMessage && <div className="text-sm text-muted-foreground">{codeMessage}</div>}
+              <input className="form-input h-12 rounded-xl border-white/10 bg-black/20" placeholder="Código PIN actual" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("currentCode")} />
+              <input className="form-input h-12 rounded-xl border-white/10 bg-black/20" placeholder="Nuevo código PIN" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("newCode")} />
+              <button className="btn-primary h-12 w-full rounded-xl" disabled={changeCode.isPending} type="submit">
+                {changeCode.isPending ? "Actualizando PIN..." : "Actualizar PIN"}
+              </button>
+              {codeMessage && <div className="text-xs text-muted-foreground text-center mt-1">{codeMessage}</div>}
             </form>
 
-            <Button
-              className="mt-3 h-12 w-full rounded-2xl hover:bg-white/10"
-              variant="ghost"
+            <button
+              className="mt-4 h-12 w-full rounded-2xl hover:bg-white/5 border border-white/10 bg-transparent text-muted-foreground hover:text-foreground transition flex items-center justify-center gap-2 cursor-pointer font-semibold"
               onClick={() => {
                 employeeSession.token = null
                 setAccountOpen(false)
                 onLogout()
               }}
+              type="button"
             >
-              <LogOut className="mr-2 h-4 w-4" />
+              <LogOut className="h-4 w-4" />
               Cerrar sesión
-            </Button>
+            </button>
           </div>
         </div>
       )}
-      <div className="mx-auto max-w-md space-y-4 p-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+
+      {/* Main Page Area */}
+      <div className="mx-auto max-w-md space-y-5 p-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
         {activeTab === "home" && (
           <>
-            <section className="rounded-3xl border border-white/10 bg-[#10151d] p-5 shadow-2xl shadow-black/20">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-2xl font-semibold">{me.data?.fullName ?? "Empleado"}</div>
-                  <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-                    <UserRound className="h-4 w-4 text-primary" />
-                    {me.data?.position ?? "Puesto"}
+            {/* Profile Banner */}
+            <section className="employee-profile-banner">
+              <div className="employee-avatar-ring">
+                {me.data?.fullName ? getInitials(me.data.fullName) : "E"}
+              </div>
+              <div className="employee-meta">
+                <div className="employee-meta-name">{me.data?.fullName ?? "Empleado"}</div>
+                <div className="employee-meta-details">
+                  <div className="employee-meta-item">
+                    <UserRound style={{ color: 'hsl(var(--primary))' }} />
+                    <span>{me.data?.position ?? "Puesto"}</span>
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                    <Building2 className="h-4 w-4 text-accent" />
-                    {me.data?.branch?.name ?? "Sucursal"}
+                  <div className="employee-meta-item">
+                    <Building2 style={{ color: 'hsl(var(--accent))' }} />
+                    <span>{me.data?.branch?.name ?? "Sucursal"}</span>
                   </div>
                 </div>
-                <div className="rounded-full border border-primary/25 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary">Activo</div>
               </div>
             </section>
 
-            <section className="rounded-3xl border border-primary/20 bg-[#18130d] p-5 shadow-2xl shadow-primary/5">
-              <div className="flex items-center gap-2 text-sm text-primary/80">
-                <Banknote className="h-4 w-4" />
-                Saldo pendiente
+            {/* Balance Card Hero */}
+            <section className="employee-balance-card">
+              <div className="employee-balance-label">
+                <Banknote style={{ width: 14, height: 14 }} />
+                Saldo pendiente por descontar
               </div>
-              <div className="mt-3 font-mono text-4xl font-semibold">{money.format(balance.data?.pendingBalance ?? 0)}</div>
+              <div className="employee-balance-value">
+                {money.format(balance.data?.pendingBalance ?? 0)}
+              </div>
+              <div className="employee-balance-footer">
+                <span>Total acumulado en el periodo actual</span>
+                <span className="badge-status badge-authorized" style={{ fontSize: '0.6rem' }}>Activo</span>
+              </div>
             </section>
 
+            {/* Middle decorative logo or brand mark */}
             <img
-              className="pointer-events-none mx-auto -my-2 h-28 w-full max-w-sm object-contain opacity-85 drop-shadow-[0_18px_30px_rgba(0,0,0,0.35)]"
+              className="pointer-events-none mx-auto -my-2 h-20 w-full max-w-[200px] object-contain opacity-40 filter brightness-150 drop-shadow-[0_18px_30px_rgba(0,0,0,0.35)]"
               src={fatboyLogo}
               alt=""
               aria-hidden="true"
             />
 
-            {recentMovements.length > 0 && <PortalMovementList title="Recientes" movements={recentMovements} />}
+            {recentMovements.length > 0 && (
+              <PortalMovementList title="Movimientos Recientes" movements={recentMovements} />
+            )}
           </>
         )}
 
         {activeTab === "request" && (
-          <Card className="rounded-3xl border-white/10 bg-[#10151d] shadow-2xl shadow-black/20">
-            <CardHeader>
-              <CardTitle>Solicitar</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className="admin-card" style={{ background: 'rgba(13,17,23,0.8)' }}>
+            <div className="admin-card-header">
+              <div className="admin-card-title">
+                <Banknote style={{ width: 16, height: 16, color: '#00e5ff' }} />
+                Nueva Solicitud
+              </div>
+            </div>
+            <div className="admin-card-body">
               <form
-                className="space-y-3"
+                className="space-y-4"
                 noValidate
                 onSubmit={form.handleSubmit(prepareRequestConfirmation, handleInvalidRequest)}
               >
-                <GuidedBlock step="1" title="Tipo" detail="Selecciona una opción">
-                  <Select className="h-12 rounded-2xl border-white/10 bg-black/20" {...form.register("kind")} onChange={(event) => {
-                    form.setValue("kind", event.target.value as EmployeeRequestFormInput["kind"])
-                    setConfirming(false)
-                    setRequestError(null)
-                  }}>
-                    {employeeRequestKinds.map((kind) => (
-                      <option key={kind} value={kind}>
-                        {movementLabels[kind]}
-                      </option>
-                    ))}
-                  </Select>
+                <GuidedBlock step="1" title="Tipo de Adelanto" detail="Selecciona la categoría de tu solicitud">
+                  <div className="employee-action-grid">
+                    {employeeRequestKinds.map((k) => {
+                      const active = selectedKind === k
+                      const Icon = k === "SALARY_ADVANCE" ? Banknote : k === "DRINK" ? WalletCards : Building2
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          className={`employee-action-btn ${active ? "active" : ""}`}
+                          onClick={() => {
+                            form.setValue("kind", k as EmployeeRequestFormInput["kind"])
+                            setConfirming(false)
+                            setRequestError(null)
+                          }}
+                        >
+                          <Icon />
+                          <span className="employee-action-label" style={{ fontSize: '0.675rem' }}>{movementLabels[k]}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </GuidedBlock>
-                <GuidedBlock step="2" title={isDrink ? "Bebida" : "Monto"} detail={isDrink ? "Precio configurado por administración" : "Captura la cantidad"}>
+
+                <GuidedBlock 
+                  step="2" 
+                  title={isDrink ? "Costo Configurado" : "Monto de la Solicitud"} 
+                  detail={isDrink ? "Precio asignado para consumos de bebidas" : "Captura el monto a solicitar"}
+                >
                   {isDrink ? (
-                    <div className="flex h-12 items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 text-sm">
-                      <span className="text-muted-foreground">Precio</span>
-                      <span className="font-mono text-lg font-semibold">{money.format(beveragePrice)}</span>
+                    <div className="flex h-12 items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 text-sm">
+                      <span className="text-muted-foreground">Precio por unidad</span>
+                      <span className="font-mono text-base font-bold text-foreground">{money.format(beveragePrice)}</span>
                     </div>
                   ) : (
-                    <Input
-                      className="h-12 rounded-2xl border-white/10 bg-black/20"
+                    <input
+                      className="form-input h-12"
                       type="number"
                       step="0.01"
                       min="0.01"
-                      placeholder="Monto"
+                      placeholder="Monto ($)"
                       {...form.register("amount", {
                         onChange: () => {
                           setConfirming(false)
@@ -2242,17 +2347,18 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                       })}
                     />
                   )}
-                  <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm">
-                    <span className="text-muted-foreground">Monto capturado</span>
-                    <span className="font-mono text-base font-semibold text-primary">{money.format(Number.isFinite(requestAmount) ? requestAmount : 0)}</span>
+                  <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs">
+                    <span className="text-muted-foreground">Total de la solicitud</span>
+                    <span className="font-mono text-sm font-bold text-primary">{money.format(Number.isFinite(requestAmount) ? requestAmount : 0)}</span>
                   </div>
                 </GuidedBlock>
-                <GuidedBlock step="3" title="Motivo" detail="Describe brevemente la razón">
-                  <div className="flex flex-wrap gap-2">
+
+                <GuidedBlock step="3" title="Motivo" detail="Razón corta obligatoria para la solicitud">
+                  <div className="flex flex-wrap gap-1.5">
                     {quickRequestReasons.map((reason) => (
                       <button
                         key={reason}
-                        className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition active:bg-primary/20"
+                        className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[0.675rem] font-semibold text-primary transition active:bg-primary/20"
                         type="button"
                         onClick={() => appendQuickReason(reason)}
                       >
@@ -2260,9 +2366,9 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                       </button>
                     ))}
                   </div>
-                  <Textarea
-                    className="rounded-2xl border-white/10 bg-black/20"
-                    placeholder="Motivo"
+                  <textarea
+                    className="form-textarea mt-2"
+                    placeholder="Escribe brevemente tu motivo..."
                     {...form.register("reason", {
                       onChange: () => {
                         setConfirming(false)
@@ -2271,34 +2377,47 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                     })}
                   />
                 </GuidedBlock>
-                {requestError && <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-3 text-sm">{requestError}</div>}
-                <Button className="h-12 w-full rounded-2xl text-base shadow-lg shadow-primary/10" disabled={create.isPending}>
-                  Continuar
-                </Button>
-                <p className="px-1 text-center text-xs text-muted-foreground">Las solicitudes quedan sujetas a revisión y autorización administrativa.</p>
-                {message && <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-sm text-muted-foreground">{message}</div>}
+
+                {requestError && (
+                  <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive-foreground text-center">
+                    {requestError}
+                  </div>
+                )}
+                
+                <button className="btn-primary h-12 w-full rounded-xl text-sm" disabled={create.isPending} type="submit">
+                  {create.isPending ? "Procesando..." : "Continuar"}
+                </button>
+                <p className="px-1 text-center text-[10px] text-muted-foreground leading-relaxed">
+                  *Las solicitudes se envían al panel de administración para su aprobación y posterior deducción de nómina.
+                </p>
+                {message && (
+                  <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-xs text-center text-muted-foreground mt-2">
+                    {message}
+                  </div>
+                )}
               </form>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
+
         {confirming && activeTab === "request" && (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" onClick={() => setConfirming(false)}>
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#10151d] p-4 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1117] p-5 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
               <div className="space-y-1">
-                <div className="text-lg font-semibold">Confirmar solicitud</div>
-                <p className="text-sm text-muted-foreground">Revisa los datos antes de enviar tu solicitud.</p>
+                <div className="text-base font-bold text-foreground">Confirmar Solicitud</div>
+                <p className="text-xs text-muted-foreground">Verifica que los datos sean correctos antes de enviarla.</p>
               </div>
-              <div className="mt-4 space-y-2 rounded-3xl border border-white/10 bg-white/[0.04] p-4 text-sm">
-                <DetailLine label="Tipo de solicitud" value={movementLabels[values.kind as MovementKind]} />
-                <DetailLine label="Monto" value={money.format(Number.isFinite(requestAmount) ? requestAmount : 0)} />
-                <DetailLine label="Motivo" value={requestReason || "Sin motivo"} />
+              <div className="mt-4 space-y-2.5 rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-xs">
+                <DetailLine label="Categoría de adelanto" value={movementLabels[values.kind as MovementKind]} />
+                <DetailLine label="Importe total" value={money.format(Number.isFinite(requestAmount) ? requestAmount : 0)} />
+                <DetailLine label="Motivo especificado" value={requestReason || "Sin motivo"} />
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <Button className="h-12 rounded-2xl hover:bg-white/10" type="button" variant="ghost" onClick={() => setConfirming(false)}>
+                <button className="btn-secondary h-12 rounded-xl text-xs" type="button" onClick={() => setConfirming(false)}>
                   Cancelar
-                </Button>
-                <Button
-                  className="h-12 rounded-2xl"
+                </button>
+                <button
+                  className="btn-primary h-12 rounded-xl text-xs"
                   type="button"
                   disabled={create.isPending}
                   onClick={form.handleSubmit((payload) => {
@@ -2306,8 +2425,8 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                     create.mutate(payload)
                   }, handleInvalidRequest)}
                 >
-                  Confirmar solicitud
-                </Button>
+                  Confirmar y enviar
+                </button>
               </div>
             </div>
           </div>
@@ -2317,17 +2436,25 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
           <PortalSettlementTicketList tickets={settlementTickets.data ?? []} />
         )}
       </div>
-      <EmployeeBottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {/* Floating dynamic bottom navigation */}
+      <EmployeeBottomNav 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        style={{ transform: showNav ? "translateY(0)" : "translateY(100%)" }}
+      />
     </main>
   )
 }
 
 function EmployeeBottomNav({
   activeTab,
-  onTabChange
+  onTabChange,
+  style
 }: {
   activeTab: "home" | "request" | "history"
   onTabChange: (tab: "home" | "request" | "history") => void
+  style?: React.CSSProperties
 }) {
   const items = [
     { id: "home" as const, label: "Inicio", icon: LayoutDashboard },
@@ -2336,21 +2463,19 @@ function EmployeeBottomNav({
   ]
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#080a0f]/90 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 shadow-2xl shadow-black/50 backdrop-blur-xl">
-      <div className="mx-auto grid max-w-md grid-cols-3 gap-2">
+    <nav className="employee-bottom-nav" style={style}>
+      <div className="employee-bottom-nav-inner">
         {items.map((item) => {
           const active = activeTab === item.id
           return (
             <button
               key={item.id}
-              className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl text-xs font-semibold transition ${
-                active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground active:bg-white/10"
-              }`}
+              className={`employee-bottom-nav-btn ${active ? "active" : ""}`}
               type="button"
               onClick={() => onTabChange(item.id)}
             >
-              <item.icon className="h-5 w-5" />
-              {item.label}
+              <item.icon />
+              <span>{item.label}</span>
             </button>
           )
         })}
@@ -2361,81 +2486,79 @@ function EmployeeBottomNav({
 
 function PortalSettlementTicketList({ tickets }: { tickets: MovementSettlementTicket[] }) {
   return (
-    <Card className="rounded-3xl border-white/10 bg-[#10151d] shadow-2xl shadow-black/20">
-      <CardHeader>
-        <CardTitle>Tickets de descuento</CardTitle>
-        <p className="text-sm text-muted-foreground">Comprobantes digitales de periodos ya liquidados.</p>
-      </CardHeader>
-      <CardContent>
-        {!tickets.length && <StatusText text="Sin tickets de descuento" />}
-        <div className="space-y-3">
-          {tickets.map((ticket) => (
-            <section key={ticket.id} className="overflow-hidden rounded-3xl border border-primary/25 bg-[#0d1118]">
-              <div className="border-b border-dashed border-white/15 bg-primary/10 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-semibold uppercase text-primary/80">Ticket de descuento</div>
-                    <div className="mt-1 truncate font-mono text-sm font-semibold">{ticket.ticketNumber}</div>
-                  </div>
-                  <Badge className="border-primary/40 bg-primary/10 text-primary">Liquidado</Badge>
+    <div className="space-y-4">
+      <div className="section-title text-[0.875rem] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+        <ClipboardList style={{ width: 14, height: 14, color: '#00e5ff' }} />
+        Historial de Periodos Liquidados
+      </div>
+      {!tickets.length && <StatusEmpty text="No hay periodos liquidados registrados aún." />}
+      <div className="space-y-3.5">
+        {tickets.map((ticket) => (
+          <section key={ticket.id} className="employee-ticket-card">
+            <div className="employee-ticket-header">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-accent">Recibo Digital</div>
+                  <div className="mt-1 font-mono text-xs font-semibold text-foreground">{ticket.ticketNumber}</div>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <div className="text-[11px] uppercase text-muted-foreground">Periodo</div>
-                    <div className="mt-1 font-medium">{formatTicketPeriod(ticket.from, ticket.to)}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[11px] uppercase text-muted-foreground">Fecha</div>
-                    <div className="mt-1 font-medium">{formatTicketDate(ticket.settledAt)}</div>
-                  </div>
+                <span className="badge-status badge-authorized" style={{ fontSize: '0.625rem' }}>Liquidado</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider">Periodo</div>
+                  <div className="mt-0.5 font-semibold text-foreground">{formatTicketPeriod(ticket.from, ticket.to)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[9px] uppercase tracking-wider">Fecha Liquidación</div>
+                  <div className="mt-0.5 font-semibold text-foreground">{formatTicketDate(ticket.settledAt)}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="employee-ticket-body space-y-3">
+              <div className="flex items-end justify-between gap-3 border-b border-dashed border-white/5 pb-2.5">
+                <div>
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Movimientos</div>
+                  <div className="mt-0.5 font-mono text-lg font-bold text-foreground">{ticket.count}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[9px] uppercase tracking-wider text-muted-foreground">Total Descontado</div>
+                  <div className="mt-0.5 font-mono text-xl font-bold text-primary">{money.format(ticket.total)}</div>
                 </div>
               </div>
 
-              <div className="space-y-3 p-4">
-                <div className="flex items-end justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] uppercase text-muted-foreground">Movimientos</div>
-                    <div className="mt-1 font-mono text-xl font-semibold">{ticket.count}</div>
+              <div className="space-y-1.5">
+                {ticket.byKind.map((item) => (
+                  <div key={item.kind} className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-1.5 text-xs">
+                    <span className="min-w-0 truncate text-muted-foreground">{movementLabels[item.kind]}</span>
+                    <span className="font-mono font-semibold text-foreground">{item.count} · {money.format(item.amount)}</span>
                   </div>
-                  <div className="text-right">
-                    <div className="text-[11px] uppercase text-muted-foreground">Total descontado</div>
-                    <div className="mt-1 font-mono text-2xl font-semibold text-primary">{money.format(ticket.total)}</div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {ticket.byKind.map((item) => (
-                    <div key={item.kind} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm">
-                      <span className="min-w-0 truncate">{movementLabels[item.kind]}</span>
-                      <span className="font-mono">{item.count} · {money.format(item.amount)}</span>
-                    </div>
-                  ))}
-                  {!ticket.byKind.length && ticket.folios.length > 0 && (
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-muted-foreground">
-                      {ticket.folios.length} folio(s) liquidados
-                    </div>
-                  )}
-                </div>
-
-                {ticket.movements.length > 0 && (
-                  <div className="space-y-2 border-t border-dashed border-white/15 pt-3">
-                    {ticket.movements.map((movement) => (
-                      <div key={movement.folio} className="grid grid-cols-[1fr_auto] gap-3 text-sm">
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">{movementLabels[movement.kind]}</div>
-                          <div className="truncate font-mono text-[11px] text-muted-foreground">{movement.folio}</div>
-                        </div>
-                        <div className="font-mono font-semibold">{money.format(movement.amount)}</div>
-                      </div>
-                    ))}
+                ))}
+                {!ticket.byKind.length && ticket.folios.length > 0 && (
+                  <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-1.5 text-xs text-muted-foreground text-center">
+                    {ticket.folios.length} folio(s) liquidados
                   </div>
                 )}
               </div>
-            </section>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+
+              {ticket.movements.length > 0 && (
+                <div className="space-y-2 border-t border-dashed border-white/10 pt-2.5">
+                  {ticket.movements.map((movement) => (
+                    <div key={movement.folio} className="grid grid-cols-[1fr_auto] gap-3 text-xs">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-foreground">{movementLabels[movement.kind]}</div>
+                        <div className="truncate font-mono text-[10px] text-muted-foreground">{movement.folio}</div>
+                      </div>
+                      <div className="font-mono font-bold text-foreground">{money.format(movement.amount)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -2454,33 +2577,41 @@ function formatTicketDate(value?: string) {
 
 function PortalMovementList({ title, movements, admin = false }: { title: string; movements: Movement[]; admin?: boolean }) {
   return (
-    <Card className="rounded-3xl border-white/10 bg-[#10151d] shadow-2xl shadow-black/20">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {!movements.length && <StatusText text="Sin movimientos" />}
-        <div className="space-y-2">
-          {movements.map((movement) => (
-            <div key={movement.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+    <div className="space-y-3">
+      <div className="section-title text-[0.875rem] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+        <ClipboardList style={{ width: 14, height: 14, color: '#00e5ff' }} />
+        {title}
+      </div>
+      {!movements.length && <StatusEmpty text="Sin movimientos en el periodo actual." />}
+      <div className="space-y-2.5">
+        {movements.map((movement) => {
+          const statusClass = movement.status.toLowerCase()
+          return (
+            <div key={movement.id} className={`employee-movement-card status-${statusClass}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-mono text-[11px] text-muted-foreground">{movement.folio}</div>
-                  <div className="truncate text-sm font-semibold">{movementLabels[movement.kind]}</div>
+                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.65rem', color: 'hsl(var(--muted-foreground))' }}>{movement.folio}</div>
+                  <div className="truncate text-sm font-semibold" style={{ color: 'hsl(var(--foreground))', marginTop: '2px' }}>{movementLabels[movement.kind]}</div>
                 </div>
-                <Badge className="border-white/10 bg-black/15">{statusLabels[movement.status]}</Badge>
+                <span className={getStatusBadgeClass(movement.status)}>{statusLabels[movement.status]}</span>
               </div>
-              <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">{new Date(movement.createdAt).toLocaleString("es-MX")}</span>
-                <span className="font-mono font-semibold">{money.format(Number(movement.amount))}</span>
+              <div className="flex items-center justify-between gap-3 mt-1.5 text-xs text-muted-foreground">
+                <span>{new Date(movement.createdAt).toLocaleString("es-MX", { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.9rem', fontWeight: 700, color: 'hsl(var(--foreground))' }}>
+                  {money.format(Number(movement.amount))}
+                </span>
               </div>
-              <div className="mt-2 text-sm text-muted-foreground">{movement.reason}</div>
-              {admin && <Badge className="mt-3 border-primary/50 text-primary">Administración</Badge>}
+              {movement.reason && (
+                <div style={{ fontSize: '0.725rem', color: 'hsl(var(--muted-foreground))', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.03)', paddingTop: '4px' }}>
+                  {movement.reason}
+                </div>
+              )}
+              {admin && <span className="badge-status badge-discounted mt-2 w-fit">Administración</span>}
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
