@@ -13,7 +13,8 @@
     "prisma:migrate:deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "prisma:status": "prisma migrate status --schema prisma/schema.prisma",
     "db:reset:coolify": "sh scripts/coolify-reset-db.sh",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "db:clear": "tsx scripts/clear-db.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

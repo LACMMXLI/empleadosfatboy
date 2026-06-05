@@ -374,7 +374,7 @@ function PortalSelector({ onNavigate }: { onNavigate: (route: PortalRoute) => vo
 
 function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void }) {
   const [error, setError] = useState<string | null>(null)
-  const form = useForm({ defaultValues: { email: "admin@fatboy.local", password: "Admin123!" } })
+  const form = useForm({ defaultValues: { email: "", password: "" } })
   const login = useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) => api.login(email, password),
     onSuccess: (data) => {
