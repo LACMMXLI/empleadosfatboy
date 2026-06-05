@@ -2168,9 +2168,8 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
         className="employee-header"
         style={{ transform: showNav ? "translateY(0)" : "translateY(-100%)" }}
       >
-        <div>
-          <div className="employee-header-title">Mi Portal</div>
-          <div className="employee-header-name">{me.data?.fullName ?? "Empleado"}</div>
+        <div className="flex items-center">
+          <img src={fatboyLogo} alt="Fatboy" className="h-6 w-auto opacity-95 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.3)]" />
         </div>
         <button
           className="btn-icon rounded-full border border-white/10 bg-white/[0.08] text-[#f7efe3] hover:bg-white/[0.12] w-10 h-10 flex items-center justify-center cursor-pointer"
