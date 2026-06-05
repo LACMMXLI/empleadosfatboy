@@ -78,7 +78,8 @@ const viewTitles: Record<View, string> = {
   adminMovements: "Movimientos",
   historial: "Historial",
   nomina: "Nómina",
-  configuracion: "Configuración"
+  configuracion: "Configuración",
+  entregas: "Entregas"
 }
 
 function getStatusBadgeClass(status: MovementStatus): string {
@@ -190,7 +191,8 @@ const adminUserSchema = z.object({
   fullName: z.string().min(3, "Nombre requerido"),
   email: z.string().email("Correo invalido"),
   password: z.string().min(8, "Mínimo 8 caracteres"),
-  role: z.enum(["ADMINISTRADOR", "GERENTE", "ENCARGADO", "CAJERO"])
+  role: z.enum(["ADMINISTRADOR", "GERENTE", "ENCARGADO", "CAJERO"]),
+  branchId: z.string().optional()
 })
 type AdminUserFormInput = z.input<typeof adminUserSchema>
 type AdminUserFormOutput = z.output<typeof adminUserSchema>
@@ -199,12 +201,13 @@ const adminUserEditSchema = z.object({
   fullName: z.string().min(3, "Nombre requerido"),
   email: z.string().email("Correo invalido"),
   password: z.string().optional().refine((value) => !value || value.length >= 8, "Mínimo 8 caracteres"),
-  role: z.enum(["ADMINISTRADOR", "GERENTE", "ENCARGADO", "CAJERO"])
+  role: z.enum(["ADMINISTRADOR", "GERENTE", "ENCARGADO", "CAJERO"]),
+  branchId: z.string().optional()
 })
 type AdminUserEditFormInput = z.input<typeof adminUserEditSchema>
 type AdminUserEditFormOutput = z.output<typeof adminUserEditSchema>
 
-type View = "dashboard" | "empleados" | "pendientes" | "adminMovements" | "historial" | "nomina" | "configuracion"
+type View = "dashboard" | "empleados" | "pendientes" | "adminMovements" | "historial" | "nomina" | "configuracion" | "entregas"
 type PortalRoute = "home" | "admin" | "employee"
 
 const employeeRequestKinds: MovementKind[] = ["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]
@@ -281,6 +284,8 @@ function App() {
   const [activeView, setActiveView] = useState<View>("pendientes")
   const [route, setRoute] = useState<PortalRoute>(resolvePortalRoute())
 
+  const me = useQuery({ queryKey: ["me"], queryFn: api.me, enabled: !!tokenState && route === "admin" })
+
   useEffect(() => {
     const onPopState = () => setRoute(resolvePortalRoute())
     window.addEventListener("popstate", onPopState)
@@ -296,6 +301,14 @@ function App() {
       clearPwa()
     }
   }, [route])
+
+  useEffect(() => {
+    if (me.data?.role === "CAJERO" && activeView !== "entregas") {
+      setActiveView("entregas")
+    } else if (me.data && me.data.role !== "CAJERO" && activeView === "entregas") {
+      setActiveView("pendientes")
+    }
+  }, [me.data, activeView])
 
   if (route === "employee" && employeeTokenState) {
     return <EmployeePortal onLogout={() => setEmployeeTokenState(null)} />
@@ -470,15 +483,22 @@ function Shell({
   const { scrollDir, isNearTop } = useScrollDirection()
   const showNav = isNearTop || scrollDir === "up"
 
-  const views = [
-    { id: "pendientes" as const, label: "Aprobaciones", icon: ShieldCheck },
-    { id: "historial" as const, label: "Historial", icon: ClipboardList },
-    { id: "empleados" as const, label: "Empleados", icon: UsersRound },
-    { id: "nomina" as const, label: "Nómina", icon: WalletCards },
-    { id: "adminMovements" as const, label: "Movimientos", icon: Building2 },
-    { id: "dashboard" as const, label: "Resumen", icon: LayoutDashboard },
-    { id: "configuracion" as const, label: "Config", icon: Settings }
-  ]
+  const views = useMemo(() => {
+    if (me.data?.role === "CAJERO") {
+      return [
+        { id: "entregas" as const, label: "Entregas", icon: CheckCircle2 }
+      ]
+    }
+    return [
+      { id: "pendientes" as const, label: "Aprobaciones", icon: ShieldCheck },
+      { id: "historial" as const, label: "Historial", icon: ClipboardList },
+      { id: "empleados" as const, label: "Empleados", icon: UsersRound },
+      { id: "nomina" as const, label: "Nómina", icon: WalletCards },
+      { id: "adminMovements" as const, label: "Movimientos", icon: Building2 },
+      { id: "dashboard" as const, label: "Resumen", icon: LayoutDashboard },
+      { id: "configuracion" as const, label: "Config", icon: Settings }
+    ]
+  }, [me.data?.role])
 
   return (
     <main className="admin-shell min-h-screen">
@@ -501,7 +521,7 @@ function Shell({
                 type="button"
               >
                 <item.icon className="nav-icon" />
-                {item.id === "pendientes" ? "Aprobaciones" : viewTitles[item.id]}
+                {item.id === "pendientes" ? "Aprobaciones" : (item.id === "entregas" ? "Entregas" : viewTitles[item.id])}
               </button>
             ))}
           </nav>
@@ -531,6 +551,7 @@ function Shell({
                 <div className="admin-header-view lg:hidden">{viewTitles[activeView]}</div>
                 <div className="admin-header-name">
                   {me.data?.fullName ?? "Usuario"}{" "}
+                  {me.data?.branch?.name ? `(${me.data.branch.name})` : ""}{" "}
                   <span style={{ opacity: 0.4 }} className="mx-1">/</span>{" "}
                   <span className="admin-header-role-inline">{me.data?.role ?? ""}</span>
                 </div>
@@ -553,6 +574,7 @@ function Shell({
             {activeView === "historial" && <History />}
             {activeView === "nomina" && <PayrollAdmin />}
             {activeView === "configuracion" && <Configuration />}
+            {activeView === "entregas" && <Deliveries />}
           </div>
         </section>
       </div>
@@ -586,11 +608,12 @@ function MobileBottomNav({
     nomina: "Nómina",
     adminMovements: "Movim.",
     dashboard: "Resumen",
-    configuracion: "Config"
+    configuracion: "Config",
+    entregas: "Entregas"
   }
   return (
     <nav className="bottom-nav lg:hidden" style={style}>
-      <div className="grid grid-cols-7 gap-0.5 max-w-lg mx-auto">
+      <div className="grid gap-0.5 max-w-lg mx-auto" style={{ gridTemplateColumns: `repeat(${views.length}, minmax(0, 1fr))` }}>
         {views.map((item) => {
           const active = activeView === item.id
           return (
@@ -939,6 +962,157 @@ function AdministrativeMovements({ user }: { user?: User }) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function Deliveries() {
+  const queryClient = useQueryClient()
+  const me = useQuery({ queryKey: ["me"], queryFn: api.me })
+  const [activeTab, setActiveTab] = useState<"pendientes" | "historial">("pendientes")
+
+  const pendingQuery = useQuery({
+    queryKey: ["movements", "deliveries-pending"],
+    queryFn: () => api.movements({ status: "AUTHORIZED", delivered: "false" }),
+    enabled: !!me.data
+  })
+
+  const historyQuery = useQuery({
+    queryKey: ["movements", "deliveries-history"],
+    queryFn: () => {
+      const today = new Date().toISOString().slice(0, 10)
+      return api.movements({ delivered: "true", from: today })
+    },
+    enabled: !!me.data
+  })
+
+  const deliverMutation = useMutation({
+    mutationFn: (id: string) => api.deliverMovement(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["movements"] })
+    }
+  })
+
+  const getKindBadgeClass = (kind: MovementKind) => {
+    switch (kind) {
+      case "DRINK": return "badge-status badge-authorized"
+      case "FOOD": return "badge-status badge-discounted"
+      case "SALARY_ADVANCE": return "badge-status badge-pending"
+      default: return "badge-status badge-partial"
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="section-header">
+        <div className="section-title">
+          <CheckCircle2 style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          Control de Caja y Entregas
+        </div>
+        <div className="section-subtitle">
+          {me.data?.branch?.name ?? "Caja General"}
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-white/5 pb-2">
+        <button
+          className={`px-4 py-2 text-sm font-semibold transition-all ${
+            activeTab === "pendientes" ? "border-b-2 border-cyan-400 text-cyan-400" : "text-muted-foreground"
+          }`}
+          onClick={() => setActiveTab("pendientes")}
+          type="button"
+        >
+          Pendientes de Entrega ({pendingQuery.data?.length ?? 0})
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-semibold transition-all ${
+            activeTab === "historial" ? "border-b-2 border-cyan-400 text-cyan-400" : "text-muted-foreground"
+          }`}
+          onClick={() => setActiveTab("historial")}
+          type="button"
+        >
+          Entregados Hoy ({historyQuery.data?.length ?? 0})
+        </button>
+      </div>
+
+      {activeTab === "pendientes" && (
+        <div className="space-y-3">
+          {pendingQuery.isLoading && <StatusEmpty text="Cargando solicitudes..." />}
+          {pendingQuery.data?.length === 0 && (
+            <StatusEmpty text="No hay movimientos pendientes de entrega en esta sucursal." />
+          )}
+          {pendingQuery.data?.map((m) => (
+            <div key={m.id} className="admin-card">
+              <div className="admin-card-body flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-lg">{m.employee?.fullName}</span>
+                    <span className={getKindBadgeClass(m.kind)}>{movementLabels[m.kind] || m.kind}</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Folio: <span className="font-mono text-cyan-300">{m.folio}</span> • Solicitado: {new Date(m.createdAt).toLocaleTimeString()}
+                  </div>
+                  {m.productName && (
+                    <div className="text-sm">
+                      Producto: <span className="text-white">{m.productName}</span>
+                      {m.quantity && ` x ${m.quantity}`}
+                    </div>
+                  )}
+                  {m.reason && <div className="text-sm italic text-muted-foreground">"{m.reason}"</div>}
+                </div>
+
+                <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                  <div className="text-right">
+                    <div className="text-sm text-muted-foreground">Monto</div>
+                    <div className="font-semibold text-lg text-emerald-400">{money.format(Number(m.amount))}</div>
+                  </div>
+                  <button
+                    className="btn-authorize px-4 py-2"
+                    onClick={() => deliverMutation.mutate(m.id)}
+                    disabled={deliverMutation.isPending}
+                    type="button"
+                  >
+                    Confirmar Salida
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeTab === "historial" && (
+        <div className="space-y-3">
+          {historyQuery.isLoading && <StatusEmpty text="Cargando historial..." />}
+          {historyQuery.data?.length === 0 && (
+            <StatusEmpty text="No se han registrado entregas hoy." />
+          )}
+          {historyQuery.data?.map((m) => (
+            <div key={m.id} className="admin-card opacity-80">
+              <div className="admin-card-body flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white/90">{m.employee?.fullName}</span>
+                    <span className="badge-status badge-discounted">{movementLabels[m.kind] || m.kind}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Folio: <span className="font-mono">{m.folio}</span> • Entregado a las: {m.deliveredAt ? new Date(m.deliveredAt).toLocaleTimeString() : ""}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Entregado por: <span className="text-cyan-400 font-semibold">{m.deliveredBy?.fullName || "Caja"}</span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground">Monto</div>
+                  <div className="font-semibold text-white/80">{money.format(Number(m.amount))}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1799,6 +1973,7 @@ function Configuration() {
   const [selectedUserId, setSelectedUserId] = useState("")
   const configuration = useQuery({ queryKey: ["configuration"], queryFn: api.configuration })
   const rules = useQuery({ queryKey: ["rules"], queryFn: api.rules })
+  const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches })
   const adminUsers = useQuery({ queryKey: ["admin-users"], queryFn: api.adminUsers })
   const selectedUser = adminUsers.data?.find((user) => user.id === selectedUserId)
   const configForm = useForm<ConfigFormInput, unknown, ConfigFormOutput>({
@@ -1811,11 +1986,11 @@ function Configuration() {
   })
   const userForm = useForm<AdminUserFormInput, unknown, AdminUserFormOutput>({
     resolver: zodResolver(adminUserSchema),
-    defaultValues: { role: "ENCARGADO" }
+    defaultValues: { role: "ENCARGADO", branchId: "" }
   })
   const userEditForm = useForm<AdminUserEditFormInput, unknown, AdminUserEditFormOutput>({
     resolver: zodResolver(adminUserEditSchema),
-    defaultValues: { fullName: "", email: "", password: "", role: "ENCARGADO" }
+    defaultValues: { fullName: "", email: "", password: "", role: "ENCARGADO", branchId: "" }
   })
   useEffect(() => {
     if (configuration.data) {
@@ -1828,7 +2003,8 @@ function Configuration() {
       fullName: selectedUser.fullName,
       email: selectedUser.email,
       password: "",
-      role: selectedUser.role as AdminUserEditFormInput["role"]
+      role: selectedUser.role as AdminUserEditFormInput["role"],
+      branchId: selectedUser.branch?.id ?? ""
     })
   }, [selectedUser, userEditForm])
   const updateConfig = useMutation({
@@ -1938,6 +2114,12 @@ function Configuration() {
                   <option key={role} value={role}>{role}</option>
                 ))}
               </select>
+              <select className="form-select" {...userForm.register("branchId")}>
+                <option value="">Sin sucursal (Matriz/Global)</option>
+                {branches.data?.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
               <button className="btn-primary" style={{ width: '100%' }} disabled={createUser.isPending} type="submit">Crear usuario</button>
               {createUser.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{createUser.error.message}</div>}
             </form>
@@ -1965,6 +2147,12 @@ function Configuration() {
                 <select className="form-select" {...userEditForm.register("role")}>
                   {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
                     <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+                <select className="form-select" {...userEditForm.register("branchId")}>
+                  <option value="">Sin sucursal (Matriz/Global)</option>
+                  {branches.data?.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
@@ -2008,7 +2196,9 @@ function Configuration() {
                   </span>
                 </div>
                 <div className="employee-card-info">{user.email}</div>
-                <div className="employee-card-info" style={{ marginTop: '4px', color: '#a855f7', fontWeight: 600 }}>{user.role}</div>
+                <div className="employee-card-info" style={{ marginTop: '4px', color: '#a855f7', fontWeight: 600 }}>
+                  {user.role} {user.branch ? `• ${user.branch.name}` : ""}
+                </div>
               </button>
             ))}
             {!adminUsers.data?.length && <StatusEmpty text="Sin usuarios administrativos." />}

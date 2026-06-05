@@ -1,4 +1,4 @@
-import type { AppConfig, AuditLog, DashboardSummary, Employee, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, User } from "@/types/domain"
+import type { AppConfig, AuditLog, Branch, DashboardSummary, Employee, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -152,11 +152,17 @@ export const api = {
   cancelMovement(id: string) {
     return request<Movement>(`/movements/${id}/cancel`, { method: "PATCH" })
   },
+  deliverMovement(id: string) {
+    return request<Movement>(`/movements/${id}/deliver`, { method: "PATCH" })
+  },
   movementAudit(id: string) {
     return request<AuditLog[]>(`/movements/${id}/audit`)
   },
   configuration() {
     return request<AppConfig>("/configuration")
+  },
+  branches() {
+    return request<Branch[]>("/configuration/branches")
   },
   updateConfiguration(payload: Partial<AppConfig>) {
     return request<AppConfig>("/configuration", { method: "PATCH", body: JSON.stringify(payload) })

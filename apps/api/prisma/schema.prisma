@@ -92,6 +92,7 @@ model User {
   employee      Employee?  @relation(fields: [employeeId], references: [id])
   registered    Movement[] @relation("RegisteredBy")
   authorized    Movement[] @relation("AuthorizedBy")
+  delivered     Movement[] @relation("DeliveredBy")
   generatedPayrolls Payroll[]
   auditLogs     AuditLog[]
   createdAt     DateTime   @default(now())
@@ -138,13 +139,16 @@ model Movement {
   requestDevice   String?
   registeredById  String?
   authorizedById  String?
+  deliveredById   String?
   employee        Employee       @relation(fields: [employeeId], references: [id])
   branch          Branch         @relation(fields: [branchId], references: [id])
   registeredBy    User?          @relation("RegisteredBy", fields: [registeredById], references: [id])
   authorizedBy    User?          @relation("AuthorizedBy", fields: [authorizedById], references: [id])
+  deliveredBy     User?          @relation("DeliveredBy", fields: [deliveredById], references: [id])
   payrollLinks    PayrollItemMovement[]
   authorizedAt    DateTime?
   canceledAt      DateTime?
+  deliveredAt     DateTime?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 

@@ -75,6 +75,11 @@ export type Movement = {
   employee?: Employee
   registeredBy?: Pick<User, "id" | "fullName" | "role">
   authorizedBy?: Pick<User, "id" | "fullName" | "role">
+  deliveredById?: string | null
+  deliveredAt?: string | null
+  deliveredBy?: Pick<User, "id" | "fullName" | "role"> | null
+  quantity?: number | null
+  unitPrice?: number | string | null
 }
 
 export type AuditLog = {

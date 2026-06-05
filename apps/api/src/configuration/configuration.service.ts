@@ -76,6 +76,13 @@ export class ConfigurationService {
     return rule
   }
 
+  branches() {
+    return this.prisma.branch.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" }
+    })
+  }
+
   private toJson(value: unknown): Prisma.InputJsonValue {
     return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
   }

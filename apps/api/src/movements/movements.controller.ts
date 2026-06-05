@@ -100,6 +100,10 @@ class ListMovementQuery {
   @IsOptional()
   @IsString()
   q?: string
+
+  @IsOptional()
+  @IsString()
+  delivered?: string
 }
 
 class SettlementQuery {
@@ -180,6 +184,12 @@ export class MovementsController {
   @Patch(":id/authorize")
   authorize(@Param("id") id: string, @Req() request: RequestWithUser) {
     return this.movements.authorize(id, request.user, request.ip)
+  }
+
+  @Roles(Role.CAJERO)
+  @Patch(":id/deliver")
+  deliver(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.movements.deliver(id, request.user, request.ip)
   }
 
   @Roles(Role.ENCARGADO)

@@ -10,6 +10,18 @@ async function main() {
     create: { code: "MATRIZ", name: "Sucursal Matriz" }
   })
 
+  const branchVenecia = await prisma.branch.upsert({
+    where: { code: "VENECIA" },
+    update: {},
+    create: { code: "VENECIA", name: "Sucursal Venecia" }
+  })
+
+  const branchSanMarcos = await prisma.branch.upsert({
+    where: { code: "SAN_MARCOS" },
+    update: {},
+    create: { code: "SAN_MARCOS", name: "Sucursal San Marcos" }
+  })
+
   const adminPassword = await bcrypt.hash("Admin123!", 12)
   await prisma.user.upsert({
     where: { email: "admin@fatboy.local" },

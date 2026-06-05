@@ -58,6 +58,11 @@ export class ConfigurationController {
     return this.configuration.rules()
   }
 
+  @Get("branches")
+  branches() {
+    return this.configuration.branches()
+  }
+
   @Roles(Role.ADMINISTRADOR)
   @Post("authorization-rules")
   createRule(@Body() dto: AuthorizationRuleDto, @Req() request: RequestWithUser) {

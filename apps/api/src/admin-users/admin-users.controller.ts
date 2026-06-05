@@ -20,6 +20,10 @@ class CreateAdminUserDto {
 
   @IsEnum(adminUserRoles)
   role!: Role
+
+  @IsOptional()
+  @IsString()
+  branchId?: string
 }
 
 class UpdateAdminUserDto {
@@ -43,6 +47,10 @@ class UpdateAdminUserDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean
+
+  @IsOptional()
+  @IsString()
+  branchId?: string
 }
 
 @Roles(Role.ADMINISTRADOR)

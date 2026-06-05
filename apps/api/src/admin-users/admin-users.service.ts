@@ -9,6 +9,7 @@ type CreateAdminUserInput = {
   email: string
   password: string
   role: Role
+  branchId?: string
 }
 
 type UpdateAdminUserInput = {
@@ -17,6 +18,7 @@ type UpdateAdminUserInput = {
   password?: string
   role?: Role
   active?: boolean
+  branchId?: string
 }
 
 const allowedRoles = new Set<Role>([Role.ADMINISTRADOR, Role.GERENTE, Role.ENCARGADO, Role.CAJERO])
@@ -48,7 +50,7 @@ export class AdminUsersService {
         email,
         passwordHash: await bcrypt.hash(dto.password, 12),
         role: dto.role,
-        branchId: fallbackBranchId
+        branchId: dto.branchId || fallbackBranchId
       },
       select: this.safeSelect()
     })
@@ -84,6 +86,7 @@ export class AdminUsersService {
         email,
         role: dto.role,
         active: dto.active,
+        branchId: dto.branchId !== undefined ? (dto.branchId || null) : undefined,
         passwordHash: dto.password ? await bcrypt.hash(dto.password, 12) : undefined
       },
       select: this.safeSelect()

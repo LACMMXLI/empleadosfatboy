@@ -52,6 +52,7 @@ type MovementFilters = {
   from?: string
   to?: string
   q?: string
+  delivered?: string
 }
 
 type SettlementRangeInput = {
@@ -108,7 +109,8 @@ export class MovementsService {
       include: {
         employee: { include: { branch: true } },
         registeredBy: { select: { id: true, fullName: true, role: true } },
-        authorizedBy: { select: { id: true, fullName: true, role: true } }
+        authorizedBy: { select: { id: true, fullName: true, role: true } },
+        deliveredBy: { select: { id: true, fullName: true, role: true } }
       },
       orderBy: { createdAt: "desc" },
       take: 100
@@ -121,7 +123,8 @@ export class MovementsService {
       include: {
         employee: { include: { branch: true } },
         registeredBy: { select: { id: true, fullName: true, role: true } },
-        authorizedBy: { select: { id: true, fullName: true, role: true } }
+        authorizedBy: { select: { id: true, fullName: true, role: true } },
+        deliveredBy: { select: { id: true, fullName: true, role: true } }
       }
     })
     if (!movement) throw new NotFoundException("Movimiento no encontrado")
@@ -357,6 +360,38 @@ export class MovementsService {
       newValue: this.toJson(updated),
       ipAddress
     })
+    return updated
+  }
+
+  async deliver(id: string, user: AuthUser, ipAddress?: string) {
+    const movement = await this.prisma.movement.findUnique({ where: { id } })
+    if (!movement) throw new NotFoundException("Movimiento no encontrado")
+    if (movement.status !== MovementStatus.AUTHORIZED) {
+      throw new BadRequestException("Solo se pueden entregar movimientos autorizados")
+    }
+    if (movement.deliveredAt) {
+      throw new BadRequestException("Este movimiento ya fue entregado")
+    }
+
+    const updated = await this.prisma.movement.update({
+      where: { id },
+      data: {
+        deliveredById: user.sub,
+        deliveredAt: new Date()
+      }
+    })
+
+    await this.audit.log({
+      userId: user.sub,
+      action: AuditAction.STATUS_CHANGE,
+      entity: "Movement",
+      entityId: id,
+      affectedEmployeeId: movement.employeeId,
+      oldValue: this.toJson(movement),
+      newValue: this.toJson(updated),
+      ipAddress
+    })
+
     return updated
   }
 
@@ -690,11 +725,16 @@ export class MovementsService {
       branchId: filters.branchId,
       kind: filters.kind,
       status: filters.status ?? { not: MovementStatus.DISCOUNTED },
+      deliveredAt: filters.delivered === "true"
+        ? { not: null }
+        : filters.delivered === "false"
+          ? null
+          : undefined,
       createdAt:
         filters.from || filters.to
           ? {
-              gte: filters.from ? new Date(filters.from) : undefined,
-              lte: filters.to ? new Date(filters.to) : undefined
+               gte: filters.from ? new Date(filters.from) : undefined,
+               lte: filters.to ? new Date(filters.to) : undefined
             }
           : undefined,
       OR: filters.q
