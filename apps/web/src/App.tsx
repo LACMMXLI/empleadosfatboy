@@ -2385,6 +2385,7 @@ function Configuration() {
 function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<"home" | "request" | "history">("home")
+  const [historyTab, setHistoryTab] = useState<"current" | "settled">("current")
   const [accountOpen, setAccountOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [requestError, setRequestError] = useState<string | null>(null)
@@ -2487,7 +2488,8 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
     },
     onError: (err: Error) => setCodeMessage(err.message)
   })
-  const recentMovements = (movements.data ?? []).filter((movement) => movement.status !== "DISCOUNTED").slice(0, 4)
+  const currentMovements = (movements.data ?? []).filter((movement) => movement.status !== "DISCOUNTED")
+  const recentMovements = currentMovements.slice(0, 4)
 
   return (
     <main className="employee-shell min-h-screen">
@@ -2597,17 +2599,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
               </div>
             </section>
 
-            {/* Middle decorative logo or brand mark */}
-            <img
-              className="pointer-events-none mx-auto -my-2 h-20 w-full max-w-[200px] object-contain opacity-40 filter brightness-150 drop-shadow-[0_18px_30px_rgba(0,0,0,0.35)]"
-              src={fatboyLogo}
-              alt=""
-              aria-hidden="true"
-            />
-
-            {recentMovements.length > 0 && (
-              <PortalMovementList title="Movimientos Recientes" movements={recentMovements} />
-            )}
+            <PortalMovementList title="Últimos Movimientos" movements={recentMovements} />
           </>
         )}
 
@@ -2766,7 +2758,12 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
         )}
 
         {activeTab === "history" && (
-          <PortalSettlementTicketList tickets={settlementTickets.data ?? []} />
+          <EmployeeHistoryTabs
+            activeTab={historyTab}
+            movements={currentMovements}
+            onTabChange={setHistoryTab}
+            tickets={settlementTickets.data ?? []}
+          />
         )}
       </div>
 
@@ -2814,6 +2811,54 @@ function EmployeeBottomNav({
         })}
       </div>
     </nav>
+  )
+}
+
+function EmployeeHistoryTabs({
+  activeTab,
+  movements,
+  onTabChange,
+  tickets
+}: {
+  activeTab: "current" | "settled"
+  movements: Movement[]
+  onTabChange: (tab: "current" | "settled") => void
+  tickets: MovementSettlementTicket[]
+}) {
+  const tabs = [
+    { id: "current" as const, label: "Movimientos", count: movements.length },
+    { id: "settled" as const, label: "Liquidados", count: tickets.length }
+  ]
+
+  return (
+    <div className="space-y-4">
+      <div className="admin-card" style={{ background: 'rgba(13,17,23,0.8)' }}>
+        <div className="admin-card-body space-y-3">
+          <div className="flex rounded-2xl border border-white/10 bg-black/25 p-1">
+            {tabs.map((tab) => {
+              const active = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  className={`h-11 flex-1 rounded-xl border-none text-xs font-bold transition ${active ? "bg-primary text-primary-foreground" : "bg-transparent text-muted-foreground"}`}
+                  type="button"
+                  onClick={() => onTabChange(tab.id)}
+                >
+                  {tab.label}
+                  <span className="ml-1 font-mono text-[10px] opacity-80">{tab.count}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {activeTab === "current" ? (
+        <PortalMovementList title="Historial de Movimientos" movements={movements} />
+      ) : (
+        <PortalSettlementTicketList tickets={tickets} />
+      )}
+    </div>
   )
 }
 
