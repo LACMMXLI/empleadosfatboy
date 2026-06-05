@@ -28,7 +28,7 @@ import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import type { Employee, Movement, MovementKind, MovementSettlementTicket, MovementStatus, Payroll, PayrollItem, Role, SalaryType, User } from "@/types/domain"
-import { syncEmployeePwa } from "@/pwa/employeePwa"
+import { clearPwa, syncAdminPwa, syncEmployeePwa } from "@/pwa/employeePwa"
 import fatboyLogo from "@/assets/logo.png"
 
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
@@ -288,7 +288,13 @@ function App() {
   }, [])
 
   useEffect(() => {
-    syncEmployeePwa(route === "employee")
+    if (route === "employee") {
+      syncEmployeePwa(true)
+    } else if (route === "admin") {
+      syncAdminPwa(true)
+    } else {
+      clearPwa()
+    }
   }, [route])
 
   if (route === "employee" && employeeTokenState) {
@@ -443,9 +449,6 @@ function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void }) 
             {employeeError && <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-center">{employeeError}</div>}
             <button className="login-primary h-12 w-full text-base" disabled={employeeLogin.isPending} type="submit">
               {employeeLogin.isPending ? "Ingresando..." : "Ingresar"}
-            </button>
-            <button className="h-11 w-full rounded-2xl text-muted-foreground hover:bg-white/5 transition" type="button" onClick={() => goToPortal("home", () => window.location.reload())}>
-              Volver
             </button>
           </form>
         </CardContent>
