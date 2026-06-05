@@ -74,10 +74,36 @@ const viewTitles: Record<View, string> = {
   dashboard: "Dashboard",
   empleados: "Empleados",
   pendientes: "Aprobaciones",
-  adminMovements: "Movimientos Administrativos",
+  adminMovements: "Movimientos",
   historial: "Historial",
   nomina: "Nómina",
   configuracion: "Configuración"
+}
+
+function getStatusBadgeClass(status: MovementStatus): string {
+  switch (status) {
+    case "PENDING": return "badge-status badge-pending"
+    case "AUTHORIZED": return "badge-status badge-authorized"
+    case "REJECTED": return "badge-status badge-rejected"
+    case "CANCELED": return "badge-status badge-canceled"
+    case "DISCOUNTED": return "badge-status badge-discounted"
+    case "PARTIALLY_DISCOUNTED": return "badge-status badge-partial"
+    default: return "badge-status badge-canceled"
+  }
+}
+
+function getPayrollBadgeClass(status: string): string {
+  switch (status) {
+    case "BORRADOR": return "badge-payroll-draft"
+    case "GENERADA": return "badge-payroll-generated"
+    case "PAGADA": return "badge-payroll-paid"
+    case "CANCELADA": return "badge-payroll-canceled"
+    default: return "badge-payroll-draft"
+  }
+}
+
+function getInitials(name: string): string {
+  return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()
 }
 
 const adminMovementSchema = z.object({
@@ -211,7 +237,7 @@ function LoginFrame({ children, variant }: { children: ReactNode; variant: "admi
 function App() {
   const [tokenState, setTokenState] = useState(session.token)
   const [employeeTokenState, setEmployeeTokenState] = useState(employeeSession.token)
-  const [activeView, setActiveView] = useState<View>("dashboard")
+  const [activeView, setActiveView] = useState<View>("pendientes")
   const [route, setRoute] = useState<PortalRoute>(resolvePortalRoute())
 
   useEffect(() => {
@@ -392,56 +418,75 @@ function Shell({
 }) {
   const me = useQuery({ queryKey: ["me"], queryFn: api.me })
   const views = [
-    { id: "dashboard" as const, label: "Dashboard", icon: LayoutDashboard },
-    { id: "empleados" as const, label: "Empleados", icon: UsersRound },
     { id: "pendientes" as const, label: "Aprobaciones", icon: ShieldCheck },
-    { id: "adminMovements" as const, label: "Movimientos", icon: Building2 },
     { id: "historial" as const, label: "Historial", icon: ClipboardList },
+    { id: "empleados" as const, label: "Empleados", icon: UsersRound },
     { id: "nomina" as const, label: "Nómina", icon: WalletCards },
-    { id: "configuracion" as const, label: "Configuración", icon: Settings }
+    { id: "adminMovements" as const, label: "Movimientos", icon: Building2 },
+    { id: "dashboard" as const, label: "Resumen", icon: LayoutDashboard },
+    { id: "configuracion" as const, label: "Config", icon: Settings }
   ]
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="admin-shell min-h-screen">
       <div className="flex min-h-screen">
-        <aside className="hidden w-64 border-r bg-card/60 p-3 lg:block">
-          <div className="mb-4 px-2">
-            <div className="text-sm font-semibold">Fatboy POS</div>
-              <div className="text-xs text-muted-foreground">Panel administrativo</div>
+        {/* === Desktop Sidebar === */}
+        <aside className="admin-sidebar hidden w-60 flex-col lg:flex" style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+          <div className="admin-sidebar-brand">
+            <img src={fatboyLogo} alt="Fatboy" className="admin-sidebar-logo" />
+            <div>
+              <div className="admin-sidebar-title">Fatboy POS</div>
+              <div className="admin-sidebar-subtitle">Admin</div>
+            </div>
           </div>
-          <nav className="space-y-1">
+          <nav className="flex flex-col gap-0.5 p-2 flex-1">
             {views.map((item) => (
-              <Button
+              <button
                 key={item.id}
-                variant={activeView === item.id ? "default" : "ghost"}
-                className="w-full justify-start"
+                className={`nav-item ${activeView === item.id ? "active" : ""}`}
                 onClick={() => onViewChange(item.id)}
+                type="button"
               >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Button>
+                <item.icon className="nav-icon" />
+                {item.id === "pendientes" ? "Aprobaciones" : viewTitles[item.id]}
+              </button>
             ))}
           </nav>
-        </aside>
-        <section className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-20 flex items-center justify-between border-b bg-card/95 p-3 backdrop-blur lg:static lg:bg-card/40">
-            <div>
-              <div className="text-[11px] font-medium uppercase text-muted-foreground lg:hidden">{viewTitles[activeView]}</div>
-              <div className="text-sm font-semibold">{me.data?.fullName ?? "Usuario"}</div>
-              <div className="text-xs text-muted-foreground">{me.data?.role ?? ""}</div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                session.token = null
-                onLogout()
-              }}
+          <div className="p-2 border-t border-white/5">
+            <button
+              className="nav-item w-full"
+              onClick={() => { session.token = null; onLogout() }}
+              type="button"
             >
-              <LogOut className="h-4 w-4" />
-            </Button>
+              <LogOut className="nav-icon" />
+              Cerrar sesión
+            </button>
+          </div>
+        </aside>
+
+        {/* === Main Content === */}
+        <section className="flex min-w-0 flex-1 flex-col">
+          <header className="admin-header">
+            <div className="flex items-center gap-3">
+              <div className="lg:hidden">
+                <img src={fatboyLogo} alt="" className="h-6 w-auto opacity-80" />
+              </div>
+              <div className="admin-header-user">
+                <div className="admin-header-view lg:hidden">{viewTitles[activeView]}</div>
+                <div className="admin-header-name">{me.data?.fullName ?? "Usuario"}</div>
+                <div className="admin-header-role">{me.data?.role ?? ""}</div>
+              </div>
+            </div>
+            <button
+              className="btn-icon lg:hidden"
+              onClick={() => { session.token = null; onLogout() }}
+              type="button"
+              aria-label="Cerrar sesión"
+            >
+              <LogOut style={{ width: 16, height: 16 }} />
+            </button>
           </header>
-          <div className="mobile-page flex-1 p-3 lg:p-4">
+          <div className="mobile-page flex-1 p-3 lg:p-5">
             {activeView === "dashboard" && <Dashboard />}
             {activeView === "empleados" && <Employees user={me.data} />}
             {activeView === "pendientes" && <PendingAuthorizations currentRole={me.data?.role} />}
@@ -452,6 +497,8 @@ function Shell({
           </div>
         </section>
       </div>
+
+      {/* === Mobile Bottom Nav === */}
       <MobileBottomNav activeView={activeView} views={views} onViewChange={onViewChange} />
     </main>
   )
@@ -466,22 +513,29 @@ function MobileBottomNav({
   views: Array<{ id: View; label: string; icon: typeof LayoutDashboard }>
   onViewChange: (view: View) => void
 }) {
+  const navLabels: Record<View, string> = {
+    pendientes: "Aprobar",
+    historial: "Historial",
+    empleados: "Empleados",
+    nomina: "Nómina",
+    adminMovements: "Movim.",
+    dashboard: "Resumen",
+    configuracion: "Config"
+  }
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-2xl backdrop-blur lg:hidden">
-      <div className="grid grid-cols-3 gap-1 sm:grid-cols-6">
+    <nav className="bottom-nav lg:hidden">
+      <div className="grid grid-cols-7 gap-0.5 max-w-lg mx-auto">
         {views.map((item) => {
           const active = activeView === item.id
           return (
             <button
               key={item.id}
-              className={`flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-medium transition ${
-                active ? "bg-primary text-primary-foreground" : "text-muted-foreground active:bg-secondary"
-              }`}
+              className={`bottom-nav-item ${active ? "active" : ""}`}
               onClick={() => onViewChange(item.id)}
               type="button"
             >
-              <item.icon className="h-5 w-5" />
-              <span className="max-w-full truncate">{item.label}</span>
+              <item.icon className="bottom-nav-icon" />
+              <span style={{ fontSize: '0.5rem', letterSpacing: '0.02em', fontWeight: 600 }}>{navLabels[item.id]}</span>
             </button>
           )
         })}
@@ -497,59 +551,98 @@ function Dashboard() {
     queryKey: ["movements", "dashboard-period", periodStart],
     queryFn: () => api.movements({ from: periodStart })
   })
-  if (isLoading) return <StatusText text="Cargando dashboard" />
-  if (error) return <StatusText text={(error as Error).message} />
+  if (isLoading) return <StatusEmpty text="Cargando resumen..." />
+  if (error) return <StatusEmpty text={(error as Error).message} />
   if (!data) return null
 
   const movements = periodMovements.data ?? []
-  const pendingRequests = movements.filter((movement) => movement.origin === "EMPLOYEE_REQUEST" && movement.status === "PENDING").length
+  const pendingRequests = movements.filter((m) => m.origin === "EMPLOYEE_REQUEST" && m.status === "PENDING").length
   const authorizedAdvances = movements
-    .filter((movement) => movement.kind === "SALARY_ADVANCE" && movement.status === "AUTHORIZED")
-    .reduce((total, movement) => total + Number(movement.amount), 0)
-  const administrativeMovements = movements.filter((movement) => movement.origin === "ADMINISTRATIVE_ACTION").length
-  const cards = [
-    { label: "Solicitudes pendientes", value: String(periodMovements.data ? pendingRequests : data.cards.pendingMovements), tone: "primary" },
-    { label: "Adelantos autorizados", value: money.format(authorizedAdvances), tone: "accent" },
-    { label: "Movimientos administrativos del periodo", value: String(administrativeMovements), tone: "neutral" },
-    { label: "Total por descontar", value: money.format(data.cards.pendingToDiscount), tone: "strong" }
-  ]
+    .filter((m) => m.kind === "SALARY_ADVANCE" && m.status === "AUTHORIZED")
+    .reduce((t, m) => t + Number(m.amount), 0)
+  const administrativeMovements = movements.filter((m) => m.origin === "ADMINISTRATIVE_ACTION").length
 
   return (
-    <div className="space-y-3">
-      <div className="grid metric-grid gap-3">
-        {cards.map((card) => (
-          <Metric key={card.label} label={card.label} value={card.value} tone={card.tone} />
-        ))}
+    <div className="space-y-4">
+      <div>
+        <div className="section-title mb-4">
+          <LayoutDashboard style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          Resumen del periodo
+        </div>
+        <div className="grid metric-grid gap-3">
+          <div className="stat-card stat-card-amber">
+            <ShieldCheck className="stat-icon" style={{ color: '#f59e0b' }} />
+            <div className="stat-label">Pendientes</div>
+            <div className="stat-value stat-value-amber">
+              {periodMovements.data ? pendingRequests : data.cards.pendingMovements}
+            </div>
+          </div>
+          <div className="stat-card stat-card-cyan">
+            <Banknote className="stat-icon" style={{ color: '#00e5ff' }} />
+            <div className="stat-label">Adelantos autorizados</div>
+            <div className="stat-value stat-value-cyan" style={{ fontSize: '1.35rem' }}>
+              {money.format(authorizedAdvances)}
+            </div>
+          </div>
+          <div className="stat-card stat-card-violet">
+            <Building2 className="stat-icon" style={{ color: '#a855f7' }} />
+            <div className="stat-label">Movim. administrativos</div>
+            <div className="stat-value stat-value-violet">{administrativeMovements}</div>
+          </div>
+          <div className="stat-card stat-card-green">
+            <WalletCards className="stat-icon" style={{ color: '#22c55e' }} />
+            <div className="stat-label">Por descontar</div>
+            <div className="stat-value stat-value-green" style={{ fontSize: '1.35rem' }}>
+              {money.format(data.cards.pendingToDiscount)}
+            </div>
+          </div>
+        </div>
       </div>
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="grid gap-3 p-4 text-sm md:grid-cols-4">
-          <DetailLine label="Periodo" value={`Desde ${formatDateLabel(periodStart)}`} />
-          <DetailLine label="Solicitudes totales" value={String(data.cards.pendingMovements)} />
-          <DetailLine label="Autorizados activos" value={String(data.cards.authorizedMovements)} />
-          <DetailLine label="Consulta" value={periodMovements.isLoading ? "Actualizando" : "Resumen administrativo"} />
-        </CardContent>
-      </Card>
+
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div className="admin-card-title">Detalle del periodo</div>
+          <span style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>
+            Desde {formatDateLabel(periodStart)}
+          </span>
+        </div>
+        <div className="admin-card-body">
+          <div className="grid gap-2 md:grid-cols-3">
+            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+              <div className="stat-label">Solicitudes totales</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'hsl(var(--foreground))' }}>{data.cards.pendingMovements}</div>
+            </div>
+            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+              <div className="stat-label">Autorizados activos</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#4ade80' }}>{data.cards.authorizedMovements}</div>
+            </div>
+            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+              <div className="stat-label">Estado</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+                {periodMovements.isLoading ? "Actualizando..." : "Al corriente"}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
 function Metric({ label, value, tone = "neutral" }: { label: string; value: string; tone?: string }) {
-  const toneClass =
-    tone === "primary"
-      ? "border-primary/35 bg-primary/10"
-      : tone === "accent"
-        ? "border-accent/35 bg-accent/10"
-        : tone === "strong"
-          ? "border-emerald-500/30 bg-emerald-500/10"
-          : "bg-card"
-
+  const cardClass = tone === "primary" ? "stat-card stat-card-amber"
+    : tone === "accent" ? "stat-card stat-card-violet"
+    : tone === "strong" ? "stat-card stat-card-green"
+    : "stat-card stat-card-cyan"
+  const valClass = tone === "primary" ? "stat-value stat-value-amber"
+    : tone === "accent" ? "stat-value stat-value-violet"
+    : tone === "strong" ? "stat-value stat-value-green"
+    : "stat-value stat-value-cyan"
   return (
-    <Card className={toneClass}>
-      <CardContent className="p-4">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="mt-1 text-2xl font-semibold">{value}</div>
-      </CardContent>
-    </Card>
+    <div className={cardClass}>
+      <div className="stat-label">{label}</div>
+      <div className={valClass} style={{ fontSize: '1.35rem' }}>{value}</div>
+    </div>
   )
 }
 
@@ -565,17 +658,15 @@ function GuidedBlock({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-lg border bg-background/45 p-3">
-      <div className="mb-3 flex items-center gap-3">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-          {step}
-        </div>
+    <section className="guided-block">
+      <div className="mb-3 flex items-center gap-2.5">
+        <div className="guided-block-step">{step}</div>
         <div className="min-w-0">
-          <div className="text-sm font-semibold">{title}</div>
-          <div className="truncate text-xs text-muted-foreground">{detail}</div>
+          <div style={{ fontSize: '0.825rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>{title}</div>
+          <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{detail}</div>
         </div>
       </div>
-      <div className="space-y-3">{children}</div>
+      <div className="space-y-2.5">{children}</div>
     </section>
   )
 }
@@ -647,136 +738,141 @@ function AdministrativeMovements({ user }: { user?: User }) {
 
   return (
     <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
+      <div className="admin-card min-w-0">
+        <div className="admin-card-header">
+          <div className="admin-card-title">
+            <Building2 style={{ width: 14, height: 14, color: '#00e5ff' }} />
             Movimientos Administrativos
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">Formulario único para cargos, descuentos, consumos internos y correcciones autorizadas.</p>
-        </CardHeader>
-        <CardContent>
+          </div>
+        </div>
+        <div className="admin-card-body">
           <form className="space-y-3" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
             <GuidedBlock step="1" title="Empleado" detail="Selecciona a quien se aplicará el movimiento">
-              <Select className="h-11" {...form.register("employeeId")}>
+              <select className="form-select" {...form.register("employeeId")}>
                 <option value="">Seleccionar empleado</option>
                 {employees.data?.map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {employee.phone} - {employee.fullName}
                   </option>
                 ))}
-              </Select>
+              </select>
             </GuidedBlock>
             <GuidedBlock step="2" title="Tipo y monto" detail="Registro administrativo directo, sin PIN de empleado">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Select className="h-11" {...form.register("kind")}>
+              <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: '1fr 1fr' }}>
+                <select className="form-select" {...form.register("kind")}>
                   {administrativeMovementKinds.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {movementLabels[kind]}
-                    </option>
+                    <option key={kind} value={kind}>{movementLabels[kind]}</option>
                   ))}
-                </Select>
-                <Input className="h-11" type="number" step="0.01" placeholder="Monto" {...form.register("amount")} />
+                </select>
+                <input className="form-input" type="number" step="0.01" placeholder="Monto" {...form.register("amount")} />
               </div>
             </GuidedBlock>
             <GuidedBlock step="3" title="Motivo y evidencia" detail="El motivo es obligatorio para auditoría">
-              <Textarea placeholder="Motivo obligatorio" {...form.register("reason")} />
-              <Textarea placeholder="Evidencia si aplica / referencia / nota administrativa" {...form.register("evidenceNote")} />
+              <textarea className="form-textarea" placeholder="Motivo obligatorio" {...form.register("reason")} />
+              <textarea className="form-textarea" placeholder="Evidencia / nota administrativa (opcional)" {...form.register("evidenceNote")} />
             </GuidedBlock>
-            <GuidedBlock step="4" title="Autorización administrativa" detail="El backend registra el usuario responsable">
-              <div className="rounded-md border bg-background/45 p-3 text-sm">
-                <div className="text-[11px] uppercase text-muted-foreground">Responsable</div>
-                <div className="mt-1 font-medium">{user?.fullName ?? "Usuario administrativo"}</div>
+            <GuidedBlock step="4" title="Responsable" detail="El backend registra el usuario autorizado">
+              <div style={{ padding: '0.625rem', borderRadius: '0.5rem', border: '1px solid rgba(0,229,255,0.15)', background: 'rgba(0,229,255,0.04)' }}>
+                <div className="stat-label">Registrado como</div>
+                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'hsl(var(--foreground))' }}>{user?.fullName ?? "Usuario administrativo"}</div>
               </div>
             </GuidedBlock>
-            <Button className="h-12 w-full text-base" disabled={mutation.isPending}>
-              Registrar movimiento administrativo
-            </Button>
-            {message && <div className="rounded-md border p-2 text-sm text-muted-foreground">{message}</div>}
+            <button className="btn-primary" style={{ width: '100%', height: '2.75rem', fontSize: '0.9rem' }} disabled={mutation.isPending} type="submit">
+              Registrar movimiento
+            </button>
+            {message && <div className="status-empty">{message}</div>}
           </form>
-        </CardContent>
-      </Card>
-      <Card className="min-w-0">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4" />
+        </div>
+      </div>
+      <div className="admin-card min-w-0">
+        <div className="admin-card-header">
+          <div className="admin-card-title">
+            <CheckCircle2 style={{ width: 14, height: 14, color: '#4ade80' }} />
             Liquidar por empleado
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">Marca como pagado un rango ya cubierto para que deje de sumar al saldo pendiente.</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(130px,0.55fr)_minmax(130px,0.55fr)]">
-            <Select
-              className="h-11 min-w-0"
+          </div>
+        </div>
+        <div className="admin-card-body space-y-4">
+          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
+            <select
+              className="form-select"
               value={settlementEmployeeId}
-              onChange={(event) => {
-                setSettlementEmployeeId(event.target.value)
-                setSettlementMessage(null)
-              }}
+              onChange={(event) => { setSettlementEmployeeId(event.target.value); setSettlementMessage(null) }}
             >
               <option value="">Seleccionar empleado</option>
               {employees.data?.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.phone} - {employee.fullName}
-                </option>
+                <option key={employee.id} value={employee.id}>{employee.phone} - {employee.fullName}</option>
               ))}
-            </Select>
-            <Input
-              className="h-11 min-w-0"
+            </select>
+            <input
+              className="form-input"
               type="date"
               value={settlementFrom}
-              onChange={(event) => {
-                setSettlementFrom(event.target.value)
-                setSettlementMessage(null)
-              }}
+              onChange={(event) => { setSettlementFrom(event.target.value); setSettlementMessage(null) }}
             />
-            <Input
-              className="h-11 min-w-0"
+            <input
+              className="form-input"
               type="date"
               value={settlementTo}
-              onChange={(event) => {
-                setSettlementTo(event.target.value)
-                setSettlementMessage(null)
-              }}
+              onChange={(event) => { setSettlementTo(event.target.value); setSettlementMessage(null) }}
             />
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
-              <div className="text-[11px] uppercase text-muted-foreground">Empleado</div>
-              <div className="mt-1 truncate text-sm font-semibold">{selectedSettlementEmployee?.fullName ?? "Sin seleccionar"}</div>
+          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(0,229,255,0.15)', background: 'rgba(0,229,255,0.04)' }}>
+              <div className="stat-label">Empleado</div>
+              <div style={{ fontSize: '0.825rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'hsl(var(--foreground))' }}>
+                {selectedSettlementEmployee?.fullName ?? "Sin seleccionar"}
+              </div>
             </div>
-            <div className="rounded-md border border-accent/30 bg-accent/10 p-3">
-              <div className="text-[11px] uppercase text-muted-foreground">Total</div>
-              <div className="mt-1 font-mono text-xl font-semibold">{money.format(settlementSummary.data?.total ?? 0)}</div>
+            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(168,85,247,0.15)', background: 'rgba(168,85,247,0.04)' }}>
+              <div className="stat-label">Total</div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '1.1rem', fontWeight: 700, color: '#c084fc' }}>
+                {money.format(settlementSummary.data?.total ?? 0)}
+              </div>
             </div>
-            <div className="rounded-md border p-3">
-              <div className="text-[11px] uppercase text-muted-foreground">Movimientos</div>
-              <div className="mt-1 font-mono text-xl font-semibold">{settlementSummary.data?.count ?? 0}</div>
+            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+              <div className="stat-label">Movimientos</div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '1.1rem', fontWeight: 700, color: 'hsl(var(--foreground))' }}>
+                {settlementSummary.data?.count ?? 0}
+              </div>
             </div>
           </div>
 
           <div className="space-y-2">
             {(settlementSummary.data?.byKind ?? []).map((item) => (
-              <div key={item.kind} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background/45 p-3 text-sm">
-                <span className="min-w-0 truncate">{movementLabels[item.kind]}</span>
-                <span className="font-mono">{item.count} · {money.format(item.amount)}</span>
+              <div
+                key={item.kind}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  background: 'rgba(5,7,16,0.4)',
+                  fontSize: '0.8rem'
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'hsl(var(--foreground))' }}>{movementLabels[item.kind]}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, color: 'hsl(var(--muted-foreground))', flexShrink: 0 }}>{item.count} · {money.format(item.amount)}</span>
               </div>
             ))}
             {settlementEmployeeId && !settlementSummary.isLoading && !settlementSummary.data?.count && (
-              <StatusText text="No hay movimientos autorizados por liquidar en este filtro." />
+              <StatusEmpty text="No hay movimientos autorizados por liquidar en este filtro." />
             )}
           </div>
 
-          <Button className="h-12 w-full text-base" disabled={!canSettle} onClick={() => settle.mutate()}>
+          <button className="btn-authorize" style={{ width: '100%', height: '2.75rem', fontSize: '0.9rem', justifyContent: 'center' }} disabled={!canSettle} onClick={() => settle.mutate()} type="button">
+            <CheckCircle2 style={{ width: 14, height: 14 }} />
             Marcar rango como liquidado
-          </Button>
-          {settlementMessage && <div className="rounded-md border p-2 text-sm text-muted-foreground">{settlementMessage}</div>}
-          <div className="rounded-md border p-3 text-sm text-muted-foreground">
-            Responsable: <span className="text-foreground">{user?.fullName}</span>
+          </button>
+          {settlementMessage && <div className="status-empty">{settlementMessage}</div>}
+          <div style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
+            Responsable: <span style={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}>{user?.fullName}</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
@@ -799,70 +895,108 @@ function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
     }
   })
   const canProcess = currentRole !== "CAJERO" && currentRole !== "EMPLEADO"
+  const count = pending.data?.length ?? 0
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Aprobaciones</CardTitle>
-        <p className="text-sm text-muted-foreground">Solicitudes pendientes listas para aprobar o rechazar.</p>
-      </CardHeader>
-      <CardContent>
-        {!pending.data?.length && <StatusText text="No hay movimientos pendientes." />}
-        <div className="space-y-3">
-          {pending.data?.map((movement) => {
-            return (
-              <div key={movement.id} className="rounded-lg border bg-background/45 p-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-[1.1fr_0.8fr_0.7fr_1.4fr_1fr]">
-                    <div className="min-w-0">
-                      <div className="text-[11px] uppercase text-muted-foreground">Empleado</div>
-                      <div className="truncate font-semibold">{movement.employee?.fullName ?? "Empleado"}</div>
-                      <div className="font-mono text-[11px] text-muted-foreground">{movement.folio}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] uppercase text-muted-foreground">Fecha</div>
-                      <div className="text-sm">{new Date(movement.createdAt).toLocaleString("es-MX")}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] uppercase text-muted-foreground">Monto solicitado</div>
-                      <div className="font-mono text-sm font-semibold">{money.format(Number(movement.amount))}</div>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[11px] uppercase text-muted-foreground">Motivo</div>
-                      <div className="text-sm text-muted-foreground">{movement.reason}</div>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[11px] uppercase text-muted-foreground">Evidencia</div>
-                      <div className="text-sm text-muted-foreground">{movement.evidenceNote || "Sin evidencia"}</div>
-                    </div>
+    <div className="space-y-4">
+      <div className="section-header">
+        <div className="section-title">
+          <ShieldCheck style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          Aprobaciones pendientes
+        </div>
+        {count > 0 && <span className="section-count">{count}</span>}
+      </div>
+
+      {pending.isLoading && <StatusEmpty text="Cargando solicitudes..." />}
+      {!pending.isLoading && count === 0 && (
+        <div className="empty-state">
+          <CheckCircle2 className="empty-state-icon" style={{ width: 48, height: 48, color: '#4ade80' }} />
+          <div className="empty-state-text">Todo al día — No hay solicitudes pendientes</div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {pending.data?.map((movement, idx) => {
+          const name = movement.employee?.fullName ?? "Empleado"
+          return (
+            <div
+              key={movement.id}
+              className="approval-card"
+              style={{ animationDelay: `${idx * 50}ms` }}
+            >
+              {/* Header row */}
+              <div className="flex items-start gap-3">
+                <div className="approval-employee-avatar">{getInitials(name)}</div>
+                <div className="flex-1 min-w-0">
+                  <div style={{ fontSize: '0.925rem', fontWeight: 700, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {name}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {canProcess && (
-                      <>
-                        <Button size="sm" onClick={() => authorize.mutate(movement.id)} disabled={authorize.isPending}>
-                          Autorizar
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => reject.mutate(movement.id)} disabled={reject.isPending}>
-                          Rechazar
-                        </Button>
-                      </>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '3px', flexWrap: 'wrap' }}>
+                    <span className="badge-status badge-pending">Pendiente</span>
+                    <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.625rem', color: 'hsl(var(--muted-foreground))' }}>{movement.folio}</span>
                   </div>
                 </div>
+                <div className="approval-amount" style={{ flexShrink: 0 }}>
+                  {money.format(Number(movement.amount))}
+                </div>
               </div>
-            )
-          })}
-        </div>
-      </CardContent>
-    </Card>
+
+              {/* Detail row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.5rem', marginTop: '0.875rem' }}>
+                <div style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(5,7,16,0.4)' }}>
+                  <div className="stat-label">Tipo</div>
+                  <div style={{ fontSize: '0.775rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>{movementLabels[movement.kind]}</div>
+                </div>
+                <div style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(5,7,16,0.4)' }}>
+                  <div className="stat-label">Fecha</div>
+                  <div style={{ fontSize: '0.725rem', color: 'hsl(var(--foreground))' }}>
+                    {new Date(movement.createdAt).toLocaleString("es-MX", { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                {movement.reason && (
+                  <div style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(5,7,16,0.4)', gridColumn: 'span 2' }}>
+                    <div className="stat-label">Motivo</div>
+                    <div style={{ fontSize: '0.775rem', color: 'hsl(var(--foreground))' }}>{movement.reason}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              {canProcess && (
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.875rem', justifyContent: 'flex-end' }}>
+                  <button
+                    className="btn-reject"
+                    onClick={() => reject.mutate(movement.id)}
+                    disabled={reject.isPending || authorize.isPending}
+                    type="button"
+                  >
+                    <X style={{ width: 12, height: 12 }} />
+                    Rechazar
+                  </button>
+                  <button
+                    className="btn-authorize"
+                    onClick={() => authorize.mutate(movement.id)}
+                    disabled={authorize.isPending || reject.isPending}
+                    type="button"
+                  >
+                    <CheckCircle2 style={{ width: 12, height: 12 }} />
+                    Autorizar
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
 function DetailLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border p-2">
-      <div className="text-[11px] uppercase text-muted-foreground">{label}</div>
-      <div className="break-words">{value}</div>
+    <div style={{ padding: '0.625rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+      <div className="stat-label" style={{ marginBottom: '3px' }}>{label}</div>
+      <div style={{ fontSize: '0.85rem', color: 'hsl(var(--foreground))', wordBreak: 'break-words' }}>{value}</div>
     </div>
   )
 }
@@ -919,6 +1053,7 @@ function formatPayrollPeriod(payroll: Pick<Payroll, "periodStart" | "periodEnd">
 }
 
 function History() {
+  const [tab, setTab] = useState<"all" | "employee">("all")
   const [employeeId, setEmployeeId] = useState("")
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
@@ -936,45 +1071,87 @@ function History() {
     [employeeId, from, kind, status, to]
   )
   const movements = useQuery({ queryKey: ["movements", params], queryFn: () => api.movements(params) })
+  const count = movements.data?.length ?? 0
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Historial</CardTitle>
-        <p className="text-sm text-muted-foreground">Consulta y auditoría de solicitudes y movimientos administrativos.</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-5">
-          <Select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
-            <option value="">Empleado</option>
-            {employees.data?.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.fullName}
-              </option>
-            ))}
-          </Select>
-          <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-          <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-          <Select value={kind} onChange={(event) => setKind(event.target.value)}>
-            <option value="">Tipo</option>
-            {Object.entries(movementLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </Select>
-          <Select value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="">Estado</option>
-            {Object.entries(statusLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </Select>
+    <div className="space-y-4">
+      {/* Header + Tabs */}
+      <div className="section-header">
+        <div className="section-title">
+          <ClipboardList style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          Historial
         </div>
-        <MovementTable movements={movements.data ?? []} />
-      </CardContent>
-    </Card>
+        {count > 0 && <span className="section-count">{count}</span>}
+      </div>
+
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: '0.375rem', padding: '0.25rem', background: 'rgba(13,17,23,0.8)', borderRadius: '0.75rem', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
+        <button
+          type="button"
+          onClick={() => setTab("all")}
+          style={{
+            padding: '0.375rem 0.875rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.775rem',
+            fontWeight: 600,
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 150ms ease',
+            background: tab === "all" ? 'rgba(0,229,255,0.1)' : 'transparent',
+            color: tab === "all" ? '#00e5ff' : 'hsl(var(--muted-foreground))'
+          }}
+        >Todos los movimientos</button>
+        <button
+          type="button"
+          onClick={() => setTab("employee")}
+          style={{
+            padding: '0.375rem 0.875rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.775rem',
+            fontWeight: 600,
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 150ms ease',
+            background: tab === "employee" ? 'rgba(0,229,255,0.1)' : 'transparent',
+            color: tab === "employee" ? '#00e5ff' : 'hsl(var(--muted-foreground))'
+          }}
+        >Por empleado</button>
+      </div>
+
+      {/* Filters */}
+      <div className="filter-bar">
+        {tab === "employee" && (
+          <select
+            value={employeeId}
+            onChange={(e) => setEmployeeId(e.target.value)}
+          >
+            <option value="">Todos los empleados</option>
+            {employees.data?.map((emp) => (
+              <option key={emp.id} value={emp.id}>{emp.fullName}</option>
+            ))}
+          </select>
+        )}
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} title="Desde" />
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} title="Hasta" />
+        <select value={kind} onChange={(e) => setKind(e.target.value)}>
+          <option value="">Todos los tipos</option>
+          {Object.entries(movementLabels).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="">Todos los estados</option>
+          {Object.entries(statusLabels).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Results */}
+      {movements.isLoading && <StatusEmpty text="Buscando movimientos..." />}
+      {!movements.isLoading && count === 0 && <StatusEmpty text="Sin movimientos para los filtros seleccionados" />}
+      <MovementTable movements={movements.data ?? []} />
+    </div>
   )
 }
 
@@ -1027,34 +1204,43 @@ function PayrollAdmin() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <WalletCards className="h-4 w-4" />
-              Nómina
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">Cálculo operativo interno con backend como única fuente de verdad.</p>
-          </div>
-          <Button onClick={() => preview.mutate()} disabled={preview.isPending}>
-            Nueva nómina
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[160px_160px_auto_1fr]">
-            <Input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} />
-            <Input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} />
-            <Button type="button" variant="secondary" onClick={() => preview.mutate()} disabled={preview.isPending}>
+      <div className="section-header">
+        <div className="section-title">
+          <WalletCards style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          Nómina
+        </div>
+      </div>
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div className="admin-card-title">Calcular período</div>
+        </div>
+        <div className="admin-card-body">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.625rem', alignItems: 'center' }}>
+            <input
+              type="date"
+              className="form-input"
+              style={{ flex: '0 0 150px' }}
+              value={periodStart}
+              onChange={(e) => setPeriodStart(e.target.value)}
+            />
+            <input
+              type="date"
+              className="form-input"
+              style={{ flex: '0 0 150px' }}
+              value={periodEnd}
+              onChange={(e) => setPeriodEnd(e.target.value)}
+            />
+            <button className="btn-secondary" type="button" onClick={() => preview.mutate()} disabled={preview.isPending}>
               Previsualizar
-            </Button>
-            <Button className="md:justify-self-end" type="button" disabled={!canGenerate} onClick={() => generate.mutate()}>
+            </button>
+            <button className="btn-primary" type="button" disabled={!canGenerate} onClick={() => generate.mutate()}>
               Generar nómina
-            </Button>
+            </button>
           </div>
-          {preview.error && <StatusText text={preview.error.message} />}
-          {generate.error && <StatusText text={generate.error.message} />}
+          {preview.error && <div className="status-empty" style={{ marginTop: '0.75rem', color: '#f87171' }}>{preview.error.message}</div>}
+          {generate.error && <div className="status-empty" style={{ marginTop: '0.75rem', color: '#f87171' }}>{generate.error.message}</div>}
           {preview.data && (
-            <>
+            <div style={{ marginTop: '1rem' }} className="space-y-4">
               <PayrollTotals
                 totalGross={preview.data.totals.totalGross}
                 totalDeductions={preview.data.totals.totalDeductions}
@@ -1062,55 +1248,77 @@ function PayrollAdmin() {
                 totalNet={preview.data.totals.totalNet}
               />
               <PayrollItemsTable items={preview.data.items} onSelect={setSelectedItem} />
-            </>
+            </div>
           )}
-          {!preview.data && <StatusText text="Selecciona un periodo y previsualiza para calcular la nómina desde el backend." />}
-        </CardContent>
-      </Card>
+          {!preview.data && <StatusEmpty text="Selecciona un periodo y previsualiza para calcular la nómina." />}
+        </div>
+      </div>
 
       {selectedItem && (
         <PayrollItemDetail title={`Detalle · ${selectedItem.employeeName}`} item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Historial de nóminas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!payrolls.data?.length && <StatusText text="Sin nóminas generadas." />}
+
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div className="admin-card-title">Historial de nóminas</div>
+        </div>
+        <div className="admin-card-body">
+          {!payrolls.data?.length && <StatusEmpty text="Sin nóminas generadas." />}
           <div className="space-y-2">
             {payrolls.data?.map((payroll) => (
-              <div key={payroll.id} className="grid gap-3 rounded-md border bg-background/45 p-3 text-sm lg:grid-cols-[1fr_auto_auto_auto_auto] lg:items-center">
-                <div className="min-w-0">
-                  <div className="font-medium">{formatPayrollPeriod(payroll)}</div>
-                  <div className="text-xs text-muted-foreground">Generada: {formatDateTime(payroll.generatedAt)}</div>
+              <div
+                key={payroll.id}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.875rem',
+                  borderRadius: '0.875rem',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  background: 'rgba(13,17,23,0.6)'
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'hsl(var(--foreground))' }}>{formatPayrollPeriod(payroll)}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>Generada: {formatDateTime(payroll.generatedAt)}</div>
                 </div>
-                <Badge>{payrollStatusLabels[payroll.status]}</Badge>
-                <div className="font-mono font-semibold">{money.format(payroll.totalNet)}</div>
-                <Button size="sm" variant="secondary" onClick={() => setSelectedPayrollId(payroll.id)}>
+                <span className={getPayrollBadgeClass(payroll.status)}>{payrollStatusLabels[payroll.status]}</span>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontSize: '0.95rem', color: '#4ade80' }}>
+                  {money.format(payroll.totalNet)}
+                </div>
+                <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.375rem 0.75rem', height: 'auto' }} onClick={() => setSelectedPayrollId(payroll.id)} type="button">
                   Ver detalle
-                </Button>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" disabled={payroll.status !== "GENERADA" || markPaid.isPending} onClick={() => markPaid.mutate(payroll.id)}>
-                    Marcar pagada
-                  </Button>
-                </div>
+                </button>
+                <button
+                  className="btn-authorize"
+                  style={{ fontSize: '0.725rem', padding: '0.375rem 0.75rem' }}
+                  disabled={payroll.status !== "GENERADA" || markPaid.isPending}
+                  onClick={() => markPaid.mutate(payroll.id)}
+                  type="button"
+                >
+                  Marcar pagada
+                </button>
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
 
       {detail && (
-        <Card>
-          <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="admin-card">
+          <div className="admin-card-header">
             <div>
-              <CardTitle>Detalle de nómina</CardTitle>
-              <p className="text-sm text-muted-foreground">{formatPayrollPeriod(detail)} · {payrollStatusLabels[detail.status]}</p>
+              <div className="admin-card-title">Detalle de nómina</div>
+              <div style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))', marginTop: '2px' }}>
+                {formatPayrollPeriod(detail)} · <span className={getPayrollBadgeClass(detail.status)}>{payrollStatusLabels[detail.status]}</span>
+              </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedPayrollId("")}>Cerrar</Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            <button className="btn-ghost" style={{ fontSize: '0.775rem' }} onClick={() => setSelectedPayrollId("")} type="button">Cerrar</button>
+          </div>
+          <div className="admin-card-body space-y-4">
             <PayrollTotals
               totalGross={detail.totalGross}
               totalDeductions={detail.totalDeductions}
@@ -1119,17 +1327,23 @@ function PayrollAdmin() {
             />
             <PayrollItemsTable items={detail.items ?? []} onSelect={setSelectedItem} />
             {detail.status === "GENERADA" && (
-              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                <Input placeholder="Motivo de cancelación" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} />
-                <Button variant="destructive" disabled={!cancelReason.trim() || cancel.isPending} onClick={() => cancel.mutate(detail.id)}>
+              <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
+                <input
+                  className="form-input"
+                  placeholder="Motivo de cancelación"
+                  style={{ flex: 1, minWidth: 180 }}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                />
+                <button className="btn-reject" disabled={!cancelReason.trim() || cancel.isPending} onClick={() => cancel.mutate(detail.id)} type="button">
                   Cancelar nómina
-                </Button>
+                </button>
               </div>
             )}
-            {cancel.error && <StatusText text={cancel.error.message} />}
-            {markPaid.error && <StatusText text={markPaid.error.message} />}
-          </CardContent>
-        </Card>
+            {cancel.error && <div className="status-empty" style={{ color: '#f87171' }}>{cancel.error.message}</div>}
+            {markPaid.error && <div className="status-empty" style={{ color: '#f87171' }}>{markPaid.error.message}</div>}
+          </div>
+        </div>
       )}
     </div>
   )
@@ -1148,48 +1362,60 @@ function PayrollTotals({
 }) {
   return (
     <div className="grid metric-grid gap-3">
-      <Metric label="Total sueldos" value={money.format(totalGross)} />
-      <Metric label="Total deducciones" value={money.format(totalDeductions)} tone="primary" />
-      <Metric label="Total ajustes" value={money.format(totalAdjustments)} tone="accent" />
-      <Metric label="Total neto a pagar" value={money.format(totalNet)} tone="strong" />
+      <div className="stat-card">
+        <div className="stat-label">Total sueldos</div>
+        <div className="stat-value" style={{ fontSize: '1.25rem' }}>{money.format(totalGross)}</div>
+      </div>
+      <div className="stat-card stat-card-amber">
+        <div className="stat-label">Deducciones</div>
+        <div className="stat-value stat-value-amber" style={{ fontSize: '1.25rem' }}>{money.format(totalDeductions)}</div>
+      </div>
+      <div className="stat-card stat-card-violet">
+        <div className="stat-label">Ajustes</div>
+        <div className="stat-value stat-value-violet" style={{ fontSize: '1.25rem' }}>{money.format(totalAdjustments)}</div>
+      </div>
+      <div className="stat-card stat-card-green">
+        <div className="stat-label">Neto a pagar</div>
+        <div className="stat-value stat-value-green" style={{ fontSize: '1.25rem' }}>{money.format(totalNet)}</div>
+      </div>
     </div>
   )
 }
 
 function PayrollItemsTable({ items, onSelect }: { items: PayrollItem[]; onSelect: (item: PayrollItem) => void }) {
-  if (!items.length) return <StatusText text="No hay empleados activos para este periodo." />
+  if (!items.length) return <StatusEmpty text="No hay empleados activos para este periodo." />
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px] text-left text-sm">
-        <thead className="text-xs text-muted-foreground">
-          <tr className="border-b">
-            <th className="py-2 pr-3">Empleado</th>
-            <th className="py-2 pr-3">Sueldo base</th>
-            <th className="py-2 pr-3">Adelantos</th>
-            <th className="py-2 pr-3">Consumos</th>
-            <th className="py-2 pr-3">Cargos</th>
-            <th className="py-2 pr-3">Ajustes</th>
-            <th className="py-2 pr-3">Neto a pagar</th>
-            <th className="py-2 pr-3">Detalle</th>
+    <div style={{ borderRadius: '0.875rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(13,17,23,0.6)', overflowX: 'auto' }}>
+      <table className="payroll-table" style={{ minWidth: 780 }}>
+        <thead>
+          <tr>
+            <th>Empleado</th>
+            <th>Sueldo base</th>
+            <th>Adelantos</th>
+            <th>Consumos</th>
+            <th>Cargos</th>
+            <th>Ajustes</th>
+            <th>Neto a pagar</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.employeeId} className="border-b last:border-0">
-              <td className="py-2 pr-3">
-                <div className="font-medium">{item.employeeName}</div>
-                <div className="text-xs text-muted-foreground">{item.position}</div>
+            <tr key={item.employeeId}>
+              <td>
+                <div style={{ fontWeight: 600, fontSize: '0.825rem' }}>{item.employeeName}</div>
+                <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>{item.position}</div>
               </td>
-              <td className="py-2 pr-3 font-mono">{money.format(item.baseSalary)}</td>
-              <td className="py-2 pr-3 font-mono">{money.format(item.totalAdvances)}</td>
-              <td className="py-2 pr-3 font-mono">{money.format(item.totalInternalConsumption)}</td>
-              <td className="py-2 pr-3 font-mono">{money.format(item.totalAdminCharges + item.totalPenalties)}</td>
-              <td className="py-2 pr-3 font-mono">{money.format(item.totalPositiveAdjustments - item.totalNegativeAdjustments)}</td>
-              <td className="py-2 pr-3 font-mono font-semibold">{money.format(item.netPay)}</td>
-              <td className="py-2 pr-3">
-                <Button size="sm" variant="secondary" onClick={() => onSelect(item)}>
-                  Ver detalle
-                </Button>
+              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem' }}>{money.format(item.baseSalary)}</td>
+              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem', color: '#fbbf24' }}>{money.format(item.totalAdvances)}</td>
+              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem' }}>{money.format(item.totalInternalConsumption)}</td>
+              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem' }}>{money.format(item.totalAdminCharges + item.totalPenalties)}</td>
+              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem' }}>{money.format(item.totalPositiveAdjustments - item.totalNegativeAdjustments)}</td>
+              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.9rem', fontWeight: 700, color: '#4ade80' }}>{money.format(item.netPay)}</td>
+              <td>
+                <button className="btn-ghost" style={{ fontSize: '0.725rem', padding: '0.25rem 0.625rem', height: 'auto' }} onClick={() => onSelect(item)} type="button">
+                  Detalle
+                </button>
               </td>
             </tr>
           ))}
@@ -1201,36 +1427,48 @@ function PayrollItemsTable({ items, onSelect }: { items: PayrollItem[]; onSelect
 
 function PayrollItemDetail({ title, item, onClose }: { title: string; item: PayrollItem; onClose: () => void }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3">
+    <div className="admin-card">
+      <div className="admin-card-header">
         <div>
-          <CardTitle>{title}</CardTitle>
-          <p className="text-sm text-muted-foreground">{item.movements.length} movimiento(s) incluidos.</p>
+          <div className="admin-card-title">{title}</div>
+          <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', marginTop: '2px' }}>{item.movements.length} movimiento(s)</div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose}>Cerrar</Button>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid gap-3 md:grid-cols-4">
+        <button className="btn-ghost" style={{ fontSize: '0.775rem' }} onClick={onClose} type="button">Cerrar</button>
+      </div>
+      <div className="admin-card-body space-y-3">
+        <div className="grid gap-2 md:grid-cols-4">
           <DetailLine label="Sueldo base" value={money.format(item.baseSalary)} />
           <DetailLine label="Deducciones" value={money.format(item.totalDeductions)} />
-          <DetailLine label="Ajustes positivos" value={money.format(item.totalPositiveAdjustments)} />
+          <DetailLine label="Ajustes" value={money.format(item.totalPositiveAdjustments)} />
           <DetailLine label="Neto" value={money.format(item.netPay)} />
         </div>
         <div className="space-y-2">
           {item.movements.map((movement) => (
-            <div key={movement.id} className="grid gap-2 rounded-md border bg-background/45 p-3 text-sm md:grid-cols-[130px_1fr_auto]">
-              <div className="font-mono text-xs text-muted-foreground">{movement.folio}</div>
+            <div
+              key={movement.id}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '100px 1fr auto',
+                gap: '0.625rem',
+                alignItems: 'center',
+                padding: '0.625rem',
+                borderRadius: '0.625rem',
+                border: '1px solid rgba(255,255,255,0.05)',
+                background: 'rgba(5,7,16,0.4)'
+              }}
+            >
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.625rem', color: 'hsl(var(--muted-foreground))' }}>{movement.folio}</div>
               <div>
-                <div className="font-medium">{movementLabels[movement.kind]}</div>
-                <div className="text-xs text-muted-foreground">{movement.reason}</div>
+                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>{movementLabels[movement.kind]}</div>
+                <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>{movement.reason}</div>
               </div>
-              <div className="font-mono font-semibold">{money.format(movement.amount)}</div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontSize: '0.875rem', color: 'hsl(var(--foreground))' }}>{money.format(movement.amount)}</div>
             </div>
           ))}
-          {!item.movements.length && <StatusText text="Sin movimientos incluidos para este empleado." />}
+          {!item.movements.length && <StatusEmpty text="Sin movimientos para este empleado." />}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
@@ -1241,71 +1479,77 @@ function MovementTable({
   movements: Movement[]
   actions?: (movement: Movement) => React.ReactNode
 }) {
-  if (!movements.length) return <StatusText text="Sin movimientos" />
+  if (!movements.length) return null
 
   return (
     <>
+      {/* Mobile cards */}
       <div className="space-y-2 md:hidden">
-        {movements.map((movement) => (
-          <div key={movement.id} className="rounded-lg border bg-background/45 p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold">{movement.employee?.fullName ?? "Empleado"}</div>
-                <div className="font-mono text-[11px] text-muted-foreground">{movement.folio}</div>
+        {movements.map((movement, idx) => (
+          <div
+            key={movement.id}
+            className="movement-row"
+            style={{ animationDelay: `${idx * 30}ms`, flexDirection: 'column', alignItems: 'stretch', gap: '0.625rem' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'hsl(var(--foreground))' }}>
+                  {movement.employee?.fullName ?? "Empleado"}
+                </div>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.625rem', color: 'hsl(var(--muted-foreground))' }}>{movement.folio}</div>
               </div>
-              <Badge>{statusLabels[movement.status]}</Badge>
+              <span className={getStatusBadgeClass(movement.status)}>{statusLabels[movement.status]}</span>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <div className="text-[11px] text-muted-foreground">Tipo</div>
-                <div>{movementLabels[movement.kind]}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-[11px] text-muted-foreground">Cantidad</div>
-                <div className="font-semibold">{money.format(Number(movement.amount))}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.375rem' }}>
+              <div style={{ fontSize: '0.775rem', color: 'hsl(var(--muted-foreground))' }}>{movementLabels[movement.kind]}</div>
+              <div style={{ fontSize: '0.875rem', fontWeight: 700, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: 'hsl(var(--foreground))' }}>
+                {money.format(Number(movement.amount))}
               </div>
             </div>
-            <div className="mt-3 rounded-md border bg-background/45 p-2 text-xs">{movementEventLabel(movement)}</div>
-            <div className="mt-3 text-xs text-muted-foreground">{new Date(movement.createdAt).toLocaleString("es-MX")}</div>
-            {actions?.(movement) && <div className="mt-3">{actions(movement)}</div>}
+            <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>
+              {new Date(movement.createdAt).toLocaleString("es-MX")}
+            </div>
+            {actions?.(movement) && <div>{actions(movement)}</div>}
           </div>
         ))}
       </div>
-      <div className="hidden overflow-x-auto md:block">
-      <table className="w-full min-w-[780px] text-left text-sm">
-        <thead className="text-xs text-muted-foreground">
-          <tr className="border-b">
-            <th className="py-2 pr-3">Folio</th>
-            <th className="py-2 pr-3">Empleado</th>
-            <th className="py-2 pr-3">Tipo</th>
-            <th className="py-2 pr-3">Cantidad</th>
-            <th className="py-2 pr-3">Estado</th>
-            <th className="py-2 pr-3">Evento</th>
-            <th className="py-2 pr-3">Registro</th>
-            <th className="py-2 pr-3">Accion</th>
-          </tr>
-        </thead>
-        <tbody>
-          {movements.map((movement) => (
-            <tr key={movement.id} className="border-b last:border-0">
-              <td className="py-2 pr-3 font-mono text-xs">{movement.folio}</td>
-              <td className="py-2 pr-3">{movement.employee?.fullName ?? "Empleado"}</td>
-              <td className="py-2 pr-3">
-                <div>{movementLabels[movement.kind]}</div>
-                <div className="text-[11px] text-muted-foreground">
-                  {movement.origin === "EMPLOYEE_REQUEST" ? "Solicitud empleado" : "Movimiento administrativo"}
-                </div>
-              </td>
-              <td className="py-2 pr-3">{money.format(Number(movement.amount))}</td>
-              <td className="py-2 pr-3">
-                <Badge>{statusLabels[movement.status]}</Badge>
-              </td>
-              <td className="py-2 pr-3">{movementEventLabel(movement)}</td>
-              <td className="py-2 pr-3 text-muted-foreground">{new Date(movement.createdAt).toLocaleString("es-MX")}</td>
-              <td className="py-2 pr-3">{actions?.(movement)}</td>
+
+      {/* Desktop table */}
+      <div className="hidden overflow-x-auto md:block" style={{ borderRadius: '0.875rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(13,17,23,0.6)' }}>
+        <table className="payroll-table">
+          <thead>
+            <tr>
+              <th>Folio</th>
+              <th>Empleado</th>
+              <th>Tipo</th>
+              <th>Monto</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+              {actions && <th>Acción</th>}
             </tr>
-          ))}
-        </tbody>
+          </thead>
+          <tbody>
+            {movements.map((movement) => (
+              <tr key={movement.id}>
+                <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.65rem', color: 'hsl(var(--muted-foreground))' }}>{movement.folio}</td>
+                <td>
+                  <div style={{ fontWeight: 600, fontSize: '0.825rem' }}>{movement.employee?.fullName ?? "Empleado"}</div>
+                  <div style={{ fontSize: '0.65rem', color: 'hsl(var(--muted-foreground))' }}>
+                    {movement.origin === "EMPLOYEE_REQUEST" ? "Solicitud" : "Administrativo"}
+                  </div>
+                </td>
+                <td style={{ fontSize: '0.8rem' }}>{movementLabels[movement.kind]}</td>
+                <td style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: '0.875rem', color: 'hsl(var(--foreground))' }}>
+                  {money.format(Number(movement.amount))}
+                </td>
+                <td><span className={getStatusBadgeClass(movement.status)}>{statusLabels[movement.status]}</span></td>
+                <td style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
+                  {new Date(movement.createdAt).toLocaleString("es-MX")}
+                </td>
+                {actions && <td>{actions(movement)}</td>}
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
     </>
@@ -1363,116 +1607,123 @@ function Employees({ user }: { user?: User }) {
   }, [editForm, selectedEmployee])
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-      <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserRoundPlus className="h-4 w-4" />
-            Alta de empleado
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="space-y-3" onSubmit={form.handleSubmit((values) => create.mutate(values))}>
-            <Input placeholder="Nombre completo" {...form.register("fullName")} />
-            <Input placeholder="Puesto" {...form.register("position")} />
-            <Input placeholder="Telefono" {...form.register("phone")} />
-            <Input type="password" placeholder="PIN" {...form.register("pin")} />
-            <div className="grid grid-cols-2 gap-3">
-              <Input type="number" step="0.01" placeholder="Sueldo base" {...form.register("salaryAmount")} />
-              <Select {...form.register("salaryType")}>
-                {Object.entries(salaryTypeLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </Select>
+    <div className="space-y-4">
+      <div className="section-header">
+        <div className="section-title">
+          <UsersRound style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          Empleados
+        </div>
+        {employees.data && <span className="section-count">{employees.data.length}</span>}
+      </div>
+
+      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+        {/* Create form */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <UserRoundPlus style={{ width: 14, height: 14, color: '#00e5ff' }} />
+              Alta de empleado
             </div>
-            <Input type="date" {...form.register("hireDate")} />
-            <Button className="w-full" disabled={create.isPending || !user?.branch?.id}>
-              Crear
-            </Button>
-            {create.error && <div className="rounded-md border p-2 text-sm">{create.error.message}</div>}
-          </form>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4" />
-            Edición y PIN
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!selectedEmployee && <StatusText text="Selecciona un empleado del directorio para editarlo." />}
-          {selectedEmployee && (
-            <form
-              className="space-y-3"
-              onSubmit={editForm.handleSubmit((values) => update.mutate({ id: selectedEmployee.id, payload: values }))}
-            >
-              <Input placeholder="Nombre completo" {...editForm.register("fullName")} />
-              <Input placeholder="Puesto" {...editForm.register("position")} />
-              <Input placeholder="Telefono" {...editForm.register("phone")} />
-              <Input type="password" placeholder="Nuevo PIN opcional" {...editForm.register("pin")} />
-              <div className="grid grid-cols-2 gap-3">
-                <Input type="number" step="0.01" placeholder="Sueldo base" {...editForm.register("salaryAmount")} />
-                <Select {...editForm.register("salaryType")}>
+          </div>
+          <div className="admin-card-body">
+            <form className="space-y-2.5" onSubmit={form.handleSubmit((values) => create.mutate(values))}>
+              <input className="form-input" placeholder="Nombre completo" {...form.register("fullName")} />
+              <input className="form-input" placeholder="Puesto" {...form.register("position")} />
+              <input className="form-input" placeholder="Teléfono" {...form.register("phone")} />
+              <input className="form-input" type="password" placeholder="PIN (6 dígitos)" {...form.register("pin")} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <input className="form-input" type="number" step="0.01" placeholder="Sueldo base" {...form.register("salaryAmount")} />
+                <select className="form-select" {...form.register("salaryType")}>
                   {Object.entries(salaryTypeLabels).map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
-                </Select>
+                </select>
               </div>
-              <Input type="date" {...editForm.register("hireDate")} />
-              <div className="grid grid-cols-2 gap-2">
-                <Button className="w-full" disabled={update.isPending}>
-                  Guardar
-                </Button>
-                <Button
-                  className="w-full"
-                  type="button"
-                  variant={selectedEmployee.active ? "destructive" : "secondary"}
-                  disabled={toggleActive.isPending}
-                  onClick={() => toggleActive.mutate(selectedEmployee)}
-                >
-                  {selectedEmployee.active ? "Desactivar" : "Activar"}
-                </Button>
-              </div>
-              {update.error && <div className="rounded-md border p-2 text-sm">{update.error.message}</div>}
-              {toggleActive.error && <div className="rounded-md border p-2 text-sm">{toggleActive.error.message}</div>}
+              <input className="form-input" type="date" {...form.register("hireDate")} />
+              <button className="btn-primary" style={{ width: '100%' }} disabled={create.isPending || !user?.branch?.id} type="submit">
+                Crear empleado
+              </button>
+              {create.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{create.error.message}</div>}
             </form>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+
+        {/* Edit form */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <KeyRound style={{ width: 14, height: 14, color: '#00e5ff' }} />
+              Edición y PIN
+            </div>
+          </div>
+          <div className="admin-card-body">
+            {!selectedEmployee && <StatusEmpty text="Selecciona un empleado de la lista para editarlo." />}
+            {selectedEmployee && (
+              <form
+                className="space-y-2.5"
+                onSubmit={editForm.handleSubmit((values) => update.mutate({ id: selectedEmployee.id, payload: values }))}
+              >
+                <input className="form-input" placeholder="Nombre completo" {...editForm.register("fullName")} />
+                <input className="form-input" placeholder="Puesto" {...editForm.register("position")} />
+                <input className="form-input" placeholder="Teléfono" {...editForm.register("phone")} />
+                <input className="form-input" type="password" placeholder="Nuevo PIN (opcional)" {...editForm.register("pin")} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <input className="form-input" type="number" step="0.01" placeholder="Sueldo" {...editForm.register("salaryAmount")} />
+                  <select className="form-select" {...editForm.register("salaryType")}>
+                    {Object.entries(salaryTypeLabels).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <input className="form-input" type="date" {...editForm.register("hireDate")} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <button className="btn-primary" disabled={update.isPending} type="submit">Guardar</button>
+                  <button
+                    className={selectedEmployee.active ? "btn-reject" : "btn-authorize"}
+                    type="button"
+                    disabled={toggleActive.isPending}
+                    onClick={() => toggleActive.mutate(selectedEmployee)}
+                  >
+                    {selectedEmployee.active ? "Desactivar" : "Activar"}
+                  </button>
+                </div>
+                {update.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{update.error.message}</div>}
+                {toggleActive.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{toggleActive.error.message}</div>}
+              </form>
+            )}
+          </div>
+        </div>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Lista de empleados</CardTitle>
-          <p className="text-sm text-muted-foreground">Información básica, estado y acceso rápido a edición.</p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+
+      {/* Employee grid */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div className="admin-card-title">Directorio de empleados</div>
+        </div>
+        <div className="admin-card-body">
+          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
             {employees.data?.map((employee: Employee) => (
               <button
                 key={employee.id}
-                className={`rounded-md border p-3 text-left transition hover:bg-secondary/60 ${
-                  selectedEmployeeId === employee.id ? "border-primary bg-primary/10" : "bg-background/45"
-                }`}
+                className={`employee-card ${selectedEmployeeId === employee.id ? "selected" : ""}`}
                 type="button"
                 onClick={() => setSelectedEmployeeId(employee.id)}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 font-medium">{employee.fullName}</div>
-                  <Badge className={employee.active ? "border-emerald-500/40 text-emerald-400" : "border-destructive/50 text-destructive"}>
-                    {employee.active ? "Activo" : "Inactivo"}
-                  </Badge>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.375rem' }}>
+                  <div className="employee-card-name">{employee.fullName}</div>
+                  <span className={employee.active ? "badge-status badge-authorized" : "badge-status badge-canceled"} style={{ flexShrink: 0 }}>
+                    {employee.active ? "Activo" : "Inact."}
+                  </span>
                 </div>
-                <div className="text-sm text-muted-foreground">{employee.phone} · {employee.position}</div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  {employee.branch.name} · {salaryTypeLabels[employee.salaryType ?? "WEEKLY"]} · {money.format(Number(employee.salaryAmount ?? 0))}
+                <div className="employee-card-info">{employee.phone} · {employee.position}</div>
+                <div className="employee-card-info" style={{ marginTop: '4px' }}>
+                  {salaryTypeLabels[employee.salaryType ?? "WEEKLY"]} · {money.format(Number(employee.salaryAmount ?? 0))}
                 </div>
               </button>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1547,170 +1798,194 @@ function Configuration() {
   })
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Banknote className="h-4 w-4" />
+    <div className="space-y-4">
+      <div className="section-header">
+        <div className="section-title">
+          <Settings style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          Configuración
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+        {/* Beverage price */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <Banknote style={{ width: 14, height: 14, color: '#fbbf24' }} />
               Precio de bebida
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">Este monto se aplica automaticamente al solicitar bebida.</p>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-3" onSubmit={configForm.handleSubmit((values) => updateConfig.mutate(values))}>
-              <Input type="number" step="0.01" placeholder="Precio" {...configForm.register("beveragePrice")} />
-              <Button className="w-full" disabled={updateConfig.isPending}>
-                Guardar precio
-              </Button>
+            </div>
+          </div>
+          <div className="admin-card-body">
+            <p style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))', marginBottom: '0.75rem' }}>Se aplica automáticamente al solicitar bebida.</p>
+            <form className="space-y-2.5" onSubmit={configForm.handleSubmit((values) => updateConfig.mutate(values))}>
+              <input className="form-input" type="number" step="0.01" placeholder="Precio" {...configForm.register("beveragePrice")} />
+              <button className="btn-primary" style={{ width: '100%' }} disabled={updateConfig.isPending} type="submit">Guardar precio</button>
             </form>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4" />
-              Nueva regla
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-3" onSubmit={form.handleSubmit((values) => createRule.mutate(values))}>
-              <Select {...form.register("kind")}>
+          </div>
+        </div>
+
+        {/* New admin rule */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <ShieldCheck style={{ width: 14, height: 14, color: '#a855f7' }} />
+              Nueva regla de autorización
+            </div>
+          </div>
+          <div className="admin-card-body">
+            <form className="space-y-2.5" onSubmit={form.handleSubmit((values) => createRule.mutate(values))}>
+              <select className="form-select" {...form.register("kind")}>
                 <option value="">Todos los tipos</option>
                 {Object.entries(movementLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
+                  <option key={value} value={value}>{label}</option>
                 ))}
-              </Select>
-              <div className="grid grid-cols-2 gap-3">
-                <Input type="number" step="0.01" placeholder="Desde" {...form.register("minAmount")} />
-                <Input type="number" step="0.01" placeholder="Hasta" {...form.register("maxAmount")} />
+              </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <input className="form-input" type="number" step="0.01" placeholder="Monto mínimo" {...form.register("minAmount")} />
+                <input className="form-input" type="number" step="0.01" placeholder="Monto máximo" {...form.register("maxAmount")} />
               </div>
-              <Select {...form.register("requiredRole")}>
+              <select className="form-select" {...form.register("requiredRole")}>
                 {["ENCARGADO", "GERENTE", "ADMINISTRADOR"].map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
+                  <option key={role} value={role}>{role}</option>
                 ))}
-              </Select>
-              <Button className="w-full">Guardar regla</Button>
+              </select>
+              <button className="btn-primary" style={{ width: '100%' }} type="submit">Guardar regla</button>
             </form>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UsersRound className="h-4 w-4" />
-              Nuevo usuario administrativo
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">Crea accesos para encargado, gerente, cajero o administrador.</p>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-3" onSubmit={userForm.handleSubmit((values) => createUser.mutate(values))}>
-              <Input placeholder="Nombre completo" {...userForm.register("fullName")} />
-              <Input placeholder="Correo" type="email" {...userForm.register("email")} />
-              <Input placeholder="Contraseña temporal" type="password" {...userForm.register("password")} />
-              <Select {...userForm.register("role")}>
+          </div>
+        </div>
+
+        {/* New admin user */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <UserRoundPlus style={{ width: 14, height: 14, color: '#00e5ff' }} />
+              Nuevo usuario del sistema
+            </div>
+          </div>
+          <div className="admin-card-body">
+            <form className="space-y-2.5" onSubmit={userForm.handleSubmit((values) => createUser.mutate(values))}>
+              <input className="form-input" placeholder="Nombre completo" {...userForm.register("fullName")} />
+              <input className="form-input" placeholder="Correo electrónico" type="email" {...userForm.register("email")} />
+              <input className="form-input" placeholder="Contraseña temporal" type="password" {...userForm.register("password")} />
+              <select className="form-select" {...userForm.register("role")}>
                 {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
                   <option key={role} value={role}>{role}</option>
                 ))}
-              </Select>
-              <Button className="w-full" disabled={createUser.isPending}>
-                Crear usuario
-              </Button>
-              {createUser.error && <div className="rounded-md border p-2 text-sm text-muted-foreground">{createUser.error.message}</div>}
+              </select>
+              <button className="btn-primary" style={{ width: '100%' }} disabled={createUser.isPending} type="submit">Crear usuario</button>
+              {createUser.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{createUser.error.message}</div>}
             </form>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <KeyRound className="h-4 w-4" />
-              Editar acceso
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!selectedUser && <StatusText text="Selecciona un usuario administrativo de la lista." />}
+          </div>
+        </div>
+
+        {/* Edit user */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <KeyRound style={{ width: 14, height: 14, color: '#00e5ff' }} />
+              Editar acceso de usuario
+            </div>
+          </div>
+          <div className="admin-card-body">
+            {!selectedUser && <StatusEmpty text="Selecciona un usuario de la lista para editarlo." />}
             {selectedUser && (
               <form
-                className="space-y-3"
+                className="space-y-2.5"
                 onSubmit={userEditForm.handleSubmit((values) => updateUser.mutate({ id: selectedUser.id, values }))}
               >
-                <Input placeholder="Nombre completo" {...userEditForm.register("fullName")} />
-                <Input placeholder="Correo" type="email" {...userEditForm.register("email")} />
-                <Input placeholder="Nueva contraseña opcional" type="password" {...userEditForm.register("password")} />
-                <Select {...userEditForm.register("role")}>
+                <input className="form-input" placeholder="Nombre completo" {...userEditForm.register("fullName")} />
+                <input className="form-input" placeholder="Correo" type="email" {...userEditForm.register("email")} />
+                <input className="form-input" placeholder="Nueva contraseña (opcional)" type="password" {...userEditForm.register("password")} />
+                <select className="form-select" {...userEditForm.register("role")}>
                   {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
                     <option key={role} value={role}>{role}</option>
                   ))}
-                </Select>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button disabled={updateUser.isPending}>Guardar</Button>
-                  <Button
+                </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <button className="btn-primary" disabled={updateUser.isPending} type="submit">Guardar</button>
+                  <button
+                    className={selectedUser.active ? "btn-reject" : "btn-authorize"}
                     type="button"
-                    variant={selectedUser.active ? "destructive" : "secondary"}
                     disabled={toggleUser.isPending}
                     onClick={() => toggleUser.mutate(selectedUser)}
                   >
                     {selectedUser.active ? "Desactivar" : "Activar"}
-                  </Button>
+                  </button>
                 </div>
-                {updateUser.error && <div className="rounded-md border p-2 text-sm text-muted-foreground">{updateUser.error.message}</div>}
-                {toggleUser.error && <div className="rounded-md border p-2 text-sm text-muted-foreground">{toggleUser.error.message}</div>}
+                {updateUser.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{updateUser.error.message}</div>}
+                {toggleUser.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{toggleUser.error.message}</div>}
               </form>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Usuarios administrativos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2 md:grid-cols-2">
-              {adminUsers.data?.map((user) => (
-                <button
-                  key={user.id}
-                  className={`rounded-md border p-3 text-left transition hover:bg-secondary/60 ${
-                    selectedUserId === user.id ? "border-primary bg-primary/10" : "bg-background/45"
-                  }`}
-                  type="button"
-                  onClick={() => setSelectedUserId(user.id)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate font-medium">{user.fullName}</div>
-                      <div className="truncate text-sm text-muted-foreground">{user.email}</div>
-                    </div>
-                    <Badge className={user.active ? "border-emerald-500/40 text-emerald-400" : "border-destructive/50 text-destructive"}>
-                      {user.active ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </div>
-                  <div className="mt-2 text-xs text-muted-foreground">{user.role} · {user.branch?.name ?? "Sin sucursal"}</div>
-                </button>
-              ))}
-              {!adminUsers.data?.length && <StatusText text="Sin usuarios administrativos." />}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Reglas activas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {rules.data?.map((rule) => (
-                <div key={rule.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm">
-                  <span>{rule.kind ? movementLabels[rule.kind as MovementKind] : "Todos"}</span>
-                  <span>{money.format(Number(rule.minAmount))} - {rule.maxAmount ? money.format(Number(rule.maxAmount)) : "sin limite"}</span>
-                  <Badge>{rule.requiredRole}</Badge>
+
+      {/* Admin users list */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div className="admin-card-title">Usuarios administrativos</div>
+          {adminUsers.data && <span className="section-count">{adminUsers.data.length}</span>}
+        </div>
+        <div className="admin-card-body">
+          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+            {adminUsers.data?.map((user) => (
+              <button
+                key={user.id}
+                className={`employee-card ${selectedUserId === user.id ? "selected" : ""}`}
+                type="button"
+                onClick={() => setSelectedUserId(user.id)}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '3px' }}>
+                  <div className="employee-card-name">{user.fullName}</div>
+                  <span className={user.active ? "badge-status badge-authorized" : "badge-status badge-canceled"} style={{ flexShrink: 0 }}>
+                    {user.active ? "Activo" : "Inact."}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                <div className="employee-card-info">{user.email}</div>
+                <div className="employee-card-info" style={{ marginTop: '4px', color: '#a855f7', fontWeight: 600 }}>{user.role}</div>
+              </button>
+            ))}
+            {!adminUsers.data?.length && <StatusEmpty text="Sin usuarios administrativos." />}
+          </div>
+        </div>
+      </div>
+
+      {/* Rules */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div className="admin-card-title">Reglas de autorización activas</div>
+          {rules.data && <span className="section-count">{rules.data.length}</span>}
+        </div>
+        <div className="admin-card-body">
+          <div className="space-y-2">
+            {rules.data?.map((rule) => (
+              <div
+                key={rule.id}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '0.5rem',
+                  padding: '0.625rem 0.75rem',
+                  borderRadius: '0.625rem',
+                  border: '1px solid rgba(168,85,247,0.15)',
+                  background: 'rgba(168,85,247,0.04)',
+                  fontSize: '0.8rem'
+                }}
+              >
+                <span style={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}>
+                  {rule.kind ? movementLabels[rule.kind as MovementKind] : "Todos los tipos"}
+                </span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
+                  {money.format(Number(rule.minAmount))} – {rule.maxAmount ? money.format(Number(rule.maxAmount)) : "∞"}
+                </span>
+                <span className="badge-status badge-discounted">{rule.requiredRole}</span>
+              </div>
+            ))}
+            {!rules.data?.length && <StatusEmpty text="Sin reglas de autorización configuradas." />}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -2211,6 +2486,10 @@ function PortalMovementList({ title, movements, admin = false }: { title: string
 
 function StatusText({ text }: { text: string }) {
   return <div className="rounded-md border bg-card p-4 text-sm text-muted-foreground">{text}</div>
+}
+
+function StatusEmpty({ text }: { text: string }) {
+  return <div className="status-empty">{text}</div>
 }
 
 export default App
