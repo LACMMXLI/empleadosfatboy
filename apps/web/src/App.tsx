@@ -138,7 +138,7 @@ const employeeRequestSchema = z.object({
   quantity: z.coerce.number().optional(),
   unitPrice: z.coerce.number().optional()
 }).superRefine((data, ctx) => {
-  if (!data.reason || data.reason.trim().length === 0) {
+  if (data.kind !== "DRINK" && (!data.reason || data.reason.trim().length === 0)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Agrega un motivo para continuar",
@@ -2438,12 +2438,16 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
       setRequestError("El monto debe ser mayor a $0")
       return
     }
-    if (!payload.reason?.trim()) {
+    if (payload.kind !== "DRINK" && !payload.reason?.trim()) {
       setRequestError("Agrega un motivo para continuar")
       return
     }
     setMessage(null)
     setRequestError(null)
+    if (payload.kind === "DRINK") {
+      create.mutate({ ...payload, reason: "" })
+      return
+    }
     setConfirming(true)
   }
 
@@ -2649,14 +2653,14 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                   </div>
                 </GuidedBlock>
 
-                <GuidedBlock 
-                  step="2" 
-                  title={isDrink ? "Costo Configurado" : "Monto de la Solicitud"} 
-                  detail={isDrink ? "Precio asignado para consumos de bebidas" : "Captura el monto a solicitar"}
+                <GuidedBlock
+                  step="2"
+                  title={isDrink ? "Consumo de bebida" : "Monto de la Solicitud"}
+                  detail={isDrink ? "Precio fijo configurado por administración" : "Captura el monto a solicitar"}
                 >
                   {isDrink ? (
                     <div className="flex h-12 items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 text-sm">
-                      <span className="text-muted-foreground">Precio por unidad</span>
+                      <span className="text-muted-foreground">Bebida consumida</span>
                       <span className="font-mono text-base font-bold text-foreground">{money.format(beveragePrice)}</span>
                     </div>
                   ) : (
@@ -2680,30 +2684,32 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                   </div>
                 </GuidedBlock>
 
-                <GuidedBlock step="3" title="Motivo" detail="Razón corta obligatoria para la solicitud">
-                  <div className="flex flex-wrap gap-1.5">
-                    {quickRequestReasons.map((reason) => (
-                      <button
-                        key={reason}
-                        className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[0.675rem] font-semibold text-primary transition active:bg-primary/20"
-                        type="button"
-                        onClick={() => appendQuickReason(reason)}
-                      >
-                        {reason}
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    className="form-textarea mt-2"
-                    placeholder="Escribe brevemente tu motivo..."
-                    {...form.register("reason", {
-                      onChange: () => {
-                        setConfirming(false)
-                        setRequestError(null)
-                      }
-                    })}
-                  />
-                </GuidedBlock>
+                {!isDrink && (
+                  <GuidedBlock step="3" title="Motivo" detail="Razón corta obligatoria para la solicitud">
+                    <div className="flex flex-wrap gap-1.5">
+                      {quickRequestReasons.map((reason) => (
+                        <button
+                          key={reason}
+                          className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[0.675rem] font-semibold text-primary transition active:bg-primary/20"
+                          type="button"
+                          onClick={() => appendQuickReason(reason)}
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      className="form-textarea mt-2"
+                      placeholder="Escribe brevemente tu motivo..."
+                      {...form.register("reason", {
+                        onChange: () => {
+                          setConfirming(false)
+                          setRequestError(null)
+                        }
+                      })}
+                    />
+                  </GuidedBlock>
+                )}
 
                 {requestError && (
                   <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive-foreground text-center">
@@ -2712,7 +2718,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                 )}
                 
                 <button className="btn-primary h-12 w-full rounded-xl text-sm" disabled={create.isPending} type="submit">
-                  {create.isPending ? "Procesando..." : "Continuar"}
+                  {create.isPending ? "Procesando..." : isDrink ? "Confirmar bebida consumida" : "Continuar"}
                 </button>
                 <p className="px-1 text-center text-[10px] text-muted-foreground leading-relaxed">
                   *Las solicitudes se envían al panel de administración para su aprobación y posterior deducción de nómina.
