@@ -996,7 +996,7 @@ function DetailLine({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ padding: '0.625rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
       <div className="stat-label" style={{ marginBottom: '3px' }}>{label}</div>
-      <div style={{ fontSize: '0.85rem', color: 'hsl(var(--foreground))', wordBreak: 'break-words' }}>{value}</div>
+      <div style={{ fontSize: '0.85rem', color: 'hsl(var(--foreground))', wordBreak: 'break-word' }}>{value}</div>
     </div>
   )
 }
