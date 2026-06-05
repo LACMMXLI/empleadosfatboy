@@ -2444,10 +2444,6 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
     }
     setMessage(null)
     setRequestError(null)
-    if (payload.kind === "DRINK") {
-      create.mutate({ ...payload, reason: "" })
-      return
-    }
     setConfirming(true)
   }
 
@@ -2718,7 +2714,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                 )}
                 
                 <button className="btn-primary h-12 w-full rounded-xl text-sm" disabled={create.isPending} type="submit">
-                  {create.isPending ? "Procesando..." : isDrink ? "Confirmar bebida consumida" : "Continuar"}
+                  {create.isPending ? "Procesando..." : isDrink ? "Revisar consumo de bebida" : "Continuar"}
                 </button>
                 <p className="px-1 text-center text-[10px] text-muted-foreground leading-relaxed">
                   *Las solicitudes se envían al panel de administración para su aprobación y posterior deducción de nómina.
@@ -2737,13 +2733,17 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" onClick={() => setConfirming(false)}>
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1117] p-5 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
               <div className="space-y-1">
-                <div className="text-base font-bold text-foreground">Confirmar Solicitud</div>
-                <p className="text-xs text-muted-foreground">Verifica que los datos sean correctos antes de enviarla.</p>
+                <div className="text-base font-bold text-foreground">{isDrink ? "Confirmar consumo de bebida" : "Confirmar Solicitud"}</div>
+                <p className="text-xs text-muted-foreground">
+                  {isDrink
+                    ? "Confirma que estás solicitando el descuento por esta bebida consumida."
+                    : "Verifica que los datos sean correctos antes de enviarla."}
+                </p>
               </div>
               <div className="mt-4 space-y-2.5 rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-xs">
-                <DetailLine label="Categoría de adelanto" value={movementLabels[values.kind as MovementKind]} />
+                <DetailLine label={isDrink ? "Concepto" : "Categoría de adelanto"} value={movementLabels[values.kind as MovementKind]} />
                 <DetailLine label="Importe total" value={money.format(Number.isFinite(requestAmount) ? requestAmount : 0)} />
-                <DetailLine label="Motivo especificado" value={requestReason || "Sin motivo"} />
+                {!isDrink && <DetailLine label="Motivo especificado" value={requestReason || "Sin motivo"} />}
               </div>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button className="btn-secondary h-12 rounded-xl text-xs" type="button" onClick={() => setConfirming(false)}>
@@ -2758,7 +2758,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                     create.mutate(payload)
                   }, handleInvalidRequest)}
                 >
-                  Confirmar y enviar
+                  {isDrink ? "Sí, descontar bebida" : "Confirmar y enviar"}
                 </button>
               </div>
             </div>
