@@ -2489,7 +2489,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
     onError: (err: Error) => setCodeMessage(err.message)
   })
   const currentMovements = (movements.data ?? []).filter((movement) => movement.status !== "DISCOUNTED")
-  const recentMovements = currentMovements.slice(0, 4)
+  const recentMovements = currentMovements.slice(0, 3)
 
   return (
     <main className="employee-shell min-h-screen">
@@ -2599,7 +2599,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
               </div>
             </section>
 
-            <PortalMovementList title="Últimos Movimientos" movements={recentMovements} />
+            <PortalMovementList compact title="Últimos Movimientos" movements={recentMovements} />
           </>
         )}
 
@@ -2953,7 +2953,17 @@ function formatTicketDate(value?: string) {
   return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
 }
 
-function PortalMovementList({ title, movements, admin = false }: { title: string; movements: Movement[]; admin?: boolean }) {
+function PortalMovementList({
+  title,
+  movements,
+  admin = false,
+  compact = false
+}: {
+  title: string
+  movements: Movement[]
+  admin?: boolean
+  compact?: boolean
+}) {
   return (
     <div className="space-y-3">
       <div className="section-title text-[0.875rem] font-bold uppercase tracking-wider text-muted-foreground mb-1">
@@ -2961,9 +2971,27 @@ function PortalMovementList({ title, movements, admin = false }: { title: string
         {title}
       </div>
       {!movements.length && <StatusEmpty text="Sin movimientos en el periodo actual." />}
-      <div className="space-y-2.5">
+      <div className={compact ? "space-y-1.5" : "space-y-2.5"}>
         {movements.map((movement) => {
           const statusClass = movement.status.toLowerCase()
+          if (compact) {
+            return (
+              <div key={movement.id} className={`employee-movement-card compact status-${statusClass}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-semibold" style={{ color: 'hsl(var(--foreground))' }}>{movementLabels[movement.kind]}</div>
+                    <div className="font-mono text-[9px] text-muted-foreground">{movement.folio}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-mono text-xs font-bold text-foreground">{money.format(Number(movement.amount))}</div>
+                    <div className="text-[9px] text-muted-foreground">
+                      {new Date(movement.createdAt).toLocaleString("es-MX", { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          }
           return (
             <div key={movement.id} className={`employee-movement-card status-${statusClass}`}>
               <div className="flex items-start justify-between gap-3">
