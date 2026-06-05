@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import type { Employee, Movement, MovementKind, MovementSettlementTicket, MovementStatus, Payroll, PayrollItem, Role, SalaryType, User } from "@/types/domain"
+import type { Branch, Employee, Movement, MovementKind, MovementSettlementTicket, MovementStatus, Payroll, PayrollItem, Role, SalaryType, User } from "@/types/domain"
 import { clearPwa, syncAdminPwa, syncEmployeePwa } from "@/pwa/employeePwa"
 import fatboyLogo from "@/assets/logo.png"
 
@@ -156,7 +156,8 @@ const employeeSchema = z.object({
   phone: z.string().min(10, "Teléfono a 10 dígitos requerido"),
   salaryAmount: z.coerce.number().min(0),
   salaryType: z.enum(["WEEKLY", "BIWEEKLY", "DAILY"]),
-  hireDate: z.string().optional()
+  hireDate: z.string().optional(),
+  branchId: z.string().min(1, "Selecciona una sucursal")
 })
 type EmployeeFormInput = z.input<typeof employeeSchema>
 type EmployeeFormOutput = z.output<typeof employeeSchema>
@@ -168,7 +169,8 @@ const employeeEditSchema = z.object({
   phone: z.string().min(10, "Teléfono a 10 dígitos requerido"),
   salaryAmount: z.coerce.number().min(0),
   salaryType: z.enum(["WEEKLY", "BIWEEKLY", "DAILY"]),
-  hireDate: z.string().optional()
+  hireDate: z.string().optional(),
+  branchId: z.string().min(1, "Selecciona una sucursal")
 })
 type EmployeeEditFormInput = z.input<typeof employeeEditSchema>
 type EmployeeEditFormOutput = z.output<typeof employeeEditSchema>
@@ -1910,20 +1912,30 @@ function Employees({ user }: { user?: User }) {
   const queryClient = useQueryClient()
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
   const employees = useQuery({ queryKey: ["employees", "admin-all"], queryFn: () => api.employees(undefined, true) })
+  const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches })
   const selectedEmployee = employees.data?.find((employee) => employee.id === selectedEmployeeId)
+  
   const form = useForm<EmployeeFormInput, unknown, EmployeeFormOutput>({
     resolver: zodResolver(employeeSchema),
-    defaultValues: { salaryAmount: 0, salaryType: "WEEKLY", hireDate: "" }
+    defaultValues: { salaryAmount: 0, salaryType: "WEEKLY", hireDate: "", branchId: user?.branch?.id || "" }
   })
+  
   const editForm = useForm<EmployeeEditFormInput, unknown, EmployeeEditFormOutput>({
     resolver: zodResolver(employeeEditSchema),
-    defaultValues: { fullName: "", position: "", phone: "", pin: "", salaryAmount: 0, salaryType: "WEEKLY", hireDate: "" }
+    defaultValues: { fullName: "", position: "", phone: "", pin: "", salaryAmount: 0, salaryType: "WEEKLY", hireDate: "", branchId: "" }
   })
+
+  useEffect(() => {
+    if (user?.branch?.id) {
+      form.setValue("branchId", user.branch.id)
+    }
+  }, [user?.branch?.id, form])
+
   const create = useMutation({
     mutationFn: (payload: EmployeeFormOutput) =>
-      api.createEmployee({ ...payload, branchId: user?.branch?.id }),
+      api.createEmployee(payload),
     onSuccess: async () => {
-      form.reset()
+      form.reset({ salaryAmount: 0, salaryType: "WEEKLY", hireDate: "", branchId: user?.branch?.id || "" })
       await queryClient.invalidateQueries({ queryKey: ["employees"] })
     }
   })
@@ -1952,7 +1964,8 @@ function Employees({ user }: { user?: User }) {
       pin: "",
       salaryAmount: Number(selectedEmployee.salaryAmount ?? 0),
       salaryType: selectedEmployee.salaryType ?? "WEEKLY",
-      hireDate: selectedEmployee.hireDate ? selectedEmployee.hireDate.slice(0, 10) : ""
+      hireDate: selectedEmployee.hireDate ? selectedEmployee.hireDate.slice(0, 10) : "",
+      branchId: selectedEmployee.branch?.id || ""
     })
   }, [editForm, selectedEmployee])
 
@@ -1990,7 +2003,13 @@ function Employees({ user }: { user?: User }) {
                 </select>
               </div>
               <input className="form-input" type="date" {...form.register("hireDate")} />
-              <button className="btn-primary" style={{ width: '100%' }} disabled={create.isPending || !user?.branch?.id} type="submit">
+              <select className="form-select" {...form.register("branchId")}>
+                <option value="">Selecciona Sucursal</option>
+                {branches.data?.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              <button className="btn-primary" style={{ width: '100%' }} disabled={create.isPending} type="submit">
                 Crear empleado
               </button>
               {create.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{create.error.message}</div>}
@@ -2026,6 +2045,12 @@ function Employees({ user }: { user?: User }) {
                   </select>
                 </div>
                 <input className="form-input" type="date" {...editForm.register("hireDate")} />
+                <select className="form-select" {...editForm.register("branchId")}>
+                  <option value="">Selecciona Sucursal</option>
+                  {branches.data?.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                   <button className="btn-primary" disabled={update.isPending} type="submit">Guardar</button>
                   <button
