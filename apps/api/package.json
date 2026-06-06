@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:scope:movements": "ts-node src/movements/movements.service.scope.spec.ts",
     "test:scope:employees": "ts-node src/employees/employees.service.scope.spec.ts",
+    "test:payroll:accounting": "ts-node src/payroll/payroll.service.accounting.spec.ts",
     "start": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

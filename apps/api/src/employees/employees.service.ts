@@ -148,7 +148,7 @@ export class EmployeesService {
 
     const movements = await this.prisma.movement.groupBy({
       by: ["kind"],
-      where: { employeeId: id, status: { in: balanceStatuses } },
+      where: { employeeId: id, status: { in: balanceStatuses }, payrollLinks: { none: {} } },
       _sum: { amount: true }
     })
     const discounted = await this.prisma.movement.aggregate({

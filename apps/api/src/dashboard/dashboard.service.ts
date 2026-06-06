@@ -20,7 +20,7 @@ export class DashboardService {
           ? { employeeId: user.employeeId ?? "__none__" }
           : { branchId: user.branchId ?? undefined }
 
-    const todayWhere = { ...scope, status: { not: MovementStatus.DISCOUNTED }, createdAt: { gte: start, lt: end } }
+    const todayWhere = { ...scope, status: { not: MovementStatus.DISCOUNTED }, payrollLinks: { none: {} }, createdAt: { gte: start, lt: end } }
     const [todayByKind, pending, authorized, debt, weekly] = await Promise.all([
       this.prisma.movement.groupBy({
         by: ["kind"],
@@ -28,11 +28,12 @@ export class DashboardService {
         _sum: { amount: true }
       }),
       this.prisma.movement.count({ where: { ...scope, status: MovementStatus.PENDING } }),
-      this.prisma.movement.count({ where: { ...scope, status: MovementStatus.AUTHORIZED } }),
+      this.prisma.movement.count({ where: { ...scope, status: MovementStatus.AUTHORIZED, payrollLinks: { none: {} } } }),
       this.prisma.movement.aggregate({
         where: {
           ...scope,
-          status: { in: [MovementStatus.AUTHORIZED, MovementStatus.PARTIALLY_DISCOUNTED] }
+          status: { in: [MovementStatus.AUTHORIZED, MovementStatus.PARTIALLY_DISCOUNTED] },
+          payrollLinks: { none: {} }
         },
         _sum: { amount: true }
       }),
@@ -41,6 +42,7 @@ export class DashboardService {
           ...scope,
           kind: MovementKind.SALARY_ADVANCE,
           status: { not: MovementStatus.DISCOUNTED },
+          payrollLinks: { none: {} },
           createdAt: { gte: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000) }
         },
         select: { createdAt: true, amount: true, employee: { select: { fullName: true } } },

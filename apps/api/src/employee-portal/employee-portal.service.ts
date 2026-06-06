@@ -129,7 +129,8 @@ export class EmployeePortalService {
       by: ["kind"],
       where: {
         employeeId: employee.id,
-        status: { in: [MovementStatus.AUTHORIZED, MovementStatus.PARTIALLY_DISCOUNTED] }
+        status: { in: [MovementStatus.AUTHORIZED, MovementStatus.PARTIALLY_DISCOUNTED] },
+        payrollLinks: { none: {} }
       },
       _sum: { amount: true }
     })
@@ -154,7 +155,7 @@ export class EmployeePortalService {
   async movements(authorization?: string) {
     const employee = await this.currentEmployee(authorization)
     return this.prisma.movement.findMany({
-      where: { employeeId: employee.id, status: { not: MovementStatus.DISCOUNTED } },
+      where: { employeeId: employee.id, status: { not: MovementStatus.DISCOUNTED }, payrollLinks: { none: {} } },
       include: {
         registeredBy: { select: { id: true, fullName: true, role: true } },
         authorizedBy: { select: { id: true, fullName: true, role: true } }
@@ -181,7 +182,7 @@ export class EmployeePortalService {
   async movementDetail(id: string, authorization?: string) {
     const employee = await this.currentEmployee(authorization)
     const movement = await this.prisma.movement.findFirst({
-      where: { id, employeeId: employee.id, status: { not: MovementStatus.DISCOUNTED } },
+      where: { id, employeeId: employee.id, status: { not: MovementStatus.DISCOUNTED }, payrollLinks: { none: {} } },
       include: {
         registeredBy: { select: { id: true, fullName: true, role: true } },
         authorizedBy: { select: { id: true, fullName: true, role: true } }

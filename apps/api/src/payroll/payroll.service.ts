@@ -169,52 +169,95 @@ export class PayrollService {
   }
 
   async markPaid(id: string, adminId: string, ipAddress?: string) {
-    const payroll = await this.prisma.payroll.findUnique({ where: { id } })
+    const payroll = await this.prisma.payroll.findUnique({
+      where: { id },
+      include: this.payrollInclude()
+    })
     if (!payroll) throw new NotFoundException("Nómina no encontrada")
     if (payroll.status === PayrollStatus.CANCELADA) throw new BadRequestException("No se puede pagar una nómina cancelada")
     if (payroll.status === PayrollStatus.PAGADA) return this.get(id)
 
-    const updated = await this.prisma.payroll.update({
-      where: { id },
-      data: { status: PayrollStatus.PAGADA, paidAt: new Date() },
-      include: this.payrollInclude()
-    })
-    await this.audit.log({
-      userId: adminId,
-      action: AuditAction.STATUS_CHANGE,
-      entity: "Payroll",
-      entityId: id,
-      oldValue: this.toJson(payroll),
-      newValue: this.toJson({ status: updated.status, paidAt: updated.paidAt }),
-      ipAddress
+    const movementIds = this.payrollMovementIds(payroll)
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (movementIds.length > 0) {
+        await tx.movement.updateMany({
+          where: {
+            id: { in: movementIds },
+            status: { in: [MovementStatus.AUTHORIZED, MovementStatus.PARTIALLY_DISCOUNTED] }
+          },
+          data: { status: MovementStatus.DISCOUNTED }
+        })
+      }
+
+      const paid = await tx.payroll.update({
+        where: { id },
+        data: { status: PayrollStatus.PAGADA, paidAt: new Date() },
+        include: this.payrollInclude()
+      })
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminId,
+          action: AuditAction.STATUS_CHANGE,
+          entity: "Payroll",
+          entityId: id,
+          oldValue: this.toJson({ status: payroll.status, movementIds }),
+          newValue: this.toJson({ status: paid.status, paidAt: paid.paidAt, discountedMovementIds: movementIds }),
+          ipAddress
+        }
+      })
+
+      return paid
     })
     return this.serializePayroll(updated)
   }
 
   async cancel(id: string, reason: string, adminId: string, ipAddress?: string) {
     if (!reason?.trim()) throw new BadRequestException("El motivo de cancelación es obligatorio")
-    const payroll = await this.prisma.payroll.findUnique({ where: { id } })
+    const payroll = await this.prisma.payroll.findUnique({
+      where: { id },
+      include: this.payrollInclude()
+    })
     if (!payroll) throw new NotFoundException("Nómina no encontrada")
     if (payroll.status === PayrollStatus.PAGADA) throw new BadRequestException("No se puede cancelar una nómina pagada")
     if (payroll.status === PayrollStatus.CANCELADA) return this.get(id)
 
-    const updated = await this.prisma.payroll.update({
-      where: { id },
-      data: {
-        status: PayrollStatus.CANCELADA,
-        cancelledAt: new Date(),
-        cancelReason: reason.trim()
-      },
-      include: this.payrollInclude()
-    })
-    await this.audit.log({
-      userId: adminId,
-      action: AuditAction.CANCEL,
-      entity: "Payroll",
-      entityId: id,
-      oldValue: this.toJson(payroll),
-      newValue: this.toJson({ status: updated.status, cancelledAt: updated.cancelledAt, cancelReason: updated.cancelReason }),
-      ipAddress
+    const movementIds = this.payrollMovementIds(payroll)
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.payrollItemMovement.deleteMany({
+        where: { payrollItem: { payrollId: id } }
+      })
+
+      const cancelled = await tx.payroll.update({
+        where: { id },
+        data: {
+          status: PayrollStatus.CANCELADA,
+          cancelledAt: new Date(),
+          cancelReason: reason.trim(),
+          periodKey: this.cancelledPeriodKey(payroll.periodKey, payroll.id)
+        },
+        include: this.payrollInclude()
+      })
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminId,
+          action: AuditAction.CANCEL,
+          entity: "Payroll",
+          entityId: id,
+          oldValue: this.toJson({ status: payroll.status, periodKey: payroll.periodKey, movementIds }),
+          newValue: this.toJson({
+            status: cancelled.status,
+            cancelledAt: cancelled.cancelledAt,
+            cancelReason: cancelled.cancelReason,
+            periodKey: cancelled.periodKey,
+            releasedMovementIds: movementIds
+          }),
+          ipAddress
+        }
+      })
+
+      return cancelled
     })
     return this.serializePayroll(updated)
   }
@@ -380,6 +423,14 @@ export class PayrollService {
         orderBy: { createdAt: "asc" }
       }
     } satisfies Prisma.PayrollInclude
+  }
+
+  private payrollMovementIds(payroll: Prisma.PayrollGetPayload<{ include: ReturnType<PayrollService["payrollInclude"]> }>) {
+    return payroll.items.flatMap((item) => item.movements.map((link) => link.movement.id))
+  }
+
+  private cancelledPeriodKey(periodKey: string, payrollId: string) {
+    return `${periodKey}__CANCELADA__${payrollId}`
   }
 
   private resolveBaseSalary(amount: number, salaryType: SalaryType, start: Date, end: Date) {
