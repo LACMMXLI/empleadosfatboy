@@ -719,8 +719,7 @@ export class MovementsService {
   }
 
   private buildWhere(filters: MovementFilters, user: AuthUser): Prisma.MovementWhereInput {
-    return {
-      ...this.scopeForUser(user),
+    const clientWhere = this.definedWhere({
       employeeId: filters.employeeId,
       branchId: filters.branchId,
       kind: filters.kind,
@@ -745,17 +744,42 @@ export class MovementsService {
             { employee: { phone: { contains: filters.q, mode: "insensitive" } } }
           ]
         : undefined
-    }
+    })
+
+    return this.andWhere(this.scopeForUser(user), clientWhere)
   }
 
   private buildSettlementWhere(input: SettlementRangeInput, user: AuthUser): Prisma.MovementWhereInput {
     const range = this.dateRange(input.from, input.to)
-    return {
-      ...this.scopeForUser(user),
+    const clientWhere = this.definedWhere({
       employeeId: input.employeeId,
       status: { in: settlementStatuses },
       createdAt: range
+    })
+
+    return this.andWhere(this.scopeForUser(user), clientWhere)
+  }
+
+  private andWhere(...clauses: Prisma.MovementWhereInput[]): Prisma.MovementWhereInput {
+    const effectiveClauses = clauses
+      .map((clause) => this.definedWhere(clause))
+      .filter((clause) => Object.keys(clause).length > 0)
+
+    if (effectiveClauses.length === 0) return {}
+    if (effectiveClauses.length === 1) return effectiveClauses[0]
+    return { AND: effectiveClauses }
+  }
+
+  private definedWhere(where: Prisma.MovementWhereInput): Prisma.MovementWhereInput {
+    const defined: Prisma.MovementWhereInput = {}
+
+    for (const [key, value] of Object.entries(where)) {
+      if (value !== undefined) {
+        ;(defined as Record<string, unknown>)[key] = value
+      }
     }
+
+    return defined
   }
 
   private async ensureEmployeeVisible(employeeId: string, user: AuthUser) {
@@ -798,7 +822,7 @@ export class MovementsService {
       return { employeeId: user.employeeId ?? "__none__", status: { in: employeeVisibleStatuses } }
     }
     if (user.role === Role.CAJERO || user.role === Role.ENCARGADO) {
-      return { branchId: user.branchId ?? undefined }
+      return { branchId: user.branchId ?? "__none__" }
     }
     return {}
   }
