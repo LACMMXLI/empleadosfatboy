@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
-import { AuditAction, MovementStatus, Prisma, SalaryType } from "@prisma/client"
+import { AuditAction, MovementStatus, Prisma, Role, SalaryType } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { PrismaService } from "../prisma/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import type { AuthUser } from "../auth/auth.types"
 
 type EmployeeWrite = {
   fullName?: string
@@ -28,28 +29,30 @@ export class EmployeesService {
     private readonly audit: AuditService
   ) {}
 
-  list(filters: { q?: string; branchId?: string; includeInactive?: boolean }) {
+  list(filters: { q?: string; branchId?: string; includeInactive?: boolean }, user: AuthUser) {
+    const clientWhere = this.definedEmployeeWhere({
+      active: filters.includeInactive ? undefined : true,
+      branchId: filters.branchId,
+      OR: filters.q
+        ? [
+            { fullName: { contains: filters.q, mode: "insensitive" } },
+            { position: { contains: filters.q, mode: "insensitive" } },
+            { phone: { contains: filters.q, mode: "insensitive" } }
+          ]
+        : undefined
+    })
+
     return this.prisma.employee.findMany({
-      where: {
-        active: filters.includeInactive ? undefined : true,
-        branchId: filters.branchId,
-        OR: filters.q
-          ? [
-              { fullName: { contains: filters.q, mode: "insensitive" } },
-              { position: { contains: filters.q, mode: "insensitive" } },
-              { phone: { contains: filters.q, mode: "insensitive" } }
-            ]
-          : undefined
-      },
+      where: this.andEmployeeWhere(this.scopeForUser(user), clientWhere),
       include: { branch: true },
       orderBy: { fullName: "asc" },
       take: 50
     })
   }
 
-  async get(id: string) {
-    const employee = await this.prisma.employee.findUnique({
-      where: { id },
+  async get(id: string, user: AuthUser) {
+    const employee = await this.prisma.employee.findFirst({
+      where: this.andEmployeeWhere(this.scopeForUser(user), { id }),
       include: {
         branch: true,
         movements: {
@@ -136,8 +139,11 @@ export class EmployeesService {
     return employee
   }
 
-  async balance(id: string) {
-    const employee = await this.prisma.employee.findUnique({ where: { id } })
+  async balance(id: string, user: AuthUser) {
+    const employee = await this.prisma.employee.findFirst({
+      where: this.andEmployeeWhere(this.scopeForUser(user), { id }),
+      select: { id: true }
+    })
     if (!employee) throw new NotFoundException("Empleado no encontrado")
 
     const movements = await this.prisma.movement.groupBy({
@@ -161,6 +167,38 @@ export class EmployeesService {
       discounted: Number(discounted._sum.amount ?? 0),
       pendingBalance: pending
     }
+  }
+
+  private scopeForUser(user: AuthUser): Prisma.EmployeeWhereInput {
+    if (user.role === Role.EMPLEADO) {
+      return { id: user.employeeId ?? "__none__" }
+    }
+    if (user.role === Role.CAJERO || user.role === Role.ENCARGADO) {
+      return { branchId: user.branchId ?? "__none__" }
+    }
+    return {}
+  }
+
+  private andEmployeeWhere(...clauses: Prisma.EmployeeWhereInput[]): Prisma.EmployeeWhereInput {
+    const effectiveClauses = clauses
+      .map((clause) => this.definedEmployeeWhere(clause))
+      .filter((clause) => Object.keys(clause).length > 0)
+
+    if (effectiveClauses.length === 0) return {}
+    if (effectiveClauses.length === 1) return effectiveClauses[0]
+    return { AND: effectiveClauses }
+  }
+
+  private definedEmployeeWhere(where: Prisma.EmployeeWhereInput): Prisma.EmployeeWhereInput {
+    const defined: Prisma.EmployeeWhereInput = {}
+
+    for (const [key, value] of Object.entries(where)) {
+      if (value !== undefined) {
+        ;(defined as Record<string, unknown>)[key] = value
+      }
+    }
+
+    return defined
   }
 
   private cleanEmployee(employee: { pinHash?: string } & Record<string, unknown>) {

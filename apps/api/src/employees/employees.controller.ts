@@ -84,18 +84,23 @@ export class EmployeesController {
   constructor(private readonly employees: EmployeesService) {}
 
   @Get()
-  list(@Query("q") q?: string, @Query("branchId") branchId?: string, @Query("includeInactive") includeInactive?: string) {
-    return this.employees.list({ q, branchId, includeInactive: includeInactive === "true" })
+  list(
+    @Query("q") q: string | undefined,
+    @Query("branchId") branchId: string | undefined,
+    @Query("includeInactive") includeInactive: string | undefined,
+    @Req() request: RequestWithUser
+  ) {
+    return this.employees.list({ q, branchId, includeInactive: includeInactive === "true" }, request.user)
   }
 
   @Get(":id")
-  get(@Param("id") id: string) {
-    return this.employees.get(id)
+  get(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.employees.get(id, request.user)
   }
 
   @Get(":id/balance")
-  balance(@Param("id") id: string) {
-    return this.employees.balance(id)
+  balance(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.employees.balance(id, request.user)
   }
 
   @Roles(Role.ENCARGADO)
