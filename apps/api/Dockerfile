@@ -9,13 +9,17 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 RUN npm config set fetch-retries 10 \
-  && npm config set fetch-retry-maxtimeout 120000
-RUN npm ci --include=dev
+  && npm config set fetch-retry-maxtimeout 120000 \
+  && npm ci --include=dev
 
 FROM deps AS build
 COPY apps/api apps/api
 RUN npm run prisma:generate --workspace apps/api
 RUN npm run build --workspace apps/api
+
+FROM build AS production-deps
+RUN npm prune --omit=dev \
+  && npm cache clean --force
 
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
@@ -29,15 +33,11 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
-RUN npm ci --omit=dev \
-  && npm cache clean --force
-
+COPY --from=production-deps /app/node_modules node_modules
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/api/prisma apps/api/prisma
-COPY --from=build /app/node_modules/.prisma node_modules/.prisma
-COPY --from=build /app/node_modules/@prisma node_modules/@prisma
+COPY --from=build /app/apps/api/scripts apps/api/scripts
 COPY apps/api/docker-entrypoint.sh apps/api/docker-entrypoint.sh
-COPY apps/api/scripts apps/api/scripts
 
 EXPOSE 3001
 CMD ["sh", "apps/api/docker-entrypoint.sh"]
