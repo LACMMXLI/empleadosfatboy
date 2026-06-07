@@ -394,30 +394,6 @@ Hay usos puntuales de `any`, por ejemplo en PWA install prompt y casting de DTO 
 4. Evitar que saldos/dashboard sigan contando movimientos ya procesados.
 5. Liberar o revertir `PayrollItemMovement` si una nomina se cancela.
 
-### Prioridad 3: completar o recortar el alcance del producto
-
-Hay que decidir formalmente:
-
-- si este repo es solo `Fatboy Control Empleados`;
-- o si debe crecer hasta ser el POS completo.
-
-Si debe ser POS completo, faltan modulos principales:
-
-- ventas;
-- productos/menu;
-- ordenes;
-- mesas;
-- cocina;
-- caja/cortes;
-- pagos;
-- tickets;
-- Electron;
-- impresoras;
-- caja registradora;
-- realtime.
-
-Si no debe ser POS completo, conviene ajustar nombre, navegacion y despliegue para no confundirlo con el sistema principal.
-
 ### Prioridad 4: dividir frontend por modulos
 
 Separar `App.tsx` en:
@@ -445,18 +421,18 @@ Esto no debe hacerse como rediseño visual, sino como refactor controlado con ty
 
 ## 10. Estado por area
 
-| Area | Estado | Comentario |
-|---|---|---|
-| Backend base | Bueno | NestJS modular, Prisma, validacion, roles y auditoria. |
-| Modelo de datos | Bueno para empleados/nomina | No cubre POS completo. |
-| Seguridad | Media | Buen inicio, pero scope de datos y secretos requieren correccion. |
-| Nomina | Riesgosa | Genera nomina, pero efectos contables sobre movimientos no estan cerrados. |
-| Frontend admin | Funcional con deuda | Muy monolitico, muchas responsabilidades en `App.tsx`. |
-| Portal empleado | Funcional | Login por telefono/PIN, solicitudes, saldo, historial y PWA. |
-| Realtime | Ausente | No hay Socket.IO/WebSocket. |
-| Impresion/Electron | Ausente | No hay Electron ni flujo de impresion termica. |
-| Despliegue web | Aceptable | Docker/Nginx/Postgres presentes. |
-| POS restaurante completo | Incompleto | No existen ventas, mesas, cocina, caja ni tickets. |
+| Area                     | Estado                      | Comentario                                                                 |
+| ------------------------ | --------------------------- | -------------------------------------------------------------------------- |
+| Backend base             | Bueno                       | NestJS modular, Prisma, validacion, roles y auditoria.                     |
+| Modelo de datos          | Bueno para empleados/nomina | No cubre POS completo.                                                     |
+| Seguridad                | Media                       | Buen inicio, pero scope de datos y secretos requieren correccion.          |
+| Nomina                   | Riesgosa                    | Genera nomina, pero efectos contables sobre movimientos no estan cerrados. |
+| Frontend admin           | Funcional con deuda         | Muy monolitico, muchas responsabilidades en `App.tsx`.                     |
+| Portal empleado          | Funcional                   | Login por telefono/PIN, solicitudes, saldo, historial y PWA.               |
+| Realtime                 | Ausente                     | No hay Socket.IO/WebSocket.                                                |
+| Impresion/Electron       | Ausente                     | No hay Electron ni flujo de impresion termica.                             |
+| Despliegue web           | Aceptable                   | Docker/Nginx/Postgres presentes.                                           |
+| POS restaurante completo | Incompleto                  | No existen ventas, mesas, cocina, caja ni tickets.                         |
 
 ## 11. Conclusion
 
