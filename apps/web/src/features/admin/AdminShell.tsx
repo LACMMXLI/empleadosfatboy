@@ -227,35 +227,116 @@ function MobileBottomNav({
 
 function Dashboard() {
   const { data, isLoading, error } = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard })
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("all")
+  
   const periodStart = useMemo(() => startOfCurrentMonth(), [])
   const periodMovements = useQuery({
     queryKey: ["movements", "dashboard-period", periodStart],
     queryFn: () => api.movements({ from: periodStart })
   })
+
+  const employeesQuery = useQuery({
+    queryKey: ["employees", "active"],
+    queryFn: () => api.employees("", false)
+  })
+
+  const branchesQuery = useQuery({
+    queryKey: ["branches"],
+    queryFn: api.branches
+  })
+
+  const branchMovementsQuery = useQuery({
+    queryKey: ["movements", "branch-non-discounted", selectedBranchId],
+    queryFn: () => api.movements({ branchId: selectedBranchId }),
+    enabled: selectedBranchId !== "all"
+  })
+
   if (isLoading) return <StatusEmpty text="Cargando resumen..." />
   if (error) return <StatusEmpty text={(error as Error).message} />
   if (!data) return null
 
   const movements = periodMovements.data ?? []
-  const pendingRequests = movements.filter((m) => m.origin === "EMPLOYEE_REQUEST" && m.status === "PENDING").length
-  const authorizedAdvances = movements
+  const filteredMovements = selectedBranchId === "all"
+    ? movements
+    : movements.filter((m) => m.employee?.branch?.id === selectedBranchId)
+
+  const pendingRequests = selectedBranchId === "all"
+    ? (periodMovements.data ? filteredMovements.filter((m) => m.origin === "EMPLOYEE_REQUEST" && m.status === "PENDING").length : data.cards.pendingMovements)
+    : filteredMovements.filter((m) => m.origin === "EMPLOYEE_REQUEST" && m.status === "PENDING").length
+
+  const authorizedAdvances = filteredMovements
     .filter((m) => m.kind === "SALARY_ADVANCE" && m.status === "AUTHORIZED")
     .reduce((t, m) => t + Number(m.amount), 0)
-  const administrativeMovements = movements.filter((m) => m.origin === "ADMINISTRATIVE_ACTION").length
+
+  const administrativeMovements = filteredMovements.filter((m) => m.origin === "ADMINISTRATIVE_ACTION").length
+
+  const branchMovements = branchMovementsQuery.data ?? []
+  const pendingToDiscount = selectedBranchId === "all"
+    ? data.cards.pendingToDiscount
+    : branchMovements
+        .filter((m) => m.status === "AUTHORIZED" || m.status === "PARTIALLY_DISCOUNTED")
+        .reduce((t, m) => t + Number(m.amount), 0)
+
+  const employees = employeesQuery.data ?? []
+  const filteredEmployees = selectedBranchId === "all"
+    ? employees
+    : employees.filter((e) => e.branch?.id === selectedBranchId)
+
+  const totalWeeklyPayroll = filteredEmployees.reduce((total, emp) => {
+    const amount = Number(emp.salaryAmount) || 0
+    let weeklyAmount = 0
+    if (emp.salaryType === "WEEKLY") {
+      weeklyAmount = amount
+    } else if (emp.salaryType === "BIWEEKLY") {
+      weeklyAmount = amount / 2
+    } else if (emp.salaryType === "DAILY") {
+      weeklyAmount = amount * 7
+    }
+    return total + weeklyAmount
+  }, 0)
+
+  const totalPendingDetails = selectedBranchId === "all"
+    ? data.cards.pendingMovements
+    : movements.filter((m) => m.employee?.branch?.id === selectedBranchId && m.status === "PENDING").length
+
+  const totalAuthorizedDetails = selectedBranchId === "all"
+    ? data.cards.authorizedMovements
+    : movements.filter((m) => m.employee?.branch?.id === selectedBranchId && m.status === "AUTHORIZED").length
 
   return (
     <div className="space-y-4">
       <div>
-        <div className="section-title mb-4">
-          <LayoutDashboard style={{ width: 16, height: 16, color: '#00e5ff' }} />
-          Resumen del periodo
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="section-title mb-0">
+            <LayoutDashboard style={{ width: 16, height: 16, color: '#00e5ff' }} />
+            Resumen del periodo
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="branch-select" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Sucursal:
+            </label>
+            <select
+              id="branch-select"
+              className="form-select text-xs py-1 px-2 h-8"
+              style={{ minWidth: '160px', width: 'auto', background: 'rgb(var(--surface-control-strong) / 0.8)' }}
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+            >
+              <option value="all">Todas las sucursales</option>
+              {branchesQuery.data?.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="grid metric-grid gap-3">
           <div className="stat-card stat-card-amber">
             <ShieldCheck className="stat-icon" style={{ color: '#f59e0b' }} />
             <div className="stat-label">Pendientes</div>
             <div className="stat-value stat-value-amber">
-              {periodMovements.data ? pendingRequests : data.cards.pendingMovements}
+              {pendingRequests}
             </div>
           </div>
           <div className="stat-card stat-card-cyan">
@@ -274,7 +355,14 @@ function Dashboard() {
             <WalletCards className="stat-icon" style={{ color: '#22c55e' }} />
             <div className="stat-label">Por descontar</div>
             <div className="stat-value stat-value-green" style={{ fontSize: '1.35rem' }}>
-              {money.format(data.cards.pendingToDiscount)}
+              {money.format(pendingToDiscount)}
+            </div>
+          </div>
+          <div className="stat-card stat-card-blue">
+            <UsersRound className="stat-icon" style={{ color: '#60a5fa' }} />
+            <div className="stat-label">Costo Nómina Semanal</div>
+            <div className="stat-value stat-value-blue" style={{ fontSize: '1.35rem' }}>
+              {money.format(totalWeeklyPayroll)}
             </div>
           </div>
         </div>
@@ -291,16 +379,16 @@ function Dashboard() {
           <div className="grid gap-2 md:grid-cols-3">
             <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
               <div className="stat-label">Solicitudes totales</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'hsl(var(--foreground))' }}>{data.cards.pendingMovements}</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'hsl(var(--foreground))' }}>{totalPendingDetails}</div>
             </div>
             <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
               <div className="stat-label">Autorizados activos</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#4ade80' }}>{data.cards.authorizedMovements}</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#4ade80' }}>{totalAuthorizedDetails}</div>
             </div>
             <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
               <div className="stat-label">Estado</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
-                {periodMovements.isLoading ? "Actualizando..." : "Al corriente"}
+                {periodMovements.isLoading || (selectedBranchId !== "all" && branchMovementsQuery.isLoading) ? "Actualizando..." : "Al corriente"}
               </div>
             </div>
           </div>
