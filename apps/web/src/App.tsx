@@ -943,6 +943,35 @@ function GuidedBlock({
   )
 }
 
+function AdminModal({
+  title,
+  subtitle,
+  children,
+  onClose
+}: {
+  title: string
+  subtitle?: string
+  children: ReactNode
+  onClose: () => void
+}) {
+  return (
+    <div className="admin-modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+      <section className="admin-modal" onClick={(event) => event.stopPropagation()}>
+        <header className="admin-modal-header">
+          <div className="min-w-0">
+            <div className="admin-modal-title">{title}</div>
+            {subtitle && <div className="admin-modal-subtitle">{subtitle}</div>}
+          </div>
+          <button className="btn-icon" onClick={onClose} type="button" aria-label="Cerrar">
+            <X style={{ width: 16, height: 16 }} />
+          </button>
+        </header>
+        <div className="admin-modal-body">{children}</div>
+      </section>
+    </div>
+  )
+}
+
 function AdministrativeMovements({ user }: { user?: User }) {
   const queryClient = useQueryClient()
   const [message, setMessage] = useState<string | null>(null)
@@ -1009,7 +1038,7 @@ function AdministrativeMovements({ user }: { user?: User }) {
   }
 
   return (
-    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)]">
+    <div className="admin-two-column">
       <div className="admin-card min-w-0">
         <div className="admin-card-header">
           <div className="admin-card-title">
@@ -1018,8 +1047,9 @@ function AdministrativeMovements({ user }: { user?: User }) {
           </div>
         </div>
         <div className="admin-card-body">
-          <form className="space-y-3" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-            <GuidedBlock step="1" title="Empleado" detail="Selecciona a quien se aplicará el movimiento">
+          <form className="admin-compact-form" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+            <div className="form-field">
+              <label className="form-label">Empleado</label>
               <select className="form-select" {...form.register("employeeId")}>
                 <option value="">Seleccionar empleado</option>
                 {employees.data?.map((employee) => (
@@ -1028,27 +1058,33 @@ function AdministrativeMovements({ user }: { user?: User }) {
                   </option>
                 ))}
               </select>
-            </GuidedBlock>
-            <GuidedBlock step="2" title="Tipo y monto" detail="Registro administrativo directo, sin PIN de empleado">
-              <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: '1fr 1fr' }}>
+            </div>
+            <div className="admin-form-row">
+              <div className="form-field">
+                <label className="form-label">Tipo</label>
                 <select className="form-select" {...form.register("kind")}>
                   {administrativeMovementKinds.map((kind) => (
                     <option key={kind} value={kind}>{movementLabels[kind]}</option>
                   ))}
                 </select>
+              </div>
+              <div className="form-field">
+                <label className="form-label">Monto</label>
                 <input className="form-input" type="number" step="0.01" placeholder="Monto" {...form.register("amount")} />
               </div>
-            </GuidedBlock>
-            <GuidedBlock step="3" title="Motivo y evidencia" detail="El motivo es obligatorio para auditoría">
+            </div>
+            <div className="form-field">
+              <label className="form-label">Motivo</label>
               <textarea className="form-textarea" placeholder="Motivo obligatorio" {...form.register("reason")} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Evidencia</label>
               <textarea className="form-textarea" placeholder="Evidencia / nota administrativa (opcional)" {...form.register("evidenceNote")} />
-            </GuidedBlock>
-            <GuidedBlock step="4" title="Responsable" detail="El backend registra el usuario autorizado">
-              <div style={{ padding: '0.625rem', borderRadius: '0.5rem', border: '1px solid rgba(0,229,255,0.15)', background: 'rgba(0,229,255,0.04)' }}>
-                <div className="stat-label">Registrado como</div>
-                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'hsl(var(--foreground))' }}>{user?.fullName ?? "Usuario administrativo"}</div>
-              </div>
-            </GuidedBlock>
+            </div>
+            <div className="admin-inline-note">
+              <span>Responsable</span>
+              <strong>{user?.fullName ?? "Usuario administrativo"}</strong>
+            </div>
             <button className="btn-primary" style={{ width: '100%', height: '2.75rem', fontSize: '0.9rem' }} disabled={mutation.isPending} type="submit">
               Registrar movimiento
             </button>
@@ -1063,72 +1099,72 @@ function AdministrativeMovements({ user }: { user?: User }) {
             Liquidar por empleado
           </div>
         </div>
-        <div className="admin-card-body space-y-4">
-          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))' }}>
-            <select
-              className="form-select"
-              value={settlementEmployeeId}
-              onChange={(event) => { setSettlementEmployeeId(event.target.value); setSettlementMessage(null) }}
-            >
-              <option value="">Seleccionar empleado</option>
-              {employees.data?.map((employee) => (
-                <option key={employee.id} value={employee.id}>{employee.phone} - {employee.fullName}</option>
-              ))}
-            </select>
-            <input
-              className="form-input"
-              type="date"
-              value={settlementFrom}
-              onChange={(event) => { setSettlementFrom(event.target.value); setSettlementMessage(null) }}
-            />
-            <input
-              className="form-input"
-              type="date"
-              value={settlementTo}
-              onChange={(event) => { setSettlementTo(event.target.value); setSettlementMessage(null) }}
-            />
+        <div className="admin-card-body admin-compact-stack">
+          <div className="settlement-controls">
+            <div className="form-field">
+              <label className="form-label">Empleado</label>
+              <select
+                className="form-select"
+                value={settlementEmployeeId}
+                onChange={(event) => { setSettlementEmployeeId(event.target.value); setSettlementMessage(null) }}
+              >
+                <option value="">Seleccionar empleado</option>
+                {employees.data?.map((employee) => (
+                  <option key={employee.id} value={employee.id}>{employee.phone} - {employee.fullName}</option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-form-row">
+              <div className="form-field">
+                <label className="form-label">Desde</label>
+                <input
+                  className="form-input"
+                  type="date"
+                  value={settlementFrom}
+                  onChange={(event) => { setSettlementFrom(event.target.value); setSettlementMessage(null) }}
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Hasta</label>
+                <input
+                  className="form-input"
+                  type="date"
+                  value={settlementTo}
+                  onChange={(event) => { setSettlementTo(event.target.value); setSettlementMessage(null) }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(0,229,255,0.15)', background: 'rgba(0,229,255,0.04)' }}>
+          <div className="settlement-summary-grid">
+            <div className="mini-stat mini-stat-cyan">
               <div className="stat-label">Empleado</div>
-              <div style={{ fontSize: '0.825rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'hsl(var(--foreground))' }}>
+              <div className="mini-stat-text">
                 {selectedSettlementEmployee?.fullName ?? "Sin seleccionar"}
               </div>
             </div>
-            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(168,85,247,0.15)', background: 'rgba(168,85,247,0.04)' }}>
+            <div className="mini-stat mini-stat-violet">
               <div className="stat-label">Total</div>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '1.1rem', fontWeight: 700, color: '#c084fc' }}>
+              <div className="mini-stat-value">
                 {money.format(settlementSummary.data?.total ?? 0)}
               </div>
             </div>
-            <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
+            <div className="mini-stat">
               <div className="stat-label">Movimientos</div>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '1.1rem', fontWeight: 700, color: 'hsl(var(--foreground))' }}>
+              <div className="mini-stat-value">
                 {settlementSummary.data?.count ?? 0}
               </div>
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="settlement-kind-list">
             {(settlementSummary.data?.byKind ?? []).map((item) => (
               <div
                 key={item.kind}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid rgb(var(--surface-line) / 0.28)',
-                  background: 'rgb(var(--surface-control) / 0.58)',
-                  borderColor: 'rgb(var(--surface-line) / 0.28)',
-                  fontSize: '0.8rem'
-                }}
+                className="settlement-kind-row"
               >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'hsl(var(--foreground))' }}>{movementLabels[item.kind]}</span>
-                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, color: 'hsl(var(--muted-foreground))', flexShrink: 0 }}>{item.count} · {money.format(item.amount)}</span>
+                <span>{movementLabels[item.kind]}</span>
+                <strong>{item.count} · {money.format(item.amount)}</strong>
               </div>
             ))}
             {settlementEmployeeId && !settlementSummary.isLoading && !settlementSummary.data?.count && (
@@ -1141,7 +1177,7 @@ function AdministrativeMovements({ user }: { user?: User }) {
             Marcar rango como liquidado
           </button>
           {settlementMessage && <div className="status-empty">{settlementMessage}</div>}
-          <div style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
+          <div className="admin-inline-note">
             Responsable: <span style={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}>{user?.fullName}</span>
           </div>
         </div>
@@ -1345,49 +1381,27 @@ function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
           return (
             <div
               key={movement.id}
-              className="approval-card"
+              className="approval-card approval-card-compact"
               style={{ animationDelay: `${idx * 50}ms` }}
             >
-              {/* Header row */}
-              <div className="flex items-start gap-3">
+              <div className="approval-card-main">
                 <div className="approval-employee-avatar">{getInitials(name)}</div>
-                <div className="flex-1 min-w-0">
-                  <div style={{ fontSize: '0.925rem', fontWeight: 700, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {name}
+                <div className="approval-card-info">
+                  <div className="approval-employee-name">{name}</div>
+                  <div className="approval-card-meta">
+                    <span>{movementLabels[movement.kind]}</span>
+                    <span>{movement.folio}</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '3px', flexWrap: 'wrap' }}>
-                    <span className="badge-status badge-pending">Pendiente</span>
-                    <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.625rem', color: 'hsl(var(--muted-foreground))' }}>{movement.folio}</span>
-                  </div>
+                  {movement.reason && <div className="approval-card-reason">{movement.reason}</div>}
                 </div>
-                <div className="approval-amount" style={{ flexShrink: 0 }}>
-                  {money.format(Number(movement.amount))}
+                <div className="approval-card-side">
+                  <div className="approval-amount">{money.format(Number(movement.amount))}</div>
+                  <div className="approval-date">{new Date(movement.createdAt).toLocaleString("es-MX", { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
               </div>
 
-              {/* Detail row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.5rem', marginTop: '0.875rem' }}>
-                <div style={{ ...insetPanelStyle, padding: '0.5rem', borderRadius: '0.5rem' }}>
-                  <div className="stat-label">Tipo</div>
-                  <div style={{ fontSize: '0.775rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>{movementLabels[movement.kind]}</div>
-                </div>
-                <div style={{ ...insetPanelStyle, padding: '0.5rem', borderRadius: '0.5rem' }}>
-                  <div className="stat-label">Fecha</div>
-                  <div style={{ fontSize: '0.725rem', color: 'hsl(var(--foreground))' }}>
-                    {new Date(movement.createdAt).toLocaleString("es-MX", { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-                {movement.reason && (
-                  <div style={{ ...insetPanelStyle, padding: '0.5rem', borderRadius: '0.5rem', gridColumn: 'span 2' }}>
-                    <div className="stat-label">Motivo</div>
-                    <div style={{ fontSize: '0.775rem', color: 'hsl(var(--foreground))' }}>{movement.reason}</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
               {canProcess && (
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.875rem', justifyContent: 'flex-end' }}>
+                <div className="approval-actions">
                   <button
                     className="btn-reject"
                     onClick={() => reject.mutate(movement.id)}
@@ -1639,26 +1653,30 @@ function PayrollAdmin() {
           <div className="admin-card-title">Calcular período</div>
         </div>
         <div className="admin-card-body">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.625rem', alignItems: 'center' }}>
-            <input
-              type="date"
-              className="form-input"
-              style={{ flex: '0 0 150px' }}
-              value={periodStart}
-              onChange={(e) => setPeriodStart(e.target.value)}
-            />
-            <input
-              type="date"
-              className="form-input"
-              style={{ flex: '0 0 150px' }}
-              value={periodEnd}
-              onChange={(e) => setPeriodEnd(e.target.value)}
-            />
-            <button className="btn-secondary" type="button" onClick={() => preview.mutate()} disabled={preview.isPending}>
+          <div className="payroll-period-row">
+            <label className="payroll-date-field">
+              <span>Desde</span>
+              <input
+                type="date"
+                className="form-input"
+                value={periodStart}
+                onChange={(e) => setPeriodStart(e.target.value)}
+              />
+            </label>
+            <label className="payroll-date-field">
+              <span>Hasta</span>
+              <input
+                type="date"
+                className="form-input"
+                value={periodEnd}
+                onChange={(e) => setPeriodEnd(e.target.value)}
+              />
+            </label>
+            <button className="btn-secondary payroll-action-btn" type="button" onClick={() => preview.mutate()} disabled={preview.isPending}>
               Previsualizar
             </button>
-            <button className="btn-primary" type="button" disabled={!canGenerate} onClick={() => generate.mutate()}>
-              Generar nómina
+            <button className="btn-primary payroll-action-btn" type="button" disabled={!canGenerate} onClick={() => generate.mutate()}>
+              Generar
             </button>
           </div>
           {preview.error && <div className="status-empty" style={{ marginTop: '0.75rem', color: '#f87171' }}>{preview.error.message}</div>}
@@ -1910,26 +1928,23 @@ function MovementTable({
         {movements.map((movement, idx) => (
           <div
             key={movement.id}
-            className="movement-row"
-            style={{ animationDelay: `${idx * 30}ms`, flexDirection: 'column', alignItems: 'stretch', gap: '0.625rem' }}
+            className="movement-row movement-row-compact"
+            style={{ animationDelay: `${idx * 30}ms` }}
           >
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'hsl(var(--foreground))' }}>
+            <div className="movement-mobile-head">
+              <div className="min-w-0">
+                <div className="movement-mobile-name">
                   {movement.employee?.fullName ?? "Empleado"}
                 </div>
-                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.625rem', color: 'hsl(var(--muted-foreground))' }}>{movement.folio}</div>
+                <div className="movement-mobile-meta">{movementLabels[movement.kind]} · {movement.folio}</div>
               </div>
               <span className={getStatusBadgeClass(movement.status)}>{statusLabels[movement.status]}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.375rem' }}>
-              <div style={{ fontSize: '0.775rem', color: 'hsl(var(--muted-foreground))' }}>{movementLabels[movement.kind]}</div>
-              <div style={{ fontSize: '0.875rem', fontWeight: 700, textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', color: 'hsl(var(--foreground))' }}>
+            <div className="movement-mobile-foot">
+              <span>{new Date(movement.createdAt).toLocaleString("es-MX", { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+              <strong>
                 {money.format(Number(movement.amount))}
-              </div>
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>
-              {new Date(movement.createdAt).toLocaleString("es-MX")}
+              </strong>
             </div>
             {actions?.(movement) && <div>{actions(movement)}</div>}
           </div>
@@ -1981,6 +1996,8 @@ function MovementTable({
 function Employees({ user }: { user?: User }) {
   const queryClient = useQueryClient()
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const employees = useQuery({ queryKey: ["employees", "admin-all"], queryFn: () => api.employees(undefined, true) })
   const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches })
   const selectedEmployee = employees.data?.find((employee) => employee.id === selectedEmployeeId)
@@ -2006,6 +2023,7 @@ function Employees({ user }: { user?: User }) {
       api.createEmployee(payload),
     onSuccess: async () => {
       form.reset({ salaryAmount: 0, salaryType: "WEEKLY", hireDate: "", branchId: user?.branch?.id || "" })
+      setCreateOpen(false)
       await queryClient.invalidateQueries({ queryKey: ["employees"] })
     }
   })
@@ -2014,6 +2032,7 @@ function Employees({ user }: { user?: User }) {
       api.updateEmployee(id, { ...payload, pin: payload.pin || undefined }),
     onSuccess: async (employee) => {
       setSelectedEmployeeId(employee.id)
+      setEditOpen(false)
       await queryClient.invalidateQueries({ queryKey: ["employees"] })
     }
   })
@@ -2060,126 +2079,30 @@ function Employees({ user }: { user?: User }) {
           <UsersRound style={{ width: 16, height: 16, color: '#00e5ff' }} />
           Empleados
         </div>
-        {employees.data && <span className="section-count">{employees.data.length}</span>}
-      </div>
-
-      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-        {/* Create form */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div className="admin-card-title">
-              <UserRoundPlus style={{ width: 14, height: 14, color: '#00e5ff' }} />
-              Alta de empleado
-            </div>
-          </div>
-          <div className="admin-card-body">
-            <form className="space-y-2.5" onSubmit={form.handleSubmit((values) => create.mutate(values))}>
-              <input className="form-input" placeholder="Nombre completo" {...form.register("fullName")} />
-              <input className="form-input" placeholder="Puesto" {...form.register("position")} />
-              <input className="form-input" placeholder="Teléfono" {...form.register("phone")} />
-              <input className="form-input" type="password" placeholder="PIN (6 dígitos)" {...form.register("pin")} />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <input className="form-input" type="number" step="0.01" placeholder="Sueldo base" {...form.register("salaryAmount")} />
-                <select className="form-select" {...form.register("salaryType")}>
-                  {Object.entries(salaryTypeLabels).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </div>
-              <input className="form-input" type="date" {...form.register("hireDate")} />
-              <select className="form-select" {...form.register("branchId")}>
-                <option value="">Selecciona Sucursal</option>
-                {branches.data?.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-              <button className="btn-primary" style={{ width: '100%' }} disabled={create.isPending} type="submit">
-                Crear empleado
-              </button>
-              {create.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{create.error.message}</div>}
-            </form>
-          </div>
-        </div>
-
-        {/* Edit form */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div className="admin-card-title">
-              <KeyRound style={{ width: 14, height: 14, color: '#00e5ff' }} />
-              Edición y PIN
-            </div>
-          </div>
-          <div className="admin-card-body">
-            {!selectedEmployee && <StatusEmpty text="Selecciona un empleado de la lista para editarlo." />}
-            {selectedEmployee && (
-              <form
-                className="space-y-2.5"
-                onSubmit={editForm.handleSubmit((values) => update.mutate({ id: selectedEmployee.id, payload: values }))}
-              >
-                <input className="form-input" placeholder="Nombre completo" {...editForm.register("fullName")} />
-                <input className="form-input" placeholder="Puesto" {...editForm.register("position")} />
-                <input className="form-input" placeholder="Teléfono" {...editForm.register("phone")} />
-                <input className="form-input" type="password" placeholder="Nuevo PIN (opcional)" {...editForm.register("pin")} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <input className="form-input" type="number" step="0.01" placeholder="Sueldo" {...editForm.register("salaryAmount")} />
-                  <select className="form-select" {...editForm.register("salaryType")}>
-                    {Object.entries(salaryTypeLabels).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <input className="form-input" type="date" {...editForm.register("hireDate")} />
-                <select className="form-select" {...editForm.register("branchId")}>
-                  <option value="">Selecciona Sucursal</option>
-                  {branches.data?.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <button className="btn-primary" disabled={update.isPending} type="submit">Guardar</button>
-                  <button
-                    className={selectedEmployee.active ? "btn-reject" : "btn-authorize"}
-                    type="button"
-                    disabled={toggleActive.isPending}
-                    onClick={() => toggleActive.mutate(selectedEmployee)}
-                  >
-                    {selectedEmployee.active ? "Desactivar" : "Activar"}
-                  </button>
-                </div>
-                {user?.role === "ADMINISTRADOR" && (
-                  <button
-                    className="btn-reject"
-                    type="button"
-                    disabled={purgeDeveloperEmployee.isPending}
-                    onClick={() => confirmDeveloperPurge(selectedEmployee)}
-                    style={{ width: '100%', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '0.375rem' }}
-                  >
-                    <Trash2 style={{ width: 14, height: 14 }} />
-                    Purga dev
-                  </button>
-                )}
-                {update.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{update.error.message}</div>}
-                {toggleActive.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{toggleActive.error.message}</div>}
-                {purgeDeveloperEmployee.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{purgeDeveloperEmployee.error.message}</div>}
-              </form>
-            )}
-          </div>
+        <div className="section-actions">
+          {employees.data && <span className="section-count">{employees.data.length}</span>}
+          <button className="btn-primary compact-action" type="button" onClick={() => setCreateOpen(true)}>
+            <UserRoundPlus style={{ width: 14, height: 14 }} />
+            Alta
+          </button>
         </div>
       </div>
 
-      {/* Employee grid */}
       <div className="admin-card">
         <div className="admin-card-header">
           <div className="admin-card-title">Directorio de empleados</div>
         </div>
         <div className="admin-card-body">
-          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+          <div className="employee-directory-grid">
             {employees.data?.map((employee: Employee) => (
               <button
                 key={employee.id}
                 className={`employee-card ${selectedEmployeeId === employee.id ? "selected" : ""}`}
                 type="button"
-                onClick={() => setSelectedEmployeeId(employee.id)}
+                onClick={() => {
+                  setSelectedEmployeeId(employee.id)
+                  setEditOpen(true)
+                }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.375rem' }}>
                   <div className="employee-card-name">{employee.fullName}</div>
@@ -2196,6 +2119,98 @@ function Employees({ user }: { user?: User }) {
           </div>
         </div>
       </div>
+
+      {createOpen && (
+        <AdminModal title="Alta de empleado" subtitle="Formulario compacto" onClose={() => setCreateOpen(false)}>
+          <form className="admin-modal-form" onSubmit={form.handleSubmit((values) => create.mutate(values))}>
+            <input className="form-input" placeholder="Nombre completo" {...form.register("fullName")} />
+            <div className="admin-form-row">
+              <input className="form-input" placeholder="Puesto" {...form.register("position")} />
+              <input className="form-input" placeholder="Teléfono" {...form.register("phone")} />
+            </div>
+            <input className="form-input" type="password" placeholder="PIN (6 dígitos)" {...form.register("pin")} />
+            <div className="admin-form-row">
+              <input className="form-input" type="number" step="0.01" placeholder="Sueldo base" {...form.register("salaryAmount")} />
+              <select className="form-select" {...form.register("salaryType")}>
+                {Object.entries(salaryTypeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-form-row">
+              <input className="form-input" type="date" {...form.register("hireDate")} />
+              <select className="form-select" {...form.register("branchId")}>
+                <option value="">Selecciona Sucursal</option>
+                {branches.data?.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+            <button className="btn-primary modal-submit" disabled={create.isPending} type="submit">
+              Guardar empleado
+            </button>
+            {create.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{create.error.message}</div>}
+          </form>
+        </AdminModal>
+      )}
+
+      {editOpen && selectedEmployee && (
+        <AdminModal title="Editar empleado" subtitle={selectedEmployee.fullName} onClose={() => setEditOpen(false)}>
+          <form
+            className="admin-modal-form"
+            onSubmit={editForm.handleSubmit((values) => update.mutate({ id: selectedEmployee.id, payload: values }))}
+          >
+            <input className="form-input" placeholder="Nombre completo" {...editForm.register("fullName")} />
+            <div className="admin-form-row">
+              <input className="form-input" placeholder="Puesto" {...editForm.register("position")} />
+              <input className="form-input" placeholder="Teléfono" {...editForm.register("phone")} />
+            </div>
+            <input className="form-input" type="password" placeholder="Nuevo PIN (opcional)" {...editForm.register("pin")} />
+            <div className="admin-form-row">
+              <input className="form-input" type="number" step="0.01" placeholder="Sueldo" {...editForm.register("salaryAmount")} />
+              <select className="form-select" {...editForm.register("salaryType")}>
+                {Object.entries(salaryTypeLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-form-row">
+              <input className="form-input" type="date" {...editForm.register("hireDate")} />
+              <select className="form-select" {...editForm.register("branchId")}>
+                <option value="">Selecciona Sucursal</option>
+                {branches.data?.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-form-row">
+              <button className="btn-primary" disabled={update.isPending} type="submit">Guardar empleado</button>
+              <button
+                className={selectedEmployee.active ? "btn-reject" : "btn-authorize"}
+                type="button"
+                disabled={toggleActive.isPending}
+                onClick={() => toggleActive.mutate(selectedEmployee)}
+              >
+                {selectedEmployee.active ? "Desactivar" : "Activar"}
+              </button>
+            </div>
+            {user?.role === "ADMINISTRADOR" && (
+              <button
+                className="btn-reject modal-submit"
+                type="button"
+                disabled={purgeDeveloperEmployee.isPending}
+                onClick={() => confirmDeveloperPurge(selectedEmployee)}
+              >
+                <Trash2 style={{ width: 14, height: 14 }} />
+                Purga dev
+              </button>
+            )}
+            {update.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{update.error.message}</div>}
+            {toggleActive.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{toggleActive.error.message}</div>}
+            {purgeDeveloperEmployee.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{purgeDeveloperEmployee.error.message}</div>}
+          </form>
+        </AdminModal>
+      )}
     </div>
   )
 }

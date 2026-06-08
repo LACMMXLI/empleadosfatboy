@@ -1671,3 +1671,525 @@
     box-shadow: 0 0 8px hsl(var(--primary));
   }
 }
+
+/* =============================================
+   ADMIN MOBILE DENSITY PASS
+   ============================================= */
+@layer components {
+  .admin-two-column {
+    display: grid;
+    min-width: 0;
+    gap: 0.875rem;
+  }
+
+  @media (min-width: 1280px) {
+    .admin-two-column {
+      grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+    }
+  }
+
+  .section-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .compact-action {
+    height: 2.25rem;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .admin-compact-form,
+  .admin-compact-stack,
+  .admin-modal-form {
+    display: grid;
+    gap: 0.625rem;
+  }
+
+  .admin-form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .admin-inline-note {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625rem;
+    min-width: 0;
+    border-radius: 0.625rem;
+    border: 1px solid rgb(var(--surface-line) / 0.26);
+    background: rgb(var(--surface-control) / 0.58);
+    padding: 0.5rem 0.625rem;
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .admin-inline-note strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: hsl(var(--foreground));
+  }
+
+  .admin-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.68);
+    padding: 0;
+    backdrop-filter: blur(12px);
+  }
+
+  .admin-modal {
+    display: flex;
+    width: 100%;
+    min-height: 100dvh;
+    flex-direction: column;
+    background: rgb(var(--surface-shell-soft));
+  }
+
+  .admin-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid rgb(var(--surface-line) / 0.28);
+    padding: calc(env(safe-area-inset-top) + 0.75rem) 0.875rem 0.75rem;
+    background: rgb(var(--surface-control) / 0.96);
+  }
+
+  .admin-modal-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+  }
+
+  .admin-modal-subtitle {
+    margin-top: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .admin-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.875rem;
+  }
+
+  .modal-submit {
+    width: 100%;
+    justify-content: center;
+  }
+
+  @media (min-width: 640px) {
+    .admin-modal-backdrop {
+      align-items: center;
+      padding: 1rem;
+    }
+
+    .admin-modal {
+      min-height: 0;
+      max-height: min(680px, calc(100dvh - 2rem));
+      max-width: 560px;
+      border: 1px solid rgb(var(--surface-line) / 0.34);
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+    }
+
+    .admin-modal-header {
+      padding: 0.875rem;
+    }
+  }
+
+  .approval-card-compact {
+    padding: 0.7rem;
+  }
+
+  .approval-card-main {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  .approval-card-info {
+    min-width: 0;
+  }
+
+  .approval-employee-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: hsl(var(--foreground));
+  }
+
+  .approval-card-meta,
+  .approval-date {
+    display: flex;
+    min-width: 0;
+    gap: 0.4rem;
+    overflow: hidden;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.66rem;
+  }
+
+  .approval-card-meta span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .approval-card-reason {
+    margin-top: 0.2rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.72rem;
+  }
+
+  .approval-card-side {
+    text-align: right;
+  }
+
+  .approval-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+  }
+
+  .approval-actions .btn-authorize,
+  .approval-actions .btn-reject {
+    justify-content: center;
+    padding: 0.48rem 0.625rem;
+  }
+
+  .settlement-controls {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .settlement-summary-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 0.8fr);
+    gap: 0.5rem;
+  }
+
+  .mini-stat {
+    min-width: 0;
+    border: 1px solid rgb(var(--surface-line) / 0.28);
+    border-radius: 0.625rem;
+    background: rgb(var(--surface-control) / 0.58);
+    padding: 0.575rem 0.625rem;
+  }
+
+  .mini-stat-cyan {
+    border-color: rgba(0, 229, 255, 0.16);
+    background: rgba(0, 229, 255, 0.04);
+  }
+
+  .mini-stat-violet {
+    border-color: rgba(168, 85, 247, 0.16);
+    background: rgba(168, 85, 247, 0.04);
+  }
+
+  .mini-stat-text,
+  .mini-stat-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: hsl(var(--foreground));
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .mini-stat-value {
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    font-size: 0.98rem;
+  }
+
+  .settlement-kind-list {
+    display: grid;
+    gap: 0.4rem;
+  }
+
+  .settlement-kind-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid rgb(var(--surface-line) / 0.28);
+    border-radius: 0.5rem;
+    background: rgb(var(--surface-control) / 0.58);
+    padding: 0.45rem 0.625rem;
+    font-size: 0.76rem;
+  }
+
+  .settlement-kind-row span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: hsl(var(--foreground));
+  }
+
+  .settlement-kind-row strong {
+    flex-shrink: 0;
+    color: hsl(var(--muted-foreground));
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    font-weight: 700;
+  }
+
+  .payroll-period-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+    align-items: end;
+    gap: 0.5rem;
+  }
+
+  .payroll-date-field {
+    display: grid;
+    min-width: 0;
+    gap: 0.25rem;
+  }
+
+  .payroll-date-field span {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .payroll-action-btn {
+    height: 2.45rem;
+    padding: 0 0.8rem;
+    font-size: 0.78rem;
+  }
+
+  .movement-row-compact {
+    display: grid;
+    align-items: stretch;
+    gap: 0.35rem;
+    padding: 0.55rem 0.625rem;
+  }
+
+  .movement-mobile-head,
+  .movement-mobile-foot {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .movement-mobile-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: hsl(var(--foreground));
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .movement-mobile-meta,
+  .movement-mobile-foot {
+    overflow: hidden;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.66rem;
+  }
+
+  .movement-mobile-foot strong {
+    color: hsl(var(--foreground));
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    font-size: 0.85rem;
+  }
+
+  .employee-directory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 767px) {
+    .mobile-page {
+      padding: 0.625rem 0.625rem calc(4.7rem + env(safe-area-inset-bottom));
+    }
+
+    .admin-shell .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+      margin-top: 0.75rem;
+    }
+
+    .admin-card {
+      border-radius: 0.75rem;
+    }
+
+    .admin-card-header {
+      padding: 0.7rem 0.75rem 0.35rem;
+    }
+
+    .admin-card-body {
+      padding: 0.55rem 0.75rem 0.75rem;
+    }
+
+    .section-header {
+      margin-bottom: 0.5rem;
+    }
+
+    .section-title {
+      font-size: 0.92rem;
+    }
+
+    .stat-label {
+      margin-bottom: 0.25rem;
+      font-size: 0.58rem;
+    }
+
+    .stat-card {
+      border-radius: 0.75rem;
+      padding: 0.7rem;
+    }
+
+    .metric-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+
+    .form-input,
+    .form-select {
+      height: 2.35rem;
+      border-radius: 0.55rem;
+      font-size: 0.8rem;
+      padding-left: 0.625rem;
+    }
+
+    .form-textarea {
+      min-height: 3.8rem;
+      border-radius: 0.55rem;
+      font-size: 0.8rem;
+      padding: 0.55rem 0.625rem;
+    }
+
+    .filter-bar {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.4rem;
+      padding: 0.5rem;
+      border-radius: 0.7rem;
+    }
+
+    .filter-bar select,
+    .filter-bar input[type="date"],
+    .filter-bar input[type="text"] {
+      min-width: 0;
+      height: 2.25rem;
+      font-size: 0.72rem;
+    }
+
+    .empty-state {
+      padding: 1.5rem 0.75rem;
+    }
+
+    .status-empty {
+      min-height: 0;
+      padding: 0.85rem 0.65rem;
+      font-size: 0.75rem;
+    }
+
+    .approval-employee-avatar {
+      width: 2rem;
+      height: 2rem;
+      font-size: 0.72rem;
+    }
+
+    .approval-amount {
+      font-size: 1rem;
+    }
+
+    .approval-date {
+      justify-content: flex-end;
+      font-size: 0.58rem;
+    }
+
+    .admin-form-row,
+    .payroll-period-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .payroll-action-btn {
+      width: 100%;
+    }
+
+    .settlement-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .settlement-summary-grid .mini-stat:first-child {
+      grid-column: 1 / -1;
+    }
+
+    .employee-directory-grid {
+      grid-template-columns: 1fr;
+      gap: 0.45rem;
+    }
+
+    .employee-card {
+      padding: 0.65rem;
+      border-radius: 0.7rem;
+    }
+
+    .bottom-nav {
+      padding-top: 0.35rem;
+      padding-left: 0.35rem;
+      padding-right: 0.35rem;
+    }
+
+    .bottom-nav-item {
+      min-height: 2.85rem;
+      border-radius: 0.55rem;
+    }
+
+    .bottom-nav-icon {
+      width: 1.05rem;
+      height: 1.05rem;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .approval-card-main {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .approval-card-side {
+      grid-column: 2;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.5rem;
+      text-align: left;
+    }
+
+    .settlement-kind-row {
+      grid-template-columns: 1fr;
+      gap: 0.15rem;
+    }
+  }
+}
