@@ -116,6 +116,12 @@ export class EmployeesController {
   }
 
   @Roles(Role.ADMINISTRADOR)
+  @Delete(":id/purge")
+  purge(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.employees.purgeForDeveloper(id, request.user.sub, request.ip)
+  }
+
+  @Roles(Role.ADMINISTRADOR)
   @Delete(":id")
   deactivate(@Param("id") id: string, @Req() request: RequestWithUser) {
     return this.employees.deactivate(id, request.user.sub, request.ip)

@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common"
+import { ConfigService } from "@nestjs/config"
 import { AuditAction, MovementStatus, Prisma, Role, SalaryType } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { PrismaService } from "../prisma/prisma.service"
@@ -26,7 +27,8 @@ const balanceStatuses: MovementStatus[] = [
 export class EmployeesService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly config: ConfigService
   ) {}
 
   list(filters: { q?: string; branchId?: string; includeInactive?: boolean }, user: AuthUser) {
@@ -137,6 +139,132 @@ export class EmployeesService {
       ipAddress
     })
     return employee
+  }
+
+  async purgeForDeveloper(id: string, userId: string, ipAddress?: string) {
+    if (!this.isDeveloperMaintenanceEnabled()) {
+      throw new ForbiddenException("Mantenimiento de desarrollador deshabilitado")
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const employee = await tx.employee.findUnique({ where: { id }, select: { id: true } })
+      if (!employee) throw new NotFoundException("Empleado no encontrado")
+
+      const linkedUsers = await tx.user.findMany({
+        where: { employeeId: id },
+        select: { id: true, email: true }
+      })
+      const linkedUserIds = linkedUsers.map((user) => user.id)
+      const linkedUserEmails = linkedUsers.map((user) => user.email)
+      const movementRows = await tx.movement.findMany({ where: { employeeId: id }, select: { id: true } })
+      const movementIds = movementRows.map((movement) => movement.id)
+      const payrollItemRows = await tx.payrollItem.findMany({
+        where: { employeeId: id },
+        select: { id: true, payrollId: true }
+      })
+      const payrollItemIds = payrollItemRows.map((item) => item.id)
+      const payrollIds = Array.from(new Set(payrollItemRows.map((item) => item.payrollId)))
+
+      if (linkedUserEmails.length) {
+        await tx.loginThrottle.deleteMany({ where: { identifier: { in: linkedUserEmails } } })
+      }
+
+      await tx.auditLog.deleteMany({
+        where: {
+          OR: [
+            { affectedEmployeeId: id },
+            { entity: "Employee", entityId: id },
+            ...(linkedUserIds.length
+              ? [
+                  { userId: { in: linkedUserIds } },
+                  { entity: "User", entityId: { in: linkedUserIds } }
+                ]
+              : [])
+          ]
+        }
+      })
+
+      const payrollLinkClauses: Prisma.PayrollItemMovementWhereInput[] = []
+      if (payrollItemIds.length) payrollLinkClauses.push({ payrollItemId: { in: payrollItemIds } })
+      if (movementIds.length) payrollLinkClauses.push({ movementId: { in: movementIds } })
+
+      if (payrollLinkClauses.length) {
+        await tx.payrollItemMovement.deleteMany({
+          where: { OR: payrollLinkClauses }
+        })
+      }
+
+      await tx.payrollItem.deleteMany({ where: { employeeId: id } })
+      await tx.movement.deleteMany({ where: { employeeId: id } })
+
+      for (const linkedUser of linkedUsers) {
+        await tx.user.update({
+          where: { id: linkedUser.id },
+          data: {
+            fullName: "Usuario purgado",
+            email: `purged-${linkedUser.id}@deleted.local`,
+            passwordHash: await bcrypt.hash(`${linkedUser.id}:${Date.now()}`, 12),
+            active: false,
+            branchId: null,
+            employeeId: null
+          }
+        })
+      }
+
+      await tx.employee.delete({ where: { id } })
+
+      for (const payrollId of payrollIds) {
+        const totals = await tx.payrollItem.aggregate({
+          where: { payrollId },
+          _sum: {
+            baseSalary: true,
+            totalDeductions: true,
+            totalPositiveAdjustments: true,
+            totalNegativeAdjustments: true,
+            netPay: true
+          }
+        })
+        const totalAdjustments = new Prisma.Decimal(totals._sum?.totalPositiveAdjustments ?? 0).minus(
+          totals._sum?.totalNegativeAdjustments ?? 0
+        )
+        await tx.payroll.update({
+          where: { id: payrollId },
+          data: {
+            totalGross: totals._sum?.baseSalary ?? new Prisma.Decimal(0),
+            totalDeductions: totals._sum?.totalDeductions ?? new Prisma.Decimal(0),
+            totalAdjustments,
+            totalNet: totals._sum?.netPay ?? new Prisma.Decimal(0)
+          }
+        })
+      }
+
+      const summary = {
+        employeeDeleted: true,
+        linkedUsersAnonymized: linkedUsers.length,
+        movementsDeleted: movementIds.length,
+        payrollItemsDeleted: payrollItemIds.length,
+        payrollsRecalculated: payrollIds.length,
+        sensitiveDataStored: false
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: AuditAction.DELETE,
+          entity: "DeveloperEmployeePurge",
+          entityId: id,
+          newValue: summary,
+          ipAddress
+        }
+      })
+
+      return { employeeId: id, ...summary }
+    })
+  }
+
+  private isDeveloperMaintenanceEnabled() {
+    const value = this.config.get<string>("ENABLE_DEVELOPER_MAINTENANCE")
+    return ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase())
   }
 
   async balance(id: string, user: AuthUser) {

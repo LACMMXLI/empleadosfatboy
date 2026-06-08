@@ -41,7 +41,7 @@ function createService(options: { employeeFound?: boolean } = {}) {
   }
 
   return {
-    service: new EmployeesService(prisma as never, {} as never),
+    service: new EmployeesService(prisma as never, {} as never, {} as never),
     captured
   }
 }

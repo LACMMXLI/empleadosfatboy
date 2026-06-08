@@ -17,6 +17,7 @@ import {
   UserRound,
   UserRoundPlus,
   UsersRound,
+  Trash2,
   X,
   Phone,
   Download
@@ -2014,6 +2015,20 @@ function Employees({ user }: { user?: User }) {
       await queryClient.invalidateQueries({ queryKey: ["employees"] })
     }
   })
+  const purgeDeveloperEmployee = useMutation({
+    mutationFn: (employee: Employee) => api.purgeEmployeeForDeveloper(employee.id),
+    onSuccess: async () => {
+      setSelectedEmployeeId("")
+      await queryClient.invalidateQueries({ queryKey: ["employees"] })
+    }
+  })
+
+  const confirmDeveloperPurge = (employee: Employee) => {
+    const confirmation = window.prompt(`Borrado definitivo de ${employee.fullName}. Escribe BORRAR para confirmar.`)
+    if (confirmation === "BORRAR") {
+      purgeDeveloperEmployee.mutate(employee)
+    }
+  }
 
   useEffect(() => {
     if (!selectedEmployee) return
@@ -2122,8 +2137,21 @@ function Employees({ user }: { user?: User }) {
                     {selectedEmployee.active ? "Desactivar" : "Activar"}
                   </button>
                 </div>
+                {user?.role === "ADMINISTRADOR" && (
+                  <button
+                    className="btn-reject"
+                    type="button"
+                    disabled={purgeDeveloperEmployee.isPending}
+                    onClick={() => confirmDeveloperPurge(selectedEmployee)}
+                    style={{ width: '100%', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '0.375rem' }}
+                  >
+                    <Trash2 style={{ width: 14, height: 14 }} />
+                    Purga dev
+                  </button>
+                )}
                 {update.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{update.error.message}</div>}
                 {toggleActive.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{toggleActive.error.message}</div>}
+                {purgeDeveloperEmployee.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{purgeDeveloperEmployee.error.message}</div>}
               </form>
             )}
           </div>

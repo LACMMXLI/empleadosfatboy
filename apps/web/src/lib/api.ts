@@ -102,6 +102,17 @@ export const api = {
   deactivateEmployee(id: string) {
     return request<Employee>(`/employees/${id}`, { method: "DELETE" })
   },
+  purgeEmployeeForDeveloper(id: string) {
+    return request<{
+      employeeId: string
+      employeeDeleted: boolean
+      linkedUsersAnonymized: number
+      movementsDeleted: number
+      payrollItemsDeleted: number
+      payrollsRecalculated: number
+      sensitiveDataStored: boolean
+    }>(`/employees/${id}/purge`, { method: "DELETE" })
+  },
   movements(params?: Record<string, string>) {
     const query = new URLSearchParams(params).toString()
     return request<Movement[]>(`/movements${query ? `?${query}` : ""}`)

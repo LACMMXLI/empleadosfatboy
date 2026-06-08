@@ -61,6 +61,7 @@ enum PayrollStatus {
 enum AuditAction {
   CREATE
   UPDATE
+  DELETE
   CANCEL
   STATUS_CHANGE
   LIMIT_CHANGE
