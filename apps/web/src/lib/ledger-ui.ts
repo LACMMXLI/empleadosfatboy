@@ -5,13 +5,13 @@ import type { MovementKind, MovementStatus, SalaryType } from "@/types/domain"
 export const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
 
 export const insetPanelStyle: CSSProperties = {
-  border: "1px solid rgb(var(--surface-line) / 0.28)",
-  background: "rgb(var(--surface-control) / 0.58)"
+  border: "1px solid rgb(var(--surface-line) / 0.42)",
+  background: "rgb(var(--surface-control) / 0.88)"
 }
 
 export const insetPanelStrongStyle: CSSProperties = {
-  border: "1px solid rgb(var(--surface-line) / 0.32)",
-  background: "rgb(var(--surface-control-strong) / 0.76)"
+  border: "1px solid rgb(var(--surface-line) / 0.5)",
+  background: "rgb(var(--surface-control-strong) / 0.92)"
 }
 
 export const movementLabels: Record<MovementKind, string> = {

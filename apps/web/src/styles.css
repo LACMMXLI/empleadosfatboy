@@ -5,11 +5,11 @@
 @layer base {
   :root {
     /* === Core Dark Theme === */
-    --background: 226 55% 3%;       /* #03050b */
+    --background: 224 50% 2.5%;     /* #03040a - Deep Void background */
     --foreground: 213 27% 89%;      /* #dde4ed */
-    --card: 220 37% 12%;            /* #131a2a */
+    --card: 220 24% 15.5%;          /* #1e2637 - Clear elevated card background */
     --card-foreground: 213 27% 89%;
-    --popover: 220 36% 13%;
+    --popover: 220 24% 16.5%;       /* #20293b */
     --popover-foreground: 213 27% 89%;
 
     /* === Electric Cyan Primary === */
@@ -17,10 +17,10 @@
     --primary-foreground: 228 47% 4%;
 
     /* === Violet Accent === */
-    --secondary: 222 31% 17%;
+    --secondary: 220 24% 20%;       /* #283144 */
     --secondary-foreground: 213 27% 89%;
-    --muted: 222 29% 15%;
-    --muted-foreground: 215 18% 60%;
+    --muted: 220 20% 17%;           /* #222935 */
+    --muted-foreground: 215 16% 62%;/* #8e9bb3 */
     --accent: 271 91% 65%;          /* #a855f7 violet */
     --accent-foreground: 0 0% 100%;
 
@@ -30,18 +30,18 @@
     --success: 142 76% 46%;         /* #22c55e */
     --warning: 38 92% 50%;          /* #f59e0b */
 
-    --border: 220 24% 22%;
-    --input: 224 33% 9%;
+    --border: 220 20% 26%;          /* #353d4c - Defined high-contrast borders */
+    --input: 222 28% 10%;           /* #121825 - Sunken input background */
     --ring: 191 100% 50%;
     --radius: 0.875rem;
 
-    --surface-shell: 3 5 11;
-    --surface-shell-soft: 7 11 20;
-    --surface-panel: 18 25 39;
-    --surface-panel-strong: 22 31 48;
-    --surface-control: 7 10 18;
-    --surface-control-strong: 10 14 24;
-    --surface-line: 58 70 96;
+    --surface-shell: 3 4 10;        /* #03040a */
+    --surface-shell-soft: 6 8 18;   /* #060812 */
+    --surface-panel: 30 38 55;      /* #1e2637 */
+    --surface-panel-strong: 37 47 68;/* #252f44 */
+    --surface-control: 15 20 31;    /* #0f141f */
+    --surface-control-strong: 18 24 37;/* #121825 */
+    --surface-line: 71 85 115;      /* #475573 - Sharp dividing lines */
   }
 
   * {
@@ -243,16 +243,17 @@
 
   /* === Admin Cards === */
   .admin-card {
-    background: rgb(var(--surface-panel) / 0.92);
-    border: 1px solid rgb(var(--surface-line) / 0.34);
+    background: rgb(var(--surface-panel) / 0.95);
+    border: 1px solid rgb(var(--surface-line) / 0.4);
     border-radius: 1rem;
     overflow: hidden;
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255, 255, 255, 0.035) inset;
-    transition: border-color 200ms ease;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.22), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    transition: border-color 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .admin-card:hover {
-    border-color: rgb(var(--surface-line) / 0.5);
+    border-color: rgb(var(--surface-line) / 0.58);
+    box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 0 20px rgba(0, 229, 255, 0.02);
   }
 
   .admin-card-header {
@@ -284,15 +285,16 @@
     overflow: hidden;
     border-radius: 1.125rem;
     padding: 1.125rem;
-    border: 1px solid rgb(var(--surface-line) / 0.36);
+    border: 1px solid rgb(var(--surface-line) / 0.4);
     background: rgb(var(--surface-panel-strong) / 0.96);
-    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-    transition: transform 200ms ease, border-color 200ms ease;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), border-color 220ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .stat-card:hover {
-    transform: translateY(-1px);
-    border-color: rgb(var(--surface-line) / 0.52);
+    transform: translateY(-1.5px);
+    border-color: rgb(var(--surface-line) / 0.58);
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.26), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
   }
 
   .stat-card::before {
@@ -306,39 +308,39 @@
   }
 
   .stat-card-cyan {
-    border-color: rgba(0, 229, 255, 0.18);
-    background: linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
+    border-color: rgba(0, 229, 255, 0.28);
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
   }
 
   .stat-card-cyan::before {
-    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.35), transparent);
   }
 
   .stat-card-violet {
-    border-color: rgba(168, 85, 247, 0.18);
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.08) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
+    border-color: rgba(168, 85, 247, 0.28);
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
   }
 
   .stat-card-violet::before {
-    background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.35), transparent);
   }
 
   .stat-card-green {
-    border-color: rgba(34, 197, 94, 0.18);
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
+    border-color: rgba(34, 197, 94, 0.28);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
   }
 
   .stat-card-green::before {
-    background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.35), transparent);
   }
 
   .stat-card-amber {
-    border-color: rgba(245, 158, 11, 0.18);
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
+    border-color: rgba(245, 158, 11, 0.28);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
   }
 
   .stat-card-amber::before {
-    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.35), transparent);
   }
 
   .stat-label {
@@ -428,17 +430,18 @@
     position: relative;
     overflow: hidden;
     border-radius: 1rem;
-    border: 1px solid rgb(var(--surface-line) / 0.34);
-    background: rgb(var(--surface-panel-strong) / 0.94);
+    border: 1px solid rgb(var(--surface-line) / 0.42);
+    background: rgb(var(--surface-panel-strong) / 0.96);
     padding: 1rem;
-    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
-    transition: border-color 200ms ease, transform 200ms ease;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+    transition: border-color 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
     animation: card-enter 300ms ease both;
   }
 
   .approval-card:hover {
-    border-color: rgba(0, 229, 255, 0.15);
-    transform: translateY(-1px);
+    border-color: rgba(0, 229, 255, 0.34);
+    transform: translateY(-1.5px);
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.28), 0 0 15px rgba(0, 229, 255, 0.03);
   }
 
   .approval-card::before {
@@ -1026,22 +1029,26 @@
   .employee-card {
     padding: 0.875rem;
     border-radius: 0.875rem;
-    border: 1px solid rgb(var(--surface-line) / 0.28);
-    background: rgb(var(--surface-control-strong) / 0.72);
+    border: 1px solid rgb(var(--surface-line) / 0.36);
+    background: rgb(var(--surface-panel) / 0.85);
     cursor: pointer;
-    transition: all 170ms ease;
+    transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
     text-align: left;
     width: 100%;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   }
 
   .employee-card:hover {
-    border-color: rgba(0, 229, 255, 0.15);
-    background: rgb(var(--surface-panel-strong) / 0.9);
+    border-color: rgba(0, 229, 255, 0.28);
+    background: rgb(var(--surface-panel-strong) / 0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   }
 
   .employee-card.selected {
-    border-color: rgba(0, 229, 255, 0.35);
-    background: rgba(0, 229, 255, 0.04);
+    border-color: rgba(0, 229, 255, 0.55);
+    background: rgba(0, 229, 255, 0.06);
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.05);
   }
 
   .employee-card-name {
@@ -1389,9 +1396,10 @@
     gap: 0.875rem;
     padding: 1rem;
     border-radius: 1.25rem;
-    background: rgb(var(--surface-panel) / 0.82);
-    border: 1px solid rgb(var(--surface-line) / 0.28);
+    background: rgb(var(--surface-panel) / 0.95);
+    border: 1px solid rgb(var(--surface-line) / 0.38);
     backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
   }
 
   .employee-avatar-ring {
@@ -1452,7 +1460,7 @@
     overflow: hidden;
     border-radius: 1.5rem;
     padding: 1.5rem;
-    border: 1px solid rgba(0, 229, 255, 0.25);
+    border: 1px solid rgba(0, 229, 255, 0.32);
     background: linear-gradient(135deg, rgba(0, 229, 255, 0.11) 0%, rgb(var(--surface-panel-strong) / 0.96) 62%);
     box-shadow:
       0 12px 30px rgba(0, 229, 255, 0.08),
@@ -1461,7 +1469,7 @@
   }
 
   .employee-balance-card:hover {
-    border-color: rgba(0, 229, 255, 0.4);
+    border-color: rgba(0, 229, 255, 0.5);
   }
 
   .employee-balance-card::before {
@@ -1798,9 +1806,10 @@
     display: flex;
     align-items: stretch;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.68);
+    background: rgba(2, 4, 10, 0.78);
     padding: 0;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
 
   .admin-modal {
@@ -1808,7 +1817,10 @@
     width: 100%;
     min-height: 100dvh;
     flex-direction: column;
-    background: rgb(var(--surface-shell-soft));
+    background: rgb(var(--surface-panel) / 0.98);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    animation: modal-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .admin-modal-header {
@@ -1816,9 +1828,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    border-bottom: 1px solid rgb(var(--surface-line) / 0.28);
-    padding: calc(env(safe-area-inset-top) + 0.75rem) 0.875rem 0.75rem;
-    background: rgb(var(--surface-control) / 0.96);
+    border-bottom: 1px solid rgb(var(--surface-line) / 0.38);
+    padding: calc(env(safe-area-inset-top) + 0.875rem) 1.25rem 0.875rem;
+    background: transparent; /* Seamless clean header */
   }
 
   .admin-modal-title {
@@ -1843,7 +1855,7 @@
   .admin-modal-body {
     flex: 1;
     overflow-y: auto;
-    padding: 0.875rem;
+    padding: 1.25rem;
   }
 
   .modal-submit {
@@ -1851,24 +1863,33 @@
     justify-content: center;
   }
 
+  @keyframes modal-enter {
+    from { opacity: 0; transform: scale(0.96) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
   @media (min-width: 640px) {
     .admin-modal-backdrop {
       align-items: center;
-      padding: 1rem;
+      padding: 1.5rem;
     }
 
     .admin-modal {
       min-height: 0;
-      max-height: min(680px, calc(100dvh - 2rem));
+      max-height: min(680px, calc(100dvh - 3rem));
       max-width: 560px;
-      border: 1px solid rgb(var(--surface-line) / 0.34);
-      border-radius: 1rem;
+      border: 1px solid rgb(var(--surface-line) / 0.46);
+      border-radius: 1.25rem;
       overflow: hidden;
-      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+      background: rgb(var(--surface-panel-strong) / 0.98);
+      box-shadow: 
+        0 35px 80px rgba(0, 0, 0, 0.65), 
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+        0 0 50px rgba(0, 229, 255, 0.05); /* Soft primary cyan glow */
     }
 
     .admin-modal-header {
-      padding: 0.875rem;
+      padding: 1.125rem 1.25rem;
     }
   }
 
