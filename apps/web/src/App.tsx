@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -34,6 +34,16 @@ import { clearPwa, PWA_UPDATE_EVENT, syncAdminPwa, syncEmployeePwa, type PwaUpda
 import fatboyLogo from "@/assets/logo.png"
 
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
+
+const insetPanelStyle: CSSProperties = {
+  border: "1px solid rgb(var(--surface-line) / 0.28)",
+  background: "rgb(var(--surface-control) / 0.58)"
+}
+
+const insetPanelStrongStyle: CSSProperties = {
+  border: "1px solid rgb(var(--surface-line) / 0.32)",
+  background: "rgb(var(--surface-control-strong) / 0.76)"
+}
 
 const movementLabels: Record<MovementKind, string> = {
   SALARY_ADVANCE: "Adelanto",
@@ -870,15 +880,15 @@ function Dashboard() {
         </div>
         <div className="admin-card-body">
           <div className="grid gap-2 md:grid-cols-3">
-            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+            <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
               <div className="stat-label">Solicitudes totales</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'hsl(var(--foreground))' }}>{data.cards.pendingMovements}</div>
             </div>
-            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+            <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
               <div className="stat-label">Autorizados activos</div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#4ade80' }}>{data.cards.authorizedMovements}</div>
             </div>
-            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+            <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
               <div className="stat-label">Estado</div>
               <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
                 {periodMovements.isLoading ? "Actualizando..." : "Al corriente"}
@@ -1092,7 +1102,7 @@ function AdministrativeMovements({ user }: { user?: User }) {
                 {money.format(settlementSummary.data?.total ?? 0)}
               </div>
             </div>
-            <div style={{ padding: '0.75rem', borderRadius: '0.625rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+            <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
               <div className="stat-label">Movimientos</div>
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '1.1rem', fontWeight: 700, color: 'hsl(var(--foreground))' }}>
                 {settlementSummary.data?.count ?? 0}
@@ -1111,8 +1121,9 @@ function AdministrativeMovements({ user }: { user?: User }) {
                   gap: '0.5rem',
                   padding: '0.5rem 0.75rem',
                   borderRadius: '0.5rem',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                  background: 'rgba(5,7,16,0.4)',
+                  border: '1px solid rgb(var(--surface-line) / 0.28)',
+                  background: 'rgb(var(--surface-control) / 0.58)',
+                  borderColor: 'rgb(var(--surface-line) / 0.28)',
                   fontSize: '0.8rem'
                 }}
               >
@@ -1356,18 +1367,18 @@ function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
 
               {/* Detail row */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.5rem', marginTop: '0.875rem' }}>
-                <div style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(5,7,16,0.4)' }}>
+                <div style={{ ...insetPanelStyle, padding: '0.5rem', borderRadius: '0.5rem' }}>
                   <div className="stat-label">Tipo</div>
                   <div style={{ fontSize: '0.775rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>{movementLabels[movement.kind]}</div>
                 </div>
-                <div style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(5,7,16,0.4)' }}>
+                <div style={{ ...insetPanelStyle, padding: '0.5rem', borderRadius: '0.5rem' }}>
                   <div className="stat-label">Fecha</div>
                   <div style={{ fontSize: '0.725rem', color: 'hsl(var(--foreground))' }}>
                     {new Date(movement.createdAt).toLocaleString("es-MX", { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
                 {movement.reason && (
-                  <div style={{ padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(5,7,16,0.4)', gridColumn: 'span 2' }}>
+                  <div style={{ ...insetPanelStyle, padding: '0.5rem', borderRadius: '0.5rem', gridColumn: 'span 2' }}>
                     <div className="stat-label">Motivo</div>
                     <div style={{ fontSize: '0.775rem', color: 'hsl(var(--foreground))' }}>{movement.reason}</div>
                   </div>
@@ -1407,7 +1418,7 @@ function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
 
 function DetailLine({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ padding: '0.625rem', borderRadius: '0.5rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(5,7,16,0.4)' }}>
+    <div style={{ ...insetPanelStyle, padding: '0.625rem', borderRadius: '0.5rem' }}>
       <div className="stat-label" style={{ marginBottom: '3px' }}>{label}</div>
       <div style={{ fontSize: '0.85rem', color: 'hsl(var(--foreground))', wordBreak: 'break-word' }}>{value}</div>
     </div>
@@ -1498,7 +1509,7 @@ function History() {
       </div>
 
       {/* Tab switcher */}
-      <div style={{ display: 'flex', gap: '0.375rem', padding: '0.25rem', background: 'rgba(13,17,23,0.8)', borderRadius: '0.75rem', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
+      <div style={{ ...insetPanelStrongStyle, display: 'flex', gap: '0.375rem', padding: '0.25rem', borderRadius: '0.75rem', width: 'fit-content' }}>
         <button
           type="button"
           onClick={() => setTab("all")}
@@ -1689,8 +1700,7 @@ function PayrollAdmin() {
                   gap: '0.75rem',
                   padding: '0.875rem',
                   borderRadius: '0.875rem',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  background: 'rgba(13,17,23,0.6)'
+                  ...insetPanelStrongStyle
                 }}
               >
                 <div style={{ flex: 1, minWidth: 160 }}>
@@ -1798,7 +1808,7 @@ function PayrollTotals({
 function PayrollItemsTable({ items, onSelect }: { items: PayrollItem[]; onSelect: (item: PayrollItem) => void }) {
   if (!items.length) return <StatusEmpty text="No hay empleados activos para este periodo." />
   return (
-    <div style={{ borderRadius: '0.875rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(13,17,23,0.6)', overflowX: 'auto' }}>
+    <div style={{ ...insetPanelStrongStyle, borderRadius: '0.875rem', overflowX: 'auto' }}>
       <table className="payroll-table" style={{ minWidth: 780 }}>
         <thead>
           <tr>
@@ -1866,8 +1876,7 @@ function PayrollItemDetail({ title, item, onClose }: { title: string; item: Payr
                 alignItems: 'center',
                 padding: '0.625rem',
                 borderRadius: '0.625rem',
-                border: '1px solid rgba(255,255,255,0.05)',
-                background: 'rgba(5,7,16,0.4)'
+                ...insetPanelStyle
               }}
             >
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.625rem', color: 'hsl(var(--muted-foreground))' }}>{movement.folio}</div>
@@ -1928,7 +1937,7 @@ function MovementTable({
       </div>
 
       {/* Desktop table */}
-      <div className="hidden overflow-x-auto md:block" style={{ borderRadius: '0.875rem', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(13,17,23,0.6)' }}>
+      <div className="hidden overflow-x-auto md:block" style={{ ...insetPanelStrongStyle, borderRadius: '0.875rem' }}>
         <table className="payroll-table">
           <thead>
             <tr>
@@ -2590,7 +2599,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
           <img src={fatboyLogo} alt="Fatboy" style={{ height: '95%', maxHeight: '49px', objectFit: 'contain' }} className="w-auto opacity-95 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.3)]" />
         </div>
         <button
-          className="btn-icon rounded-full border border-white/10 bg-white/[0.08] text-[#f7efe3] hover:bg-white/[0.12] w-10 h-10 flex items-center justify-center cursor-pointer"
+          className="btn-icon rounded-full border border-border bg-secondary/50 text-foreground hover:bg-secondary w-10 h-10 flex items-center justify-center cursor-pointer"
           onClick={() => {
             setCodeMessage(null)
             setAccountOpen(true)
@@ -2605,7 +2614,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
       {/* Account Settings Modal */}
       {accountOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" onClick={() => setAccountOpen(false)}>
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1117] p-5 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
+          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-5 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -2619,13 +2628,13 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
               </button>
             </div>
 
-            <form className="mt-5 space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4" onSubmit={codeForm.handleSubmit((values) => changeCode.mutate(values))}>
+            <form className="mt-5 space-y-3 rounded-2xl border border-border bg-secondary/40 p-4" onSubmit={codeForm.handleSubmit((values) => changeCode.mutate(values))}>
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <KeyRound className="h-4 w-4 text-primary" />
                 Cambiar PIN privado
               </div>
-              <input className="form-input h-12 rounded-xl border-white/10 bg-black/20" placeholder="Código PIN actual" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("currentCode")} />
-              <input className="form-input h-12 rounded-xl border-white/10 bg-black/20" placeholder="Nuevo código PIN" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("newCode")} />
+              <input className="form-input h-12 rounded-xl" placeholder="Código PIN actual" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("currentCode")} />
+              <input className="form-input h-12 rounded-xl" placeholder="Nuevo código PIN" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("newCode")} />
               <button className="btn-primary h-12 w-full rounded-xl" disabled={changeCode.isPending} type="submit">
                 {changeCode.isPending ? "Actualizando PIN..." : "Actualizar PIN"}
               </button>
@@ -2692,7 +2701,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
         )}
 
         {activeTab === "request" && (
-          <div className="admin-card" style={{ background: 'rgba(13,17,23,0.8)' }}>
+          <div className="admin-card">
             <div className="admin-card-header">
               <div className="admin-card-title">
                 <Banknote style={{ width: 16, height: 16, color: '#00e5ff' }} />
@@ -2735,7 +2744,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                   detail={isDrink ? "Precio fijo configurado por administración" : "Captura el monto a solicitar"}
                 >
                   {isDrink ? (
-                    <div className="flex h-12 items-center justify-between rounded-xl border border-white/10 bg-black/30 px-4 text-sm">
+                    <div className="flex h-12 items-center justify-between rounded-xl border border-border bg-background/70 px-4 text-sm">
                       <span className="text-muted-foreground">Bebida consumida</span>
                       <span className="font-mono text-base font-bold text-foreground">{money.format(beveragePrice)}</span>
                     </div>
@@ -2754,7 +2763,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                       })}
                     />
                   )}
-                  <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs">
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-secondary/30 px-4 py-2.5 text-xs">
                     <span className="text-muted-foreground">Total de la solicitud</span>
                     <span className="font-mono text-sm font-bold text-primary">{money.format(Number.isFinite(requestAmount) ? requestAmount : 0)}</span>
                   </div>
@@ -2800,7 +2809,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                   *Las solicitudes se envían al panel de administración para su aprobación y posterior deducción de nómina.
                 </p>
                 {message && (
-                  <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-xs text-center text-muted-foreground mt-2">
+                  <div className="rounded-xl border border-border bg-secondary/30 p-3 text-xs text-center text-muted-foreground mt-2">
                     {message}
                   </div>
                 )}
@@ -2811,7 +2820,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
 
         {confirming && activeTab === "request" && (
           <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" onClick={() => setConfirming(false)}>
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0d1117] p-5 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
+            <div className="w-full max-w-md rounded-3xl border border-border bg-card p-5 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
               <div className="space-y-1">
                 <div className="text-base font-bold text-foreground">{isDrink ? "Confirmar consumo de bebida" : "Confirmar Solicitud"}</div>
                 <p className="text-xs text-muted-foreground">
@@ -2820,7 +2829,7 @@ function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                     : "Verifica que los datos sean correctos antes de enviarla."}
                 </p>
               </div>
-              <div className="mt-4 space-y-2.5 rounded-2xl border border-white/5 bg-white/[0.02] p-4 text-xs">
+              <div className="mt-4 space-y-2.5 rounded-2xl border border-border bg-secondary/30 p-4 text-xs">
                 <DetailLine label={isDrink ? "Concepto" : "Categoría de adelanto"} value={movementLabels[values.kind as MovementKind]} />
                 <DetailLine label="Importe total" value={money.format(Number.isFinite(requestAmount) ? requestAmount : 0)} />
                 {!isDrink && <DetailLine label="Motivo especificado" value={requestReason || "Sin motivo"} />}
@@ -2920,9 +2929,9 @@ function EmployeeHistoryTabs({
 
   return (
     <div className="space-y-4">
-      <div className="admin-card" style={{ background: 'rgba(13,17,23,0.8)' }}>
+      <div className="admin-card">
         <div className="admin-card-body space-y-3">
-          <div className="flex rounded-2xl border border-white/10 bg-black/25 p-1">
+          <div className="flex rounded-2xl border border-border bg-background/70 p-1">
             {tabs.map((tab) => {
               const active = activeTab === tab.id
               return (
@@ -2995,13 +3004,13 @@ function PortalSettlementTicketList({ tickets }: { tickets: MovementSettlementTi
 
               <div className="space-y-1.5">
                 {ticket.byKind.map((item) => (
-                  <div key={item.kind} className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-1.5 text-xs">
+                  <div key={item.kind} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-secondary/30 px-3 py-1.5 text-xs">
                     <span className="min-w-0 truncate text-muted-foreground">{movementLabels[item.kind]}</span>
                     <span className="font-mono font-semibold text-foreground">{item.count} · {money.format(item.amount)}</span>
                   </div>
                 ))}
                 {!ticket.byKind.length && ticket.folios.length > 0 && (
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-1.5 text-xs text-muted-foreground text-center">
+                  <div className="rounded-xl border border-border bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground text-center">
                     {ticket.folios.length} folio(s) liquidados
                   </div>
                 )}
