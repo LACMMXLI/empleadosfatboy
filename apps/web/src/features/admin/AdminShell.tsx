@@ -205,7 +205,7 @@ function MobileBottomNav({
   }
   return (
     <nav className="bottom-nav lg:hidden" style={style}>
-      <div className="grid gap-0.5 max-w-lg mx-auto" style={{ gridTemplateColumns: `repeat(${views.length}, minmax(0, 1fr))` }}>
+      <div className="bottom-nav-inner" style={{ gridTemplateColumns: `repeat(${views.length}, minmax(0, 1fr))` }}>
         {views.map((item) => {
           const active = activeView === item.id
           return (
@@ -216,7 +216,7 @@ function MobileBottomNav({
               type="button"
             >
               <item.icon className="bottom-nav-icon" />
-              <span style={{ fontSize: '0.5rem', letterSpacing: '0.02em', fontWeight: 600 }}>{navLabels[item.id]}</span>
+              <span className="bottom-nav-label">{navLabels[item.id]}</span>
             </button>
           )
         })}
