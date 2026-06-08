@@ -13,6 +13,7 @@ import { PayrollModule } from "./payroll/payroll.module"
 import { AdminUsersModule } from "./admin-users/admin-users.module"
 import { JwtAuthGuard } from "./auth/jwt-auth.guard"
 import { RolesGuard } from "./auth/roles.guard"
+import { HealthController } from "./health.controller"
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { RolesGuard } from "./auth/roles.guard"
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard }
-  ]
+  ],
+  controllers: [HealthController]
 })
 export class AppModule {}
