@@ -4,6 +4,7 @@ dist
 .env.local
 coverage
 *.log
+.playwright-cli
 apps/api/prisma/dev.db
 apps/web/dist
 .playwright-mcp
