@@ -76,11 +76,99 @@ export class ConfigurationService {
     return rule
   }
 
-  branches() {
+  branches(includeInactive = false) {
     return this.prisma.branch.findMany({
-      where: { active: true },
+      where: includeInactive ? {} : { active: true },
       orderBy: { name: "asc" }
     })
+  }
+
+  async createBranch(dto: { name: string; code: string }, userId: string, ipAddress?: string) {
+    const branch = await this.prisma.branch.create({
+      data: {
+        name: dto.name,
+        code: dto.code
+      }
+    })
+    await this.audit.log({
+      userId,
+      action: AuditAction.CREATE,
+      entity: "Branch",
+      entityId: branch.id,
+      newValue: this.toJson(branch),
+      ipAddress
+    })
+    return branch
+  }
+
+  async updateBranch(id: string, dto: { name?: string; code?: string; active?: boolean }, userId: string, ipAddress?: string) {
+    const before = await this.prisma.branch.findUnique({ where: { id } })
+    const branch = await this.prisma.branch.update({
+      where: { id },
+      data: dto
+    })
+    await this.audit.log({
+      userId,
+      action: AuditAction.UPDATE,
+      entity: "Branch",
+      entityId: branch.id,
+      oldValue: this.toJson(before),
+      newValue: this.toJson(branch),
+      ipAddress
+    })
+    return branch
+  }
+
+  async deleteBranch(id: string, userId: string, ipAddress?: string) {
+    const before = await this.prisma.branch.findUnique({ where: { id } })
+    const branch = await this.prisma.branch.update({
+      where: { id },
+      data: { active: false }
+    })
+    await this.audit.log({
+      userId,
+      action: AuditAction.UPDATE,
+      entity: "Branch",
+      entityId: branch.id,
+      oldValue: this.toJson(before),
+      newValue: this.toJson(branch),
+      ipAddress
+    })
+    return branch
+  }
+
+  async updateRule(id: string, dto: Partial<RuleDto> & { active?: boolean }, userId: string, ipAddress?: string) {
+    const before = await this.prisma.authorizationRule.findUnique({ where: { id } })
+    const rule = await this.prisma.authorizationRule.update({
+      where: { id },
+      data: dto
+    })
+    await this.audit.log({
+      userId,
+      action: AuditAction.LIMIT_CHANGE,
+      entity: "AuthorizationRule",
+      entityId: rule.id,
+      oldValue: this.toJson(before),
+      newValue: this.toJson(rule),
+      ipAddress
+    })
+    return rule
+  }
+
+  async deleteRule(id: string, userId: string, ipAddress?: string) {
+    const before = await this.prisma.authorizationRule.findUnique({ where: { id } })
+    const rule = await this.prisma.authorizationRule.delete({
+      where: { id }
+    })
+    await this.audit.log({
+      userId,
+      action: AuditAction.LIMIT_CHANGE,
+      entity: "AuthorizationRule",
+      entityId: id,
+      oldValue: this.toJson(before),
+      ipAddress
+    })
+    return rule
   }
 
   private toJson(value: unknown): Prisma.InputJsonValue {

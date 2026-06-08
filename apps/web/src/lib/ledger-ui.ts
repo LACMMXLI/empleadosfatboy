@@ -203,3 +203,10 @@ export const administrativeMovementKinds: MovementKind[] = [
   "DAMAGE_DISCOUNT",
   "BALANCE_CORRECTION"
 ]
+
+export const branchSchema = z.object({
+  name: z.string().min(2, "Nombre requerido"),
+  code: z.string().min(2, "Código de sucursal requerido").toUpperCase()
+})
+export type BranchFormInput = z.input<typeof branchSchema>
+export type BranchFormOutput = z.output<typeof branchSchema>

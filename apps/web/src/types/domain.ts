@@ -43,6 +43,7 @@ export type Branch = {
   id: string
   name: string
   code: string
+  active: boolean
 }
 
 export type Employee = {

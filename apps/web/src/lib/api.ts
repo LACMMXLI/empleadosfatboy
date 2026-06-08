@@ -172,11 +172,26 @@ export const api = {
   configuration() {
     return request<AppConfig>("/configuration")
   },
-  branches() {
-    return request<Branch[]>("/configuration/branches")
+  branches(includeInactive = false) {
+    return request<Branch[]>(`/configuration/branches${includeInactive ? "?includeInactive=true" : ""}`)
+  },
+  createBranch(payload: Record<string, unknown>) {
+    return request<Branch>("/configuration/branches", { method: "POST", body: JSON.stringify(payload) })
+  },
+  updateBranch(id: string, payload: Record<string, unknown>) {
+    return request<Branch>(`/configuration/branches/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
+  },
+  deleteBranch(id: string) {
+    return request<Branch>(`/configuration/branches/${id}`, { method: "DELETE" })
   },
   updateConfiguration(payload: Partial<AppConfig>) {
     return request<AppConfig>("/configuration", { method: "PATCH", body: JSON.stringify(payload) })
+  },
+  updateRule(id: string, payload: Record<string, unknown>) {
+    return request<unknown>(`/configuration/authorization-rules/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
+  },
+  deleteRule(id: string) {
+    return request<unknown>(`/configuration/authorization-rules/${id}`, { method: "DELETE" })
   },
   adminUsers() {
     return request<User[]>("/admin/users")

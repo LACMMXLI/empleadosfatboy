@@ -17,7 +17,8 @@ import {
   UsersRound,
   Trash2,
   X,
-  Phone
+  Phone,
+  Pencil
 } from "lucide-react"
 import { api, session } from "@/lib/api"
 import type { Employee, Movement, MovementKind, MovementStatus, Payroll, PayrollItem, Role, User } from "@/types/domain"
@@ -29,6 +30,7 @@ import {
   administrativeMovementKinds,
   adminUserEditSchema,
   adminUserSchema,
+  branchSchema,
   configSchema,
   getInitials,
   getPayrollBadgeClass,
@@ -48,6 +50,8 @@ import {
   type AdminUserEditFormOutput,
   type AdminUserFormInput,
   type AdminUserFormOutput,
+  type BranchFormInput,
+  type BranchFormOutput,
   type ConfigFormInput,
   type ConfigFormOutput,
   type EmployeeEditFormInput,
@@ -242,7 +246,7 @@ function Dashboard() {
 
   const branchesQuery = useQuery({
     queryKey: ["branches"],
-    queryFn: api.branches
+    queryFn: () => api.branches()
   })
 
   const branchMovementsQuery = useQuery({
@@ -1433,7 +1437,7 @@ function Employees({ user }: { user?: User }) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const employees = useQuery({ queryKey: ["employees", "admin-all"], queryFn: () => api.employees(undefined, true) })
-  const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches })
+  const branches = useQuery({ queryKey: ["branches"], queryFn: () => api.branches() })
   const selectedEmployee = employees.data?.find((employee) => employee.id === selectedEmployeeId)
   
   const form = useForm<EmployeeFormInput, unknown, EmployeeFormOutput>({
@@ -1652,32 +1656,80 @@ function Employees({ user }: { user?: User }) {
 function Configuration() {
   const queryClient = useQueryClient()
   const [selectedUserId, setSelectedUserId] = useState("")
+  const [editRuleId, setEditRuleId] = useState("")
+  const [editBranchId, setEditBranchId] = useState("")
+
   const configuration = useQuery({ queryKey: ["configuration"], queryFn: api.configuration })
   const rules = useQuery({ queryKey: ["rules"], queryFn: api.rules })
-  const branches = useQuery({ queryKey: ["branches"], queryFn: api.branches })
+  const branches = useQuery({ queryKey: ["branches-admin-all"], queryFn: () => api.branches(true) })
   const adminUsers = useQuery({ queryKey: ["admin-users"], queryFn: api.adminUsers })
+
+  const activeBranches = branches.data?.filter(b => b.active) ?? []
   const selectedUser = adminUsers.data?.find((user) => user.id === selectedUserId)
+  
   const configForm = useForm<ConfigFormInput, unknown, ConfigFormOutput>({
     resolver: zodResolver(configSchema),
     defaultValues: { beveragePrice: 30 }
   })
+  
   const form = useForm<RuleFormInput, unknown, RuleFormOutput>({
     resolver: zodResolver(ruleSchema),
     defaultValues: { requiredRole: "ENCARGADO", minAmount: 0 }
   })
+  
   const userForm = useForm<AdminUserFormInput, unknown, AdminUserFormOutput>({
     resolver: zodResolver(adminUserSchema),
     defaultValues: { role: "ENCARGADO", branchId: "" }
   })
+  
   const userEditForm = useForm<AdminUserEditFormInput, unknown, AdminUserEditFormOutput>({
     resolver: zodResolver(adminUserEditSchema),
     defaultValues: { fullName: "", email: "", password: "", role: "ENCARGADO", branchId: "" }
   })
+
+  const branchForm = useForm<BranchFormInput, unknown, BranchFormOutput>({
+    resolver: zodResolver(branchSchema),
+    defaultValues: { name: "", code: "" }
+  })
+
+  const selectedBranchForEdit = branches.data?.find((b) => b.id === editBranchId)
+  const branchEditForm = useForm<{ name: string; code: string; active: boolean }>({
+    defaultValues: { name: "", code: "", active: true }
+  })
+
+  useEffect(() => {
+    if (selectedBranchForEdit) {
+      branchEditForm.reset({
+        name: selectedBranchForEdit.name,
+        code: selectedBranchForEdit.code,
+        active: selectedBranchForEdit.active
+      })
+    }
+  }, [selectedBranchForEdit, branchEditForm])
+
+  const selectedRuleForEdit = rules.data?.find((r) => r.id === editRuleId)
+  const ruleEditForm = useForm<RuleFormInput, unknown, RuleFormOutput>({
+    resolver: zodResolver(ruleSchema),
+    defaultValues: { requiredRole: "ENCARGADO", minAmount: 0 }
+  })
+
+  useEffect(() => {
+    if (selectedRuleForEdit) {
+      ruleEditForm.reset({
+        kind: selectedRuleForEdit.kind ?? undefined,
+        minAmount: Number(selectedRuleForEdit.minAmount),
+        maxAmount: selectedRuleForEdit.maxAmount ? Number(selectedRuleForEdit.maxAmount) : undefined,
+        requiredRole: selectedRuleForEdit.requiredRole as RuleFormInput["requiredRole"]
+      })
+    }
+  }, [selectedRuleForEdit, ruleEditForm])
+
   useEffect(() => {
     if (configuration.data) {
       configForm.reset({ beveragePrice: Number(configuration.data.beveragePrice ?? 30) })
     }
   }, [configForm, configuration.data])
+
   useEffect(() => {
     if (!selectedUser) return
     userEditForm.reset({
@@ -1688,15 +1740,61 @@ function Configuration() {
       branchId: selectedUser.branch?.id ?? ""
     })
   }, [selectedUser, userEditForm])
+
   const updateConfig = useMutation({
     mutationFn: (values: ConfigFormOutput) => api.updateConfiguration({ beveragePrice: values.beveragePrice }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["configuration"] })
   })
+
   const createRule = useMutation({
     mutationFn: (values: RuleFormOutput) =>
       api.createRule({ ...values, kind: values.kind || undefined, maxAmount: values.maxAmount || undefined }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["rules"] })
   })
+
+  const updateRule = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: Partial<RuleFormOutput> & { active?: boolean } }) =>
+      api.updateRule(id, { ...values, kind: values.kind || null, maxAmount: values.maxAmount || null }),
+    onSuccess: () => {
+      setEditRuleId("")
+      queryClient.invalidateQueries({ queryKey: ["rules"] })
+    }
+  })
+
+  const deleteRule = useMutation({
+    mutationFn: (id: string) => api.deleteRule(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rules"] })
+    }
+  })
+
+  const createBranch = useMutation({
+    mutationFn: (values: BranchFormOutput) => api.createBranch(values),
+    onSuccess: () => {
+      branchForm.reset({ name: "", code: "" })
+      queryClient.invalidateQueries({ queryKey: ["branches-admin-all"] })
+      queryClient.invalidateQueries({ queryKey: ["branches"] })
+    }
+  })
+
+  const updateBranch = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: { name?: string; code?: string; active?: boolean } }) =>
+      api.updateBranch(id, values),
+    onSuccess: () => {
+      setEditBranchId("")
+      queryClient.invalidateQueries({ queryKey: ["branches-admin-all"] })
+      queryClient.invalidateQueries({ queryKey: ["branches"] })
+    }
+  })
+
+  const deleteBranch = useMutation({
+    mutationFn: (id: string) => api.deleteBranch(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["branches-admin-all"] })
+      queryClient.invalidateQueries({ queryKey: ["branches"] })
+    }
+  })
+
   const createUser = useMutation({
     mutationFn: (values: AdminUserFormOutput) => api.createAdminUser(values),
     onSuccess: async () => {
@@ -1704,6 +1802,7 @@ function Configuration() {
       await queryClient.invalidateQueries({ queryKey: ["admin-users"] })
     }
   })
+
   const updateUser = useMutation({
     mutationFn: ({ id, values }: { id: string; values: AdminUserEditFormOutput }) =>
       api.updateAdminUser(id, { ...values, password: values.password || undefined }),
@@ -1712,6 +1811,7 @@ function Configuration() {
       await queryClient.invalidateQueries({ queryKey: ["admin-users"] })
     }
   })
+
   const toggleUser = useMutation({
     mutationFn: (user: User) => api.updateAdminUser(user.id, { active: !user.active }),
     onSuccess: async (user) => {
@@ -1777,6 +1877,24 @@ function Configuration() {
           </div>
         </div>
 
+        {/* New Branch */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <Building2 style={{ width: 14, height: 14, color: '#00e5ff' }} />
+              Nueva sucursal
+            </div>
+          </div>
+          <div className="admin-card-body">
+            <form className="space-y-2.5" onSubmit={branchForm.handleSubmit((values) => createBranch.mutate(values))}>
+              <input className="form-input" placeholder="Nombre de sucursal" {...branchForm.register("name")} />
+              <input className="form-input" placeholder="Código único (ej. NORTE)" {...branchForm.register("code")} />
+              <button className="btn-primary" style={{ width: '100%' }} disabled={createBranch.isPending} type="submit">Crear sucursal</button>
+              {createBranch.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{createBranch.error.message}</div>}
+            </form>
+          </div>
+        </div>
+
         {/* New admin user */}
         <div className="admin-card">
           <div className="admin-card-header">
@@ -1797,7 +1915,7 @@ function Configuration() {
               </select>
               <select className="form-select" {...userForm.register("branchId")}>
                 <option value="">Sin sucursal (Matriz/Global)</option>
-                {branches.data?.map((b) => (
+                {activeBranches.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
@@ -1832,7 +1950,7 @@ function Configuration() {
                 </select>
                 <select className="form-select" {...userEditForm.register("branchId")}>
                   <option value="">Sin sucursal (Matriz/Global)</option>
-                  {branches.data?.map((b) => (
+                  {activeBranches.map((b) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>
@@ -1851,6 +1969,62 @@ function Configuration() {
                 {toggleUser.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{toggleUser.error.message}</div>}
               </form>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Admin branches list */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div className="admin-card-title">
+            <Building2 style={{ width: 15, height: 15, color: '#00e5ff' }} />
+            Catálogo de sucursales
+          </div>
+          {branches.data && <span className="section-count">{branches.data.length}</span>}
+        </div>
+        <div className="admin-card-body">
+          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+            {branches.data?.map((branch) => (
+              <div
+                key={branch.id}
+                className={`employee-card ${editBranchId === branch.id ? "selected" : ""}`}
+                style={{ padding: '0.75rem', cursor: 'default' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '3px' }}>
+                  <div className="employee-card-name" style={{ fontWeight: 700 }}>{branch.name}</div>
+                  <span className={branch.active ? "badge-status badge-authorized" : "badge-status badge-canceled"} style={{ flexShrink: 0 }}>
+                    {branch.active ? "Activa" : "Inact."}
+                  </span>
+                </div>
+                <div className="employee-card-info font-mono text-cyan-300" style={{ fontSize: '0.75rem' }}>{branch.code}</div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '10px', justifyContent: 'flex-end' }}>
+                  <button
+                    className="btn-ghost"
+                    style={{ height: '1.75rem', padding: '0 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    onClick={() => setEditBranchId(branch.id)}
+                    type="button"
+                  >
+                    <Pencil style={{ width: 11, height: 11 }} />
+                    Editar
+                  </button>
+                  {branch.active && (
+                    <button
+                      className="btn-reject"
+                      style={{ height: '1.75rem', padding: '0 0.5rem', fontSize: '0.75rem', borderRadius: '0.375rem' }}
+                      onClick={() => {
+                        if (confirm(`¿Estás seguro de que deseas desactivar la sucursal ${branch.name}?`)) {
+                          deleteBranch.mutate(branch.id)
+                        }
+                      }}
+                      type="button"
+                    >
+                      Desactivar
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {!branches.data?.length && <StatusEmpty text="Sin sucursales registradas." />}
           </div>
         </div>
       </div>
@@ -1911,19 +2085,119 @@ function Configuration() {
                   fontSize: '0.8rem'
                 }}
               >
-                <span style={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}>
-                  {rule.kind ? movementLabels[rule.kind as MovementKind] : "Todos los tipos"}
-                </span>
-                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
-                  {money.format(Number(rule.minAmount))} – {rule.maxAmount ? money.format(Number(rule.maxAmount)) : "∞"}
-                </span>
-                <span className="badge-status badge-discounted">{rule.requiredRole}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                  <span style={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}>
+                    {rule.kind ? movementLabels[rule.kind as MovementKind] : "Todos los tipos"}
+                  </span>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
+                    {money.format(Number(rule.minAmount))} – {rule.maxAmount ? money.format(Number(rule.maxAmount)) : "∞"}
+                  </span>
+                  <span className="badge-status badge-discounted" style={{ marginLeft: 'auto' }}>{rule.requiredRole}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.35rem' }}>
+                  <button
+                    className="btn-icon"
+                    style={{ width: '1.75rem', height: '1.75rem', borderRadius: '0.375rem' }}
+                    onClick={() => setEditRuleId(rule.id)}
+                    type="button"
+                  >
+                    <Pencil style={{ width: 11, height: 11 }} />
+                  </button>
+                  <button
+                    className="btn-reject"
+                    style={{ width: '1.75rem', height: '1.75rem', borderRadius: '0.375rem', padding: 0 }}
+                    onClick={() => {
+                      if (confirm("¿Estás seguro de que deseas eliminar esta regla de autorización?")) {
+                        deleteRule.mutate(rule.id)
+                      }
+                    }}
+                    type="button"
+                  >
+                    <Trash2 style={{ width: 11, height: 11 }} />
+                  </button>
+                </div>
               </div>
             ))}
             {!rules.data?.length && <StatusEmpty text="Sin reglas de autorización configuradas." />}
           </div>
         </div>
       </div>
+
+      {/* Edit Rule Modal */}
+      {editRuleId && selectedRuleForEdit && (
+        <AdminModal title="Editar regla de autorización" subtitle="Modificar montos o rol" onClose={() => setEditRuleId("")}>
+          <form
+            className="admin-modal-form"
+            onSubmit={ruleEditForm.handleSubmit((values) => updateRule.mutate({ id: editRuleId, values }))}
+          >
+            <div className="form-field">
+              <label className="form-label">Tipo de movimiento</label>
+              <select className="form-select" {...ruleEditForm.register("kind")}>
+                <option value="">Todos los tipos</option>
+                {Object.entries(movementLabels).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="admin-form-row">
+              <div className="form-field">
+                <label className="form-label">Monto mínimo</label>
+                <input className="form-input" type="number" step="0.01" placeholder="Monto mínimo" {...ruleEditForm.register("minAmount")} />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Monto máximo</label>
+                <input className="form-input" type="number" step="0.01" placeholder="Monto máximo" {...ruleEditForm.register("maxAmount")} />
+              </div>
+            </div>
+            <div className="form-field">
+              <label className="form-label">Rol requerido</label>
+              <select className="form-select" {...ruleEditForm.register("requiredRole")}>
+                {["ENCARGADO", "GERENTE", "ADMINISTRADOR"].map((role) => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
+            </div>
+            <button className="btn-primary modal-submit mt-2" disabled={updateRule.isPending} type="submit">
+              Guardar regla
+            </button>
+            {updateRule.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{updateRule.error.message}</div>}
+          </form>
+        </AdminModal>
+      )}
+
+      {/* Edit Branch Modal */}
+      {editBranchId && selectedBranchForEdit && (
+        <AdminModal title="Editar sucursal" subtitle={selectedBranchForEdit.name} onClose={() => setEditBranchId("")}>
+          <form
+            className="admin-modal-form"
+            onSubmit={branchEditForm.handleSubmit((values) => updateBranch.mutate({ id: editBranchId, values }))}
+          >
+            <div className="form-field">
+              <label className="form-label">Nombre de sucursal</label>
+              <input className="form-input" placeholder="Nombre completo" {...branchEditForm.register("name")} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Código (Único)</label>
+              <input className="form-input" placeholder="Ej. MATRIZ" {...branchEditForm.register("code")} />
+            </div>
+            <div className="flex items-center gap-2 mt-4">
+              <input
+                type="checkbox"
+                id="branch-active-checkbox"
+                style={{ width: '1.15rem', height: '1.15rem', accentColor: '#00e5ff' }}
+                {...branchEditForm.register("active")}
+              />
+              <label htmlFor="branch-active-checkbox" className="text-sm font-semibold text-foreground select-none cursor-pointer">
+                Sucursal activa
+              </label>
+            </div>
+            <button className="btn-primary modal-submit mt-4" disabled={updateBranch.isPending} type="submit">
+              Guardar cambios
+            </button>
+            {updateBranch.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{updateBranch.error.message}</div>}
+          </form>
+        </AdminModal>
+      )}
     </div>
   )
 }
