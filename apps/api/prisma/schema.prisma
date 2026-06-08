@@ -237,6 +237,23 @@ model SystemConfig {
   updatedAt       DateTime @updatedAt
 }
 
+model LoginThrottle {
+  id             String    @id @default(cuid())
+  scope          String
+  identifier     String
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  lastFailureAt  DateTime?
+  lastFailureIp  String?
+  lastUserAgent  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([scope, identifier])
+  @@index([lockedUntil])
+  @@index([updatedAt])
+}
+
 model AuditLog {
   id          String      @id @default(cuid())
   userId      String?

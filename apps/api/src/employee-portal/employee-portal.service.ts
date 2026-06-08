@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { AuditService } from "../audit/audit.service"
 import { PrismaService } from "../prisma/prisma.service"
+import { LoginThrottleService } from "../security/login-throttle.service"
 import { MovementsService, RequestMetadata, type CreateEmployeeRequestInput } from "../movements/movements.service"
 
 type PortalToken = {
@@ -23,11 +24,15 @@ export class EmployeePortalService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly audit: AuditService,
-    private readonly movementsService: MovementsService
+    private readonly movementsService: MovementsService,
+    private readonly loginThrottle: LoginThrottleService
   ) {}
 
   async login(dto: PortalLoginInput, metadata: RequestMetadata) {
     const phone = dto.phone.trim()
+
+    await this.loginThrottle.assertCanAttempt("employee", phone)
+
     const employee = await this.prisma.employee.findFirst({
       where: {
         active: true,
@@ -35,10 +40,18 @@ export class EmployeePortalService {
       },
       include: { branch: true }
     })
-    if (!employee) throw new UnauthorizedException("Teléfono o código inválido")
+    if (!employee) {
+      await this.loginThrottle.recordFailure("employee", phone, metadata)
+      throw new UnauthorizedException("Teléfono o código inválido")
+    }
 
     const validPin = await bcrypt.compare(dto.pin, employee.pinHash)
-    if (!validPin) throw new UnauthorizedException("Teléfono o código inválido")
+    if (!validPin) {
+      await this.loginThrottle.recordFailure("employee", phone, metadata)
+      throw new UnauthorizedException("Teléfono o código inválido")
+    }
+
+    await this.loginThrottle.recordSuccess("employee", phone)
 
     await this.audit.log({
       action: AuditAction.LOGIN,

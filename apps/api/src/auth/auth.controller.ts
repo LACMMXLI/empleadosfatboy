@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from "@nestjs/common"
+import { Body, Controller, Get, Headers, Post, Req } from "@nestjs/common"
 import type { Request } from "express"
 import { IsEmail, IsString, MinLength } from "class-validator"
 import { Public } from "./public.decorator"
@@ -20,8 +20,11 @@ export class AuthController {
 
   @Public()
   @Post("login")
-  login(@Body() dto: LoginDto, @Req() request: Request) {
-    return this.auth.login(dto.email, dto.password, request.ip)
+  login(@Body() dto: LoginDto, @Req() request: Request, @Headers("user-agent") userAgent?: string) {
+    return this.auth.login(dto.email, dto.password, {
+      ipAddress: request.ip,
+      userAgent
+    })
   }
 
   @Get("me")

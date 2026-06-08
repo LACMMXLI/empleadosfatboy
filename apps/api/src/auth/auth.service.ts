@@ -5,31 +5,50 @@ import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { PrismaService } from "../prisma/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { LoginThrottleService } from "../security/login-throttle.service"
+
+type LoginMetadata = {
+  ipAddress?: string
+  userAgent?: string
+}
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly loginThrottle: LoginThrottleService
   ) {}
 
-  async login(email: string, password: string, ipAddress?: string) {
+  async login(email: string, password: string, metadata: LoginMetadata = {}) {
+    const loginEmail = email.trim()
+
+    await this.loginThrottle.assertCanAttempt("admin", loginEmail)
+
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: loginEmail },
       include: { branch: true, employee: true }
     })
-    if (!user?.active) throw new UnauthorizedException("Credenciales invalidas")
+    if (!user?.active) {
+      await this.loginThrottle.recordFailure("admin", loginEmail, metadata)
+      throw new UnauthorizedException("Credenciales invalidas")
+    }
 
     const valid = await bcrypt.compare(password, user.passwordHash)
-    if (!valid) throw new UnauthorizedException("Credenciales invalidas")
+    if (!valid) {
+      await this.loginThrottle.recordFailure("admin", loginEmail, metadata)
+      throw new UnauthorizedException("Credenciales invalidas")
+    }
+
+    await this.loginThrottle.recordSuccess("admin", loginEmail)
 
     await this.audit.log({
       userId: user.id,
       action: AuditAction.LOGIN,
       entity: "User",
       entityId: user.id,
-      ipAddress
+      ipAddress: metadata.ipAddress
     })
 
     const token = jwt.sign(
