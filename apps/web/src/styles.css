@@ -1153,6 +1153,56 @@
     gap: 0.55rem;
   }
 
+  .timeclock-code-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 9rem;
+    gap: 0.6rem;
+    align-items: stretch;
+  }
+
+  .timeclock-code-input {
+    width: 100%;
+    min-height: 3.2rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    background: rgba(0, 0, 0, 0.24);
+    color: #f8fafc;
+    text-align: center;
+    font-size: 1.35rem;
+    font-weight: 900;
+    letter-spacing: 0;
+  }
+
+  .timeclock-employee-confirm {
+    display: grid;
+    gap: 0.2rem;
+    min-height: 4.25rem;
+    margin-bottom: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.75rem;
+    background: rgba(15, 23, 42, 0.72);
+    padding: 0.8rem;
+  }
+
+  .timeclock-employee-confirm strong,
+  .timeclock-employee-confirm span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .timeclock-employee-confirm strong {
+    color: #f8fafc;
+    font-size: 1rem;
+    font-weight: 900;
+  }
+
+  .timeclock-employee-confirm span {
+    color: #94a3b8;
+    font-size: 0.82rem;
+    font-weight: 750;
+  }
+
   .timeclock-employee,
   .timeclock-toggle button,
   .timeclock-primary,
@@ -1164,6 +1214,13 @@
     color: #f8fafc;
     font-weight: 800;
     cursor: pointer;
+  }
+
+  .timeclock-toggle button:disabled,
+  .timeclock-primary:disabled,
+  .timeclock-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
   }
 
   .timeclock-employee {
@@ -1440,6 +1497,10 @@
     .timeclock-grid,
     .attendance-row,
     .attendance-request-card {
+      grid-template-columns: 1fr;
+    }
+
+    .timeclock-code-form {
       grid-template-columns: 1fr;
     }
 

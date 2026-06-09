@@ -69,13 +69,15 @@ class UpdateDeviceDto {
 
 class RegisterEntryDto {
   @IsString()
-  employeeId!: string
+  employeeCode!: string
 
   @IsEnum(TimeClockEventType)
   type!: TimeClockEventType
+}
 
+class VerifyEmployeeCodeDto {
   @IsString()
-  pin!: string
+  employeeCode!: string
 }
 
 class AttendanceQuery {
@@ -136,9 +138,16 @@ export class TimeClockPublicController {
     return this.timeClock.publicDevice(token)
   }
 
-  @Get("employees")
-  employees(@Headers("x-time-clock-device") token?: string) {
-    return this.timeClock.publicEmployees(token)
+  @Post("employee-code")
+  employeeCode(
+    @Headers("x-time-clock-device") token: string | undefined,
+    @Body() dto: VerifyEmployeeCodeDto,
+    @Req() request: RequestWithUser
+  ) {
+    return this.timeClock.verifyEmployeeCode(token, dto, {
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] as string | undefined
+    })
   }
 
   @Post("device-requests")

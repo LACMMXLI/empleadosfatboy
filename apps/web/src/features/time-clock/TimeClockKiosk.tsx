@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Camera, CheckCircle2, Clock3, Copy, LogIn, LogOut, RefreshCw, ShieldAlert } from "lucide-react"
+import { CheckCircle2, Clock3, Copy, LogIn, LogOut, RefreshCw, ShieldAlert } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
+import type { Employee } from "@/types/domain"
 import type { TimeClockEventType } from "@/types/domain"
 
 export function TimeClockKiosk() {
@@ -18,10 +19,10 @@ export function TimeClockKiosk() {
     timeClockDeviceRequestSession.token = created
     return created
   })
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
-  const [type, setType] = useState<TimeClockEventType>("ENTRY")
-  const [pin, setPin] = useState("")
-  const [photo, setPhoto] = useState<Blob | null>(null)
+  const [employeeCode, setEmployeeCode] = useState("")
+  const [verifiedEmployee, setVerifiedEmployee] = useState<Pick<Employee, "id" | "fullName" | "position"> | null>(null)
+  const [actionLocked, setActionLocked] = useState(false)
+  const [photoAttempted, setPhotoAttempted] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
 
@@ -42,7 +43,6 @@ export function TimeClockKiosk() {
     enabled: needsAuthorization,
     refetchInterval: (query) => query.state.data?.status === "AUTHORIZED" ? false : 5000
   })
-  const employees = useQuery({ queryKey: ["timeClock", "employees", deviceToken], queryFn: api.timeClock.employees, enabled: hasToken && !device.error })
 
   useEffect(() => {
     if (deviceRequest.data?.status !== "AUTHORIZED") return
@@ -80,34 +80,64 @@ export function TimeClockKiosk() {
     }
   }, [hasToken, device.error])
 
+  const verifyCode = useMutation({
+    mutationFn: () => api.timeClock.verifyEmployeeCode(employeeCode),
+    onSuccess: (result) => {
+      setVerifiedEmployee(result.employee)
+      setMessage(null)
+      setActionLocked(false)
+      setPhotoAttempted(false)
+    },
+    onError: (error: Error) => {
+      setVerifiedEmployee(null)
+      setMessage(error.message)
+    }
+  })
+
   const register = useMutation({
-    mutationFn: () => {
-      if (!photo) throw new Error("Toma la foto para continuar")
-      return api.timeClock.registerEntry({ employeeId: selectedEmployeeId, type, pin, photo })
+    mutationFn: async (type: TimeClockEventType) => {
+      if (!verifiedEmployee) throw new Error("Valida el codigo del empleado")
+      if (cameraError) throw new Error(cameraError)
+      if (photoAttempted) throw new Error("La foto ya fue intentada para esta checada")
+      setPhotoAttempted(true)
+      const photo = await capturePhotoOnce()
+      return api.timeClock.registerEntry({ employeeCode, type, photo })
     },
     onSuccess: async (result) => {
       setMessage(result.message)
-      setSelectedEmployeeId("")
-      setPin("")
-      setPhoto(null)
-      await queryClient.invalidateQueries({ queryKey: ["timeClock", "employees"] })
-      window.setTimeout(() => setMessage(null), 3500)
+      setActionLocked(true)
+      window.setTimeout(() => resetEmployeeFlow(), 4500)
     },
-    onError: (error: Error) => setMessage(error.message)
+    onError: (error: Error) => {
+      setMessage(error.message)
+      setActionLocked(true)
+      window.setTimeout(() => resetEmployeeFlow(), 4500)
+    }
   })
 
-  const selectedEmployee = employees.data?.find((employee) => employee.id === selectedEmployeeId)
-  const canSubmit = Boolean(selectedEmployeeId && pin.length === 6 && photo && !register.isPending)
+  const canVerify = employeeCode.length >= 4 && !verifyCode.isPending && !register.isPending
+  const canRegister = Boolean(verifiedEmployee && !register.isPending && !actionLocked && !cameraError && !photoAttempted)
 
-  async function capturePhoto() {
+  function resetEmployeeFlow() {
+    setEmployeeCode("")
+    setVerifiedEmployee(null)
+    setActionLocked(false)
+    setPhotoAttempted(false)
+    setMessage(null)
+  }
+
+  async function capturePhotoOnce() {
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas) return
+    if (!video || !canvas || video.readyState < 2) {
+      throw new Error("La camara no esta lista. No se registro la checada.")
+    }
     canvas.width = video.videoWidth || 640
     canvas.height = video.videoHeight || 480
     canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height)
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82))
-    if (blob) setPhoto(blob)
+    if (!blob) throw new Error("No se pudo capturar la foto. No se registro la checada.")
+    return blob
   }
 
   function regenerateRequestCode() {
@@ -175,75 +205,73 @@ export function TimeClockKiosk() {
 
         <div className="timeclock-grid">
           <div className="timeclock-section">
-            <div className="timeclock-section-title">Empleado</div>
-            <div className="timeclock-employee-grid">
-              {employees.data?.map((employee) => (
-                <button
-                  key={employee.id}
-                  className={`timeclock-employee ${selectedEmployeeId === employee.id ? "active" : ""}`}
-                  type="button"
-                  onClick={() => setSelectedEmployeeId(employee.id)}
-                >
-                  <strong>{employee.fullName}</strong>
-                  <span>{employee.position}</span>
-                </button>
-              ))}
+            <div className="timeclock-section-title">Codigo de empleado</div>
+            <form
+              className="timeclock-code-form"
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (canVerify) verifyCode.mutate()
+              }}
+            >
+              <input
+                className="timeclock-code-input"
+                inputMode="numeric"
+                maxLength={12}
+                placeholder="Ingresa tu codigo"
+                type="password"
+                value={employeeCode}
+                disabled={register.isPending}
+                onChange={(event) => {
+                  setEmployeeCode(event.target.value.replace(/\D/g, "").slice(0, 12))
+                  setVerifiedEmployee(null)
+                  setPhotoAttempted(false)
+                  setActionLocked(false)
+                }}
+              />
+              <button className="timeclock-primary" disabled={!canVerify} type="submit">
+                {verifyCode.isPending ? <RefreshCw className="spin" /> : <CheckCircle2 />}
+                Validar
+              </button>
+            </form>
+            <div className="timeclock-camera">
+              <video ref={videoRef} muted playsInline />
+              {cameraError && <div className="timeclock-camera-error">{cameraError}</div>}
             </div>
+            <canvas ref={canvasRef} className="hidden" />
           </div>
 
           <div className="timeclock-section">
             <div className="timeclock-section-title">Checada</div>
+            <div className="timeclock-employee-confirm">
+              {verifiedEmployee ? (
+                <>
+                  <strong>{verifiedEmployee.fullName}</strong>
+                  <span>{verifiedEmployee.position}</span>
+                </>
+              ) : (
+                <>
+                  <strong>Empleado sin validar</strong>
+                  <span>Ingresa tu codigo para continuar</span>
+                </>
+              )}
+            </div>
             <div className="timeclock-toggle">
-              <button className={type === "ENTRY" ? "active" : ""} type="button" onClick={() => setType("ENTRY")}>
+              <button disabled={!canRegister} type="button" onClick={() => register.mutate("ENTRY")}>
                 <LogIn />
                 Entrada
               </button>
-              <button className={type === "EXIT" ? "active" : ""} type="button" onClick={() => setType("EXIT")}>
+              <button disabled={!canRegister} type="button" onClick={() => register.mutate("EXIT")}>
                 <LogOut />
                 Salida
               </button>
             </div>
 
-            <input
-              className="timeclock-pin"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="PIN"
-              type="password"
-              value={pin}
-              onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
-            />
-
-            <div className="timeclock-camera">
-              <video ref={videoRef} muted playsInline />
-              {photo && (
-                <div className="timeclock-photo-ready">
-                  <CheckCircle2 />
-                  Foto lista
-                </div>
-              )}
-              {cameraError && <div className="timeclock-camera-error">{cameraError}</div>}
-            </div>
-            <canvas ref={canvasRef} className="hidden" />
-
-            <div className="timeclock-actions">
-              <button className="timeclock-secondary" type="button" onClick={capturePhoto}>
-                <Camera />
-                Tomar foto
-              </button>
-              <button
-                className="timeclock-primary"
-                disabled={!canSubmit}
-                type="button"
-                onClick={() => register.mutate()}
-              >
-                {register.isPending ? <RefreshCw className="spin" /> : <CheckCircle2 />}
-                Registrar
-              </button>
-            </div>
-
             <div className="timeclock-selected">
-              {selectedEmployee ? `${selectedEmployee.fullName} · ${type === "ENTRY" ? "Entrada" : "Salida"}` : "Selecciona empleado"}
+              {register.isPending
+                ? "Capturando foto y registrando..."
+                : photoAttempted
+                  ? "Foto tomada. Espera el resultado."
+                  : "La foto se toma automaticamente al elegir entrada o salida."}
             </div>
             {message && <div className="timeclock-message">{message}</div>}
           </div>

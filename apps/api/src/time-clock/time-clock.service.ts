@@ -15,6 +15,7 @@ import { AuditService } from "../audit/audit.service"
 import type { AuthUser } from "../auth/auth.types"
 import { FilesService } from "../files/files.service"
 import { PrismaService } from "../prisma/prisma.service"
+import { LoginThrottleService } from "../security/login-throttle.service"
 
 type RequestMetadata = {
   ipAddress?: string
@@ -43,9 +44,12 @@ type UpdateDeviceInput = {
 }
 
 type RegisterEntryInput = {
-  employeeId: string
+  employeeCode: string
   type: TimeClockEventType
-  pin: string
+}
+
+type VerifyEmployeeCodeInput = {
+  employeeCode: string
 }
 
 type AttendanceFilters = {
@@ -65,6 +69,7 @@ type ManualAdjustmentInput = {
 
 const timeZone = "America/Tijuana"
 const deviceRequestMinutes = 30
+const minimumTimeClockGapMs = 2 * 60 * 1000
 const movementKindsThatRequireActiveShift = new Set<MovementKind>([
   MovementKind.SALARY_ADVANCE,
   MovementKind.ADMIN_SALARY_ADVANCE,
@@ -78,7 +83,8 @@ export class TimeClockService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly files: FilesService
+    private readonly files: FilesService,
+    private readonly loginThrottle: LoginThrottleService
   ) {}
 
   async listDevices(user: AuthUser) {
@@ -376,6 +382,30 @@ export class TimeClockService {
     })
   }
 
+  async verifyEmployeeCode(token: string | undefined, input: VerifyEmployeeCodeInput, metadata: RequestMetadata) {
+    const device = await this.validateDeviceToken(token)
+    const employeeCode = this.normalizeEmployeeCode(input.employeeCode)
+    if (!employeeCode) throw new BadRequestException("Codigo de empleado requerido")
+
+    const throttleId = this.timeClockThrottleIdentifier(device.id, employeeCode, metadata.ipAddress)
+    await this.loginThrottle.assertCanAttempt("time-clock", throttleId)
+
+    const employee = await this.findEmployeeByCode(device.branchId, employeeCode)
+    if (!employee) {
+      await this.loginThrottle.recordFailure("time-clock", throttleId, metadata)
+      throw new BadRequestException("Codigo de empleado invalido")
+    }
+
+    await this.loginThrottle.recordSuccess("time-clock", throttleId)
+    return {
+      employee: {
+        id: employee.id,
+        fullName: employee.fullName,
+        position: employee.position
+      }
+    }
+  }
+
   async registerEntry(
     token: string | undefined,
     input: RegisterEntryInput,
@@ -383,22 +413,27 @@ export class TimeClockService {
     metadata: RequestMetadata
   ) {
     if (!photo) throw new BadRequestException("La foto es obligatoria")
-    if (!/^\d{6}$/.test(input.pin)) throw new BadRequestException("PIN invalido")
 
     const device = await this.validateDeviceToken(token)
-    const employee = await this.prisma.employee.findFirst({
-      where: { id: input.employeeId, branchId: device.branchId, active: true },
-      include: { branch: true }
-    })
-    if (!employee) throw new NotFoundException("Empleado no encontrado o fuera de sucursal")
+    const employeeCode = this.normalizeEmployeeCode(input.employeeCode)
+    if (!employeeCode) throw new BadRequestException("Codigo de empleado requerido")
 
-    const validPin = await bcrypt.compare(input.pin, employee.pinHash)
-    if (!validPin) throw new BadRequestException("PIN del empleado invalido")
+    const throttleId = this.timeClockThrottleIdentifier(device.id, employeeCode, metadata.ipAddress)
+    await this.loginThrottle.assertCanAttempt("time-clock", throttleId)
+
+    const employee = await this.findEmployeeByCode(device.branchId, employeeCode)
+    if (!employee) {
+      await this.loginThrottle.recordFailure("time-clock", throttleId, metadata)
+      throw new BadRequestException("Codigo de empleado invalido")
+    }
+
+    await this.loginThrottle.recordSuccess("time-clock", throttleId)
 
     const now = new Date()
     const local = this.localParts(now)
 
     await this.assertEntryAllowed(employee.id, input.type)
+    await this.assertMinimumGap(employee.id, now)
     const evidence = await this.files.uploadTimeClockEvidence(photo, employee.branchId, metadata.ipAddress)
 
     try {
@@ -748,6 +783,24 @@ export class TimeClockService {
     }
   }
 
+  private async assertMinimumGap(employeeId: string, now: Date) {
+    const lastEntry = await this.prisma.timeClockEntry.findFirst({
+      where: {
+        employeeId,
+        status: { in: [TimeClockEntryStatus.VALID, TimeClockEntryStatus.MANUAL] }
+      },
+      orderBy: { occurredAt: "desc" },
+      select: { occurredAt: true, type: true }
+    })
+    if (!lastEntry) return
+
+    const elapsedMs = now.getTime() - lastEntry.occurredAt.getTime()
+    if (elapsedMs >= minimumTimeClockGapMs) return
+
+    const remainingSeconds = Math.ceil((minimumTimeClockGapMs - elapsedMs) / 1000)
+    throw new BadRequestException(`Espera ${remainingSeconds} segundos antes de registrar otra checada`)
+  }
+
   private async validateDeviceToken(token: string | undefined) {
     const cleanToken = token?.trim()
     if (!cleanToken) throw new UnauthorizedException("Dispositivo no registrado")
@@ -758,6 +811,28 @@ export class TimeClockService {
     })
     if (!device?.active || !device.branch.active) throw new UnauthorizedException("Dispositivo no autorizado")
     return device
+  }
+
+  private async findEmployeeByCode(branchId: string, employeeCode: string) {
+    const employees = await this.prisma.employee.findMany({
+      where: { branchId, active: true },
+      include: { branch: true },
+      orderBy: { fullName: "asc" }
+    })
+
+    for (const employee of employees) {
+      if (await bcrypt.compare(employeeCode, employee.pinHash)) return employee
+    }
+    return null
+  }
+
+  private normalizeEmployeeCode(value: string) {
+    return value.trim().replace(/\D/g, "").slice(0, 12)
+  }
+
+  private timeClockThrottleIdentifier(deviceId: string, employeeCode: string, ipAddress?: string) {
+    const ip = ipAddress?.trim() || "unknown-ip"
+    return `${deviceId}:${employeeCode}:${ip}`
   }
 
   private async findVisibleDevice(id: string, user: AuthUser) {

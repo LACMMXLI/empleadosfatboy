@@ -352,14 +352,16 @@ export const api = {
     device() {
       return timeClockRequest<{ id: string; name: string; branch: Branch }>("/time-clock/public/device")
     },
-    employees() {
-      return timeClockRequest<Array<Pick<Employee, "id" | "fullName" | "position">>>("/time-clock/public/employees")
+    verifyEmployeeCode(employeeCode: string) {
+      return timeClockRequest<{ employee: Pick<Employee, "id" | "fullName" | "position"> }>("/time-clock/public/employee-code", {
+        method: "POST",
+        body: JSON.stringify({ employeeCode })
+      })
     },
-    registerEntry(payload: { employeeId: string; type: TimeClockEventType; pin: string; photo: Blob }) {
+    registerEntry(payload: { employeeCode: string; type: TimeClockEventType; photo: Blob }) {
       const formData = new FormData()
-      formData.append("employeeId", payload.employeeId)
+      formData.append("employeeCode", payload.employeeCode)
       formData.append("type", payload.type)
-      formData.append("pin", payload.pin)
       formData.append("photo", payload.photo, "checador.jpg")
       return timeClockFormRequest<{ ok: boolean; message: string; entry: TimeClockEntry }>("/time-clock/public/entries", formData)
     },
