@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from "@nestjs/common"
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common"
 import { IsEnum, IsOptional, IsString } from "class-validator"
 import { IncidentStatus, Role } from "@prisma/client"
 import { Roles } from "../auth/roles.decorator"
@@ -79,6 +79,12 @@ export class IncidentsController {
   @Get(":id")
   get(@Param("id") id: string, @Req() request: RequestWithUser) {
     return this.incidents.get(id, request.user)
+  }
+
+  @Roles(Role.ADMINISTRADOR)
+  @Delete(":id/purge")
+  purge(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.incidents.purgeForDeveloper(id, request.user.sub, request.ip)
   }
 
   @Patch(":id/status")

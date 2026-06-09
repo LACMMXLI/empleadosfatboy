@@ -173,6 +173,15 @@ export const api = {
   addIncidentMessage(id: string, message: string) {
     return request<Incident>(`/admin/incidents/${id}/messages`, { method: "POST", body: JSON.stringify({ message }) })
   },
+  purgeIncidentForDeveloper(id: string) {
+    return request<{
+      incidentId: string
+      incidentDeleted: boolean
+      messagesDeleted: number
+      evidenceDeleted: number
+      storageObjectsDeleted: number
+    }>(`/admin/incidents/${id}/purge`, { method: "DELETE" })
+  },
   deactivateEmployee(id: string) {
     return request<Employee>(`/employees/${id}`, { method: "DELETE" })
   },

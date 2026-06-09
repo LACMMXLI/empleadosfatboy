@@ -7,6 +7,7 @@ import {
   Building2,
   CheckCircle2,
   ClipboardList,
+  Download,
   Eye,
   FileImage,
   ImagePlus,
@@ -14,6 +15,7 @@ import {
   LayoutDashboard,
   LogOut,
   MessageSquareText,
+  Maximize2,
   Settings,
   ShieldCheck,
   Send,
@@ -974,6 +976,7 @@ function IncidentsAdmin({ user }: { user?: User }) {
   const [detailFiles, setDetailFiles] = useState<File[]>([])
   const [comment, setComment] = useState("")
   const [statusMessage, setStatusMessage] = useState("")
+  const [previewFile, setPreviewFile] = useState<FileAsset | null>(null)
 
   useEffect(() => {
     if (user?.branch?.id && !branchId) setBranchId(user.branch.id)
@@ -1006,6 +1009,8 @@ function IncidentsAdmin({ user }: { user?: User }) {
   }, [branchId, branches.data, targetEmployeeId])
 
   const selectedIncident = incidentDetail.data ?? incidents.data?.find((incident) => incident.id === selectedIncidentId)
+  const isDeveloperAdmin = user?.role === "ADMINISTRADOR"
+  const selectedIncidentIsFinal = selectedIncident ? ["RESUELTA", "CERRADA"].includes(selectedIncident.status) : false
 
   const resetCreateForm = () => {
     setTitle("")
@@ -1078,6 +1083,28 @@ function IncidentsAdmin({ user }: { user?: User }) {
       await queryClient.invalidateQueries({ queryKey: ["incident", incident.id] })
     }
   })
+
+  const purgeIncident = useMutation({
+    mutationFn: () => {
+      if (!selectedIncident) throw new Error("Selecciona una incidencia")
+      return api.purgeIncidentForDeveloper(selectedIncident.id)
+    },
+    onSuccess: async () => {
+      const purgedId = selectedIncidentId
+      setSelectedIncidentId("")
+      setPreviewFile(null)
+      await queryClient.invalidateQueries({ queryKey: ["incidents"] })
+      if (purgedId) await queryClient.removeQueries({ queryKey: ["incident", purgedId] })
+    }
+  })
+
+  const confirmIncidentPurge = () => {
+    if (!selectedIncident) return
+    const confirmation = window.prompt(`Borrado definitivo de ${selectedIncident.folio}. Escribe BORRAR para confirmar.`)
+    if (confirmation === "BORRAR") {
+      purgeIncident.mutate()
+    }
+  }
 
   const onCreateFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setCreateFiles(Array.from(event.target.files ?? []))
@@ -1158,7 +1185,15 @@ function IncidentsAdmin({ user }: { user?: User }) {
         <div className="admin-card incident-detail-card">
           <div className="admin-card-header">
             <div className="admin-card-title">Detalle</div>
-            {selectedIncident && <span className={getIncidentBadgeClass(selectedIncident.status)}>{incidentStatusLabels[selectedIncident.status]}</span>}
+            <div className="incident-detail-header-actions">
+              {selectedIncident && <span className={getIncidentBadgeClass(selectedIncident.status)}>{incidentStatusLabels[selectedIncident.status]}</span>}
+              {selectedIncident && isDeveloperAdmin && (
+                <button className="btn-reject" type="button" disabled={purgeIncident.isPending} onClick={confirmIncidentPurge}>
+                  <Trash2 style={{ width: 13, height: 13 }} />
+                  Eliminar prueba
+                </button>
+              )}
+            </div>
           </div>
           <div className="admin-card-body">
             {!selectedIncident && <StatusEmpty text="Selecciona una incidencia para ver el seguimiento" />}
@@ -1175,6 +1210,23 @@ function IncidentsAdmin({ user }: { user?: User }) {
                     <DetailLine label="Sucursal" value={selectedIncident.branch?.name ?? "Sin sucursal"} />
                     <DetailLine label="Reportó" value={selectedIncident.reportedByUser?.fullName ?? "Sistema"} />
                     <DetailLine label="Fecha" value={formatDateTime(selectedIncident.createdAt)} />
+                    <DetailLine label="Vista" value={formatDateTime(selectedIncident.viewedAt)} />
+                    <DetailLine label="Cierre" value={formatDateTime(selectedIncident.closedAt ?? selectedIncident.resolvedAt)} />
+                  </div>
+                </div>
+
+                <div className="incident-summary-strip">
+                  <div>
+                    <span>Que paso</span>
+                    <strong>{selectedIncident.description}</strong>
+                  </div>
+                  <div>
+                    <span>Donde</span>
+                    <strong>{selectedIncident.employee?.fullName ? `${selectedIncident.employee.fullName} / ${selectedIncident.branch?.name ?? "Sucursal"}` : selectedIncident.branch?.name ?? "Sucursal"}</strong>
+                  </div>
+                  <div>
+                    <span>Respuesta</span>
+                    <strong>{selectedIncident.messages.length ? `${selectedIncident.messages.length} nota(s) de seguimiento` : "Sin respuesta registrada"}</strong>
                   </div>
                 </div>
 
@@ -1194,7 +1246,7 @@ function IncidentsAdmin({ user }: { user?: User }) {
                 </div>
                 <input
                   className="form-input"
-                  placeholder="Nota opcional para el cambio de estado"
+                  placeholder="Nota opcional: que se reviso, quien atiende o que decision se tomo"
                   value={statusMessage}
                   onChange={(event) => setStatusMessage(event.target.value)}
                 />
@@ -1206,7 +1258,7 @@ function IncidentsAdmin({ user }: { user?: User }) {
                   </div>
                   <div className="incident-evidence-grid">
                     {selectedIncident.evidence.map((file) => (
-                      <EvidenceThumb key={file.id} file={file} />
+                      <EvidenceThumb key={file.id} file={file} onOpen={setPreviewFile} />
                     ))}
                     {!selectedIncident.evidence.length && <div className="incident-empty-inline">Sin evidencias cargadas</div>}
                   </div>
@@ -1225,6 +1277,13 @@ function IncidentsAdmin({ user }: { user?: User }) {
                     Seguimiento
                   </div>
                   <div className="incident-message-list">
+                    <div className="incident-message system">
+                      <div className="incident-message-meta">
+                        <span>Registro inicial</span>
+                        <span>{formatDateTime(selectedIncident.createdAt)}</span>
+                      </div>
+                      <div>{selectedIncident.description}</div>
+                    </div>
                     {selectedIncident.messages.map((message) => (
                       <div key={message.id} className="incident-message">
                         <div className="incident-message-meta">
@@ -1237,17 +1296,23 @@ function IncidentsAdmin({ user }: { user?: User }) {
                     {!selectedIncident.messages.length && <div className="incident-empty-inline">Sin comentarios todavía</div>}
                   </div>
                   <div className="incident-comment-row">
-                    <textarea className="form-textarea" placeholder="Escribe respuesta o seguimiento" value={comment} onChange={(event) => setComment(event.target.value)} />
-                    <button className="btn-primary" type="button" disabled={!comment.trim() || addMessage.isPending} onClick={() => addMessage.mutate()}>
+                    <textarea
+                      className="form-textarea"
+                      placeholder={selectedIncidentIsFinal ? "Incidencia finalizada" : "Respuesta o seguimiento: accion tomada, responsable, evidencia pendiente"}
+                      value={comment}
+                      disabled={selectedIncidentIsFinal}
+                      onChange={(event) => setComment(event.target.value)}
+                    />
+                    <button className="btn-primary" type="button" disabled={!comment.trim() || addMessage.isPending || selectedIncidentIsFinal} onClick={() => addMessage.mutate()}>
                       <Send style={{ width: 14, height: 14 }} />
                       Enviar
                     </button>
                   </div>
                 </section>
 
-                {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error) && (
+                {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error || purgeIncident.error) && (
                   <div className="status-empty" style={{ color: "#f87171", padding: "0.5rem" }}>
-                    {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error)?.message}
+                    {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error || purgeIncident.error)?.message}
                   </div>
                 )}
               </div>
@@ -1300,11 +1365,13 @@ function IncidentsAdmin({ user }: { user?: User }) {
           </form>
         </AdminModal>
       )}
+
+      {previewFile && <EvidencePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />}
     </div>
   )
 }
 
-function EvidenceThumb({ file }: { file: FileAsset }) {
+function EvidencePreviewModal({ file, onClose }: { file: FileAsset; onClose: () => void }) {
   const [url, setUrl] = useState("")
   const blob = useQuery({
     queryKey: ["file-blob", file.id],
@@ -1319,10 +1386,85 @@ function EvidenceThumb({ file }: { file: FileAsset }) {
     return () => URL.revokeObjectURL(objectUrl)
   }, [blob.data])
 
+  const download = () => {
+    if (!url) return
+    const link = document.createElement("a")
+    link.href = url
+    link.download = file.originalName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
+
+  return (
+    <div className="incident-preview-backdrop" role="dialog" aria-modal="true">
+      <div className="incident-preview-modal">
+        <div className="incident-preview-header">
+          <div>
+            <div className="incident-folio">Evidencia</div>
+            <h3>{file.originalName}</h3>
+          </div>
+          <div className="incident-preview-actions">
+            <button className="btn-secondary" type="button" onClick={download} disabled={!url}>
+              <Download style={{ width: 14, height: 14 }} />
+              Descargar
+            </button>
+            <button className="btn-icon" type="button" onClick={onClose} title="Cerrar">
+              <X style={{ width: 16, height: 16 }} />
+            </button>
+          </div>
+        </div>
+        <div className="incident-preview-body">
+          {url ? <img src={url} alt={file.originalName} /> : <StatusEmpty text="Cargando imagen..." />}
+        </div>
+        {blob.error && <div className="status-empty" style={{ color: "#f87171", padding: "0.5rem" }}>{blob.error.message}</div>}
+      </div>
+    </div>
+  )
+}
+
+function EvidenceThumb({ file, onOpen }: { file: FileAsset; onOpen: (file: FileAsset) => void }) {
+  const [url, setUrl] = useState("")
+  const blob = useQuery({
+    queryKey: ["file-blob", file.id],
+    queryFn: () => api.fileBlob(file.id),
+    staleTime: Infinity
+  })
+
+  useEffect(() => {
+    if (!blob.data) return
+    const objectUrl = URL.createObjectURL(blob.data)
+    setUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [blob.data])
+
+  const download = async () => {
+    const data = blob.data ?? await api.fileBlob(file.id)
+    const shouldRevoke = !url
+    const objectUrl = url || URL.createObjectURL(data)
+    const link = document.createElement("a")
+    link.href = objectUrl
+    link.download = file.originalName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    if (shouldRevoke) URL.revokeObjectURL(objectUrl)
+  }
+
   return (
     <div className="incident-evidence-thumb">
-      {url ? <img src={url} alt={file.originalName} /> : <FileImage style={{ width: 28, height: 28 }} />}
-      <div title={file.originalName}>{file.originalName}</div>
+      <button className="incident-evidence-preview" type="button" onClick={() => onOpen(file)} disabled={!url}>
+        {url ? <img src={url} alt={file.originalName} /> : <FileImage style={{ width: 28, height: 28 }} />}
+      </button>
+      <div className="incident-evidence-name" title={file.originalName}>{file.originalName}</div>
+      <div className="incident-evidence-actions">
+        <button className="btn-icon" type="button" title="Ver completa" onClick={() => onOpen(file)} disabled={!url}>
+          <Maximize2 style={{ width: 13, height: 13 }} />
+        </button>
+        <button className="btn-icon" type="button" title="Descargar" onClick={download} disabled={blob.isLoading}>
+          <Download style={{ width: 13, height: 13 }} />
+        </button>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common"
+import { ConfigService } from "@nestjs/config"
 import { AuditAction, FileAssetModule, IncidentStatus, Prisma, Role } from "@prisma/client"
 import { AuditService } from "../audit/audit.service"
 import type { AuthUser } from "../auth/auth.types"
+import { FilesService } from "../files/files.service"
 import { PrismaService } from "../prisma/prisma.service"
 
 type CreateIncidentInput = {
@@ -46,7 +48,9 @@ const terminalStatuses = new Set<IncidentStatus>([IncidentStatus.RESUELTA, Incid
 export class IncidentsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly config: ConfigService,
+    private readonly files: FilesService
   ) {}
 
   async list(filters: IncidentFilters, user: AuthUser) {
@@ -177,6 +181,63 @@ export class IncidentsService {
     ])
 
     return this.get(id, user)
+  }
+
+  async purgeForDeveloper(id: string, userId: string, ipAddress?: string) {
+    if (!this.isDeveloperMaintenanceEnabled()) {
+      throw new ForbiddenException("Mantenimiento de desarrollador deshabilitado")
+    }
+
+    const incident = await this.prisma.incident.findUnique({
+      where: { id },
+      include: this.includeDetail()
+    })
+    if (!incident) throw new NotFoundException("Incidencia no encontrada")
+
+    const evidence = await this.prisma.fileAsset.findMany({
+      where: {
+        module: FileAssetModule.INCIDENCIAS,
+        entityId: id
+      },
+      orderBy: { createdAt: "asc" }
+    })
+
+    for (const file of evidence) {
+      await this.files.deleteStoredObject(file.key)
+    }
+
+    const summary = {
+      incidentId: id,
+      incidentDeleted: true,
+      messagesDeleted: incident.messages.length,
+      evidenceDeleted: evidence.length,
+      storageObjectsDeleted: evidence.length
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (evidence.length) {
+        await tx.fileAsset.deleteMany({
+          where: { id: { in: evidence.map((file) => file.id) } }
+        })
+      }
+
+      await tx.incident.delete({ where: { id } })
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: AuditAction.DELETE,
+          entity: "DeveloperIncidentPurge",
+          entityId: id,
+          affectedEmployeeId: incident.employeeId ?? undefined,
+          oldValue: this.toJson({ incident, evidence }),
+          newValue: this.toJson(summary),
+          ipAddress
+        }
+      })
+    })
+
+    return summary
   }
 
   private async resolveTarget(input: CreateIncidentInput, user: AuthUser) {
@@ -313,6 +374,11 @@ export class IncidentsService {
 
   private includeDetail() {
     return this.includeSummary()
+  }
+
+  private isDeveloperMaintenanceEnabled() {
+    const value = this.config.get<string>("ENABLE_DEVELOPER_MAINTENANCE")
+    return ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase())
   }
 
   private async nextFolio() {

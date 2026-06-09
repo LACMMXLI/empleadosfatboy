@@ -136,6 +136,10 @@ export class FilesService {
     return { id: deleted.id, deleted: true }
   }
 
+  async deleteStoredObject(key: string) {
+    await this.deleteObject(key)
+  }
+
   private validateImage(file: Express.Multer.File) {
     if (!allowedImageMimeTypes.includes(file.mimetype as (typeof allowedImageMimeTypes)[number])) {
       throw new BadRequestException("Solo se permiten imagenes JPEG, PNG o WEBP")
