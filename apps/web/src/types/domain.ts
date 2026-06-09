@@ -113,6 +113,35 @@ export type FileAsset = {
   createdAt: string
 }
 
+export type IncidentStatus = "REPORTADA" | "VISTA" | "EN_PROCESO" | "RESUELTA" | "CERRADA"
+
+export type IncidentMessage = {
+  id: string
+  message: string
+  createdAt: string
+  author?: Pick<User, "id" | "fullName" | "role"> | null
+}
+
+export type Incident = {
+  id: string
+  folio: string
+  title: string
+  description: string
+  status: IncidentStatus
+  employeeId?: string | null
+  branchId: string
+  viewedAt?: string | null
+  resolvedAt?: string | null
+  closedAt?: string | null
+  employee?: Employee | null
+  branch?: Branch
+  reportedByUser?: Pick<User, "id" | "fullName" | "role"> | null
+  messages: IncidentMessage[]
+  evidence: FileAsset[]
+  createdAt: string
+  updatedAt: string
+}
+
 export type DashboardSummary = {
   cards: {
     advancesToday: number

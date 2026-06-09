@@ -74,6 +74,14 @@ enum FileAssetModule {
   CHECKLISTS
 }
 
+enum IncidentStatus {
+  REPORTADA
+  VISTA
+  EN_PROCESO
+  RESUELTA
+  CERRADA
+}
+
 model Branch {
   id        String     @id @default(cuid())
   name      String
@@ -83,6 +91,7 @@ model Branch {
   employees Employee[]
   movements Movement[]
   fileAssets FileAsset[]
+  incidents Incident[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
@@ -104,6 +113,8 @@ model User {
   generatedPayrolls Payroll[]
   auditLogs     AuditLog[]
   uploadedFiles FileAsset[] @relation("UploadedFiles")
+  reportedIncidents Incident[] @relation("IncidentReporter")
+  incidentMessages IncidentMessage[] @relation("IncidentMessageAuthor")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 }
@@ -124,8 +135,47 @@ model Employee {
   movements    Movement[]
   payrollItems PayrollItem[]
   auditLogs    AuditLog[]  @relation("AffectedEmployee")
+  incidents    Incident[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+}
+
+model Incident {
+  id               String            @id @default(cuid())
+  folio            String            @unique
+  title            String
+  description      String
+  status           IncidentStatus    @default(REPORTADA)
+  employeeId       String?
+  branchId         String
+  reportedByUserId String?
+  viewedAt         DateTime?
+  resolvedAt       DateTime?
+  closedAt         DateTime?
+  employee         Employee?         @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  branch           Branch            @relation(fields: [branchId], references: [id])
+  reportedByUser   User?             @relation("IncidentReporter", fields: [reportedByUserId], references: [id], onDelete: SetNull)
+  messages         IncidentMessage[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([employeeId, createdAt])
+  @@index([branchId, createdAt])
+  @@index([reportedByUserId, createdAt])
+}
+
+model IncidentMessage {
+  id         String   @id @default(cuid())
+  incidentId String
+  authorId   String?
+  message    String
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  author     User?    @relation("IncidentMessageAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([incidentId, createdAt])
+  @@index([authorId, createdAt])
 }
 
 model Movement {

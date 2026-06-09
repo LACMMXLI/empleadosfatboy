@@ -1,4 +1,4 @@
-import type { AppConfig, AuditLog, Branch, DashboardSummary, Employee, FileAsset, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, User } from "@/types/domain"
+import type { AppConfig, AuditLog, Branch, DashboardSummary, Employee, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -154,6 +154,24 @@ export const api = {
   },
   deleteFile(id: string) {
     return request<{ id: string; deleted: true }>(`/files/${id}`, { method: "DELETE" })
+  },
+  incidents(params?: Partial<{ status: IncidentStatus; employeeId: string; branchId: string; from: string; to: string; q: string }>) {
+    const query = new URLSearchParams(
+      Object.fromEntries(Object.entries(params ?? {}).filter(([, value]) => Boolean(value))) as Record<string, string>
+    ).toString()
+    return request<Incident[]>(`/admin/incidents${query ? `?${query}` : ""}`)
+  },
+  createIncident(payload: { title: string; description: string; employeeId?: string; branchId?: string }) {
+    return request<Incident>("/admin/incidents", { method: "POST", body: JSON.stringify(payload) })
+  },
+  incident(id: string) {
+    return request<Incident>(`/admin/incidents/${id}`)
+  },
+  updateIncidentStatus(id: string, payload: { status: IncidentStatus; message?: string }) {
+    return request<Incident>(`/admin/incidents/${id}/status`, { method: "PATCH", body: JSON.stringify(payload) })
+  },
+  addIncidentMessage(id: string, message: string) {
+    return request<Incident>(`/admin/incidents/${id}/messages`, { method: "POST", body: JSON.stringify({ message }) })
   },
   deactivateEmployee(id: string) {
     return request<Employee>(`/employees/${id}`, { method: "DELETE" })

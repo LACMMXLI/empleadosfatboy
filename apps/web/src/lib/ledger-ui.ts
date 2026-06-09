@@ -52,7 +52,7 @@ export const payrollStatusLabels: Record<string, string> = {
   CANCELADA: "Cancelada"
 }
 
-export type View = "dashboard" | "empleados" | "pendientes" | "adminMovements" | "historial" | "nomina" | "configuracion" | "entregas"
+export type View = "dashboard" | "empleados" | "pendientes" | "adminMovements" | "historial" | "incidencias" | "nomina" | "configuracion" | "entregas"
 export type PortalRoute = "home" | "admin" | "employee"
 
 export const viewTitles: Record<View, string> = {
@@ -61,6 +61,7 @@ export const viewTitles: Record<View, string> = {
   pendientes: "Aprobaciones",
   adminMovements: "Movimientos",
   historial: "Historial",
+  incidencias: "Incidencias",
   nomina: "Nómina",
   configuracion: "Configuración",
   entregas: "Entregas"

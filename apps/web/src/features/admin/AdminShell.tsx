@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { type ChangeEvent, useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -7,11 +7,16 @@ import {
   Building2,
   CheckCircle2,
   ClipboardList,
+  Eye,
+  FileImage,
+  ImagePlus,
   KeyRound,
   LayoutDashboard,
   LogOut,
+  MessageSquareText,
   Settings,
   ShieldCheck,
+  Send,
   WalletCards,
   UserRoundPlus,
   UsersRound,
@@ -21,7 +26,7 @@ import {
   Pencil
 } from "lucide-react"
 import { api, session } from "@/lib/api"
-import type { Employee, Movement, MovementKind, MovementStatus, Payroll, PayrollItem, Role, User } from "@/types/domain"
+import type { Employee, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementStatus, Payroll, PayrollItem, Role, User } from "@/types/domain"
 import { useScrollDirection } from "@/hooks/useScrollDirection"
 import { StatusEmpty, StatusText } from "@/components/common/Status"
 import { AdminModal, DetailLine, GuidedBlock } from "@/components/common/AdminPrimitives"
@@ -91,6 +96,7 @@ export function Shell({
       { id: "empleados" as const, label: "Empleados", icon: UsersRound },
       { id: "nomina" as const, label: "Nómina", icon: WalletCards },
       { id: "adminMovements" as const, label: "Movimientos", icon: Building2 },
+      { id: "incidencias" as const, label: "Incidencias", icon: MessageSquareText },
       { id: "dashboard" as const, label: "Resumen", icon: LayoutDashboard },
       { id: "configuracion" as const, label: "Config", icon: Settings }
     ]
@@ -167,6 +173,7 @@ export function Shell({
             {activeView === "empleados" && <Employees user={me.data} />}
             {activeView === "pendientes" && <PendingAuthorizations currentRole={me.data?.role} />}
             {activeView === "adminMovements" && <AdministrativeMovements user={me.data} />}
+            {activeView === "incidencias" && <IncidentsAdmin user={me.data} />}
             {activeView === "historial" && <History />}
             {activeView === "nomina" && <PayrollAdmin />}
             {activeView === "configuracion" && <Configuration />}
@@ -200,6 +207,7 @@ function MobileBottomNav({
   const navLabels: Record<View, string> = {
     pendientes: "Aprobar",
     historial: "Historial",
+    incidencias: "Incid.",
     empleados: "Empleados",
     nomina: "Nómina",
     adminMovements: "Movim.",
@@ -926,6 +934,386 @@ function formatDateTime(value?: string | Date | null) {
 
 function formatPayrollPeriod(payroll: Pick<Payroll, "periodStart" | "periodEnd">) {
   return `${formatDateLabel(String(payroll.periodStart).slice(0, 10))} a ${formatDateLabel(String(payroll.periodEnd).slice(0, 10))}`
+}
+
+const incidentStatuses: IncidentStatus[] = ["REPORTADA", "VISTA", "EN_PROCESO", "RESUELTA", "CERRADA"]
+
+const incidentStatusLabels: Record<IncidentStatus, string> = {
+  REPORTADA: "Reportada",
+  VISTA: "Vista",
+  EN_PROCESO: "En proceso",
+  RESUELTA: "Resuelta",
+  CERRADA: "Cerrada"
+}
+
+function getIncidentBadgeClass(status: IncidentStatus) {
+  switch (status) {
+    case "REPORTADA": return "badge-status badge-pending"
+    case "VISTA": return "badge-status badge-partial"
+    case "EN_PROCESO": return "badge-status badge-discounted"
+    case "RESUELTA": return "badge-status badge-authorized"
+    case "CERRADA": return "badge-status badge-canceled"
+    default: return "badge-status badge-canceled"
+  }
+}
+
+function IncidentsAdmin({ user }: { user?: User }) {
+  const queryClient = useQueryClient()
+  const [selectedIncidentId, setSelectedIncidentId] = useState("")
+  const [createOpen, setCreateOpen] = useState(false)
+  const [status, setStatus] = useState("")
+  const [employeeId, setEmployeeId] = useState("")
+  const [from, setFrom] = useState("")
+  const [to, setTo] = useState("")
+  const [q, setQ] = useState("")
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [targetEmployeeId, setTargetEmployeeId] = useState("")
+  const [branchId, setBranchId] = useState(user?.branch?.id ?? "")
+  const [createFiles, setCreateFiles] = useState<File[]>([])
+  const [detailFiles, setDetailFiles] = useState<File[]>([])
+  const [comment, setComment] = useState("")
+  const [statusMessage, setStatusMessage] = useState("")
+
+  useEffect(() => {
+    if (user?.branch?.id && !branchId) setBranchId(user.branch.id)
+  }, [branchId, user?.branch?.id])
+
+  const params = useMemo(
+    () => ({
+      ...(status ? { status: status as IncidentStatus } : {}),
+      ...(employeeId ? { employeeId } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(q ? { q } : {})
+    }),
+    [employeeId, from, q, status, to]
+  )
+
+  const incidents = useQuery({ queryKey: ["incidents", params], queryFn: () => api.incidents(params) })
+  const incidentDetail = useQuery({
+    queryKey: ["incident", selectedIncidentId],
+    queryFn: () => api.incident(selectedIncidentId),
+    enabled: Boolean(selectedIncidentId)
+  })
+  const employees = useQuery({ queryKey: ["employees", "incidents"], queryFn: () => api.employees() })
+  const branches = useQuery({ queryKey: ["branches"], queryFn: () => api.branches() })
+
+  const selectedIncident = incidentDetail.data ?? incidents.data?.find((incident) => incident.id === selectedIncidentId)
+
+  const resetCreateForm = () => {
+    setTitle("")
+    setDescription("")
+    setTargetEmployeeId("")
+    setBranchId(user?.branch?.id ?? "")
+    setCreateFiles([])
+  }
+
+  const createIncident = useMutation({
+    mutationFn: async () => {
+      const incident = await api.createIncident({
+        title,
+        description,
+        employeeId: targetEmployeeId || undefined,
+        branchId: targetEmployeeId ? undefined : branchId || user?.branch?.id
+      })
+      for (const file of createFiles) {
+        await api.uploadFile({ file, module: "incidencias", entityId: incident.id, branchId: incident.branchId })
+      }
+      return api.incident(incident.id)
+    },
+    onSuccess: async (incident) => {
+      resetCreateForm()
+      setCreateOpen(false)
+      setSelectedIncidentId(incident.id)
+      await queryClient.invalidateQueries({ queryKey: ["incidents"] })
+      await queryClient.invalidateQueries({ queryKey: ["incident", incident.id] })
+    }
+  })
+
+  const addEvidence = useMutation({
+    mutationFn: async () => {
+      if (!selectedIncident) throw new Error("Selecciona una incidencia")
+      for (const file of detailFiles) {
+        await api.uploadFile({ file, module: "incidencias", entityId: selectedIncident.id, branchId: selectedIncident.branchId })
+      }
+      return api.incident(selectedIncident.id)
+    },
+    onSuccess: async (incident) => {
+      setDetailFiles([])
+      await queryClient.invalidateQueries({ queryKey: ["incidents"] })
+      await queryClient.invalidateQueries({ queryKey: ["incident", incident.id] })
+    }
+  })
+
+  const addMessage = useMutation({
+    mutationFn: () => {
+      if (!selectedIncident) throw new Error("Selecciona una incidencia")
+      return api.addIncidentMessage(selectedIncident.id, comment)
+    },
+    onSuccess: async (incident) => {
+      setComment("")
+      await queryClient.invalidateQueries({ queryKey: ["incidents"] })
+      await queryClient.invalidateQueries({ queryKey: ["incident", incident.id] })
+    }
+  })
+
+  const updateStatus = useMutation({
+    mutationFn: (nextStatus: IncidentStatus) => {
+      if (!selectedIncident) throw new Error("Selecciona una incidencia")
+      return api.updateIncidentStatus(selectedIncident.id, {
+        status: nextStatus,
+        message: statusMessage || undefined
+      })
+    },
+    onSuccess: async (incident) => {
+      setStatusMessage("")
+      await queryClient.invalidateQueries({ queryKey: ["incidents"] })
+      await queryClient.invalidateQueries({ queryKey: ["incident", incident.id] })
+    }
+  })
+
+  const onCreateFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setCreateFiles(Array.from(event.target.files ?? []))
+  }
+
+  const onDetailFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setDetailFiles(Array.from(event.target.files ?? []))
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="section-header">
+        <div className="section-title">
+          <MessageSquareText style={{ width: 16, height: 16, color: "#00e5ff" }} />
+          Incidencias
+        </div>
+        <div className="section-actions">
+          {incidents.data && <span className="section-count">{incidents.data.length}</span>}
+          <button className="btn-primary compact-action" type="button" onClick={() => setCreateOpen(true)}>
+            <ImagePlus style={{ width: 14, height: 14 }} />
+            Reportar
+          </button>
+        </div>
+      </div>
+
+      <div className="filter-bar">
+        <input type="text" placeholder="Buscar folio, empleado o descripción" value={q} onChange={(event) => setQ(event.target.value)} />
+        <select value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="">Todos los estados</option>
+          {incidentStatuses.map((item) => (
+            <option key={item} value={item}>{incidentStatusLabels[item]}</option>
+          ))}
+        </select>
+        <select value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
+          <option value="">Todos los empleados</option>
+          {employees.data?.map((employee) => (
+            <option key={employee.id} value={employee.id}>{employee.fullName}</option>
+          ))}
+        </select>
+        <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} title="Desde" />
+        <input type="date" value={to} onChange={(event) => setTo(event.target.value)} title="Hasta" />
+      </div>
+
+      <div className="incident-workspace">
+        <div className="admin-card incident-list-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">Historial y seguimiento</div>
+          </div>
+          <div className="admin-card-body">
+            {incidents.isLoading && <StatusEmpty text="Cargando incidencias..." />}
+            {!incidents.isLoading && !incidents.data?.length && <StatusEmpty text="Sin incidencias con estos filtros" />}
+            <div className="incident-list">
+              {incidents.data?.map((incident) => (
+                <button
+                  key={incident.id}
+                  className={`incident-list-item ${selectedIncidentId === incident.id ? "selected" : ""}`}
+                  type="button"
+                  onClick={() => setSelectedIncidentId(incident.id)}
+                >
+                  <div className="incident-list-top">
+                    <span className="incident-folio">{incident.folio}</span>
+                    <span className={getIncidentBadgeClass(incident.status)}>{incidentStatusLabels[incident.status]}</span>
+                  </div>
+                  <div className="incident-list-title">{incident.title}</div>
+                  <div className="incident-list-meta">
+                    {incident.employee?.fullName ?? "General"} · {incident.branch?.name ?? "Sucursal"} · {formatDateTime(incident.createdAt)}
+                  </div>
+                  <div className="incident-list-stats">
+                    <span>{incident.messages.length} comentarios</span>
+                    <span>{incident.evidence.length} evidencias</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="admin-card incident-detail-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">Detalle</div>
+            {selectedIncident && <span className={getIncidentBadgeClass(selectedIncident.status)}>{incidentStatusLabels[selectedIncident.status]}</span>}
+          </div>
+          <div className="admin-card-body">
+            {!selectedIncident && <StatusEmpty text="Selecciona una incidencia para ver el seguimiento" />}
+            {selectedIncident && (
+              <div className="incident-detail">
+                <div className="incident-detail-head">
+                  <div>
+                    <div className="incident-folio">{selectedIncident.folio}</div>
+                    <h2>{selectedIncident.title}</h2>
+                    <p>{selectedIncident.description}</p>
+                  </div>
+                  <div className="incident-detail-meta">
+                    <DetailLine label="Empleado" value={selectedIncident.employee?.fullName ?? "General"} />
+                    <DetailLine label="Sucursal" value={selectedIncident.branch?.name ?? "Sin sucursal"} />
+                    <DetailLine label="Reportó" value={selectedIncident.reportedByUser?.fullName ?? "Sistema"} />
+                    <DetailLine label="Fecha" value={formatDateTime(selectedIncident.createdAt)} />
+                  </div>
+                </div>
+
+                <div className="incident-actions">
+                  {incidentStatuses.map((item) => (
+                    <button
+                      key={item}
+                      className={selectedIncident.status === item ? "btn-primary" : "btn-secondary"}
+                      type="button"
+                      disabled={updateStatus.isPending || selectedIncident.status === item}
+                      onClick={() => updateStatus.mutate(item)}
+                    >
+                      {item === "VISTA" && <Eye style={{ width: 14, height: 14 }} />}
+                      {incidentStatusLabels[item]}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  className="form-input"
+                  placeholder="Nota opcional para el cambio de estado"
+                  value={statusMessage}
+                  onChange={(event) => setStatusMessage(event.target.value)}
+                />
+
+                <section className="incident-evidence-section">
+                  <div className="incident-subtitle">
+                    <FileImage style={{ width: 14, height: 14 }} />
+                    Evidencias
+                  </div>
+                  <div className="incident-evidence-grid">
+                    {selectedIncident.evidence.map((file) => (
+                      <EvidenceThumb key={file.id} file={file} />
+                    ))}
+                    {!selectedIncident.evidence.length && <div className="incident-empty-inline">Sin evidencias cargadas</div>}
+                  </div>
+                  <div className="incident-upload-row">
+                    <input className="form-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={onDetailFileChange} />
+                    <button className="btn-secondary" type="button" disabled={!detailFiles.length || addEvidence.isPending} onClick={() => addEvidence.mutate()}>
+                      <ImagePlus style={{ width: 14, height: 14 }} />
+                      Subir
+                    </button>
+                  </div>
+                </section>
+
+                <section className="incident-chat">
+                  <div className="incident-subtitle">
+                    <MessageSquareText style={{ width: 14, height: 14 }} />
+                    Seguimiento
+                  </div>
+                  <div className="incident-message-list">
+                    {selectedIncident.messages.map((message) => (
+                      <div key={message.id} className="incident-message">
+                        <div className="incident-message-meta">
+                          <span>{message.author?.fullName ?? "Sistema"}</span>
+                          <span>{formatDateTime(message.createdAt)}</span>
+                        </div>
+                        <div>{message.message}</div>
+                      </div>
+                    ))}
+                    {!selectedIncident.messages.length && <div className="incident-empty-inline">Sin comentarios todavía</div>}
+                  </div>
+                  <div className="incident-comment-row">
+                    <textarea className="form-textarea" placeholder="Escribe respuesta o seguimiento" value={comment} onChange={(event) => setComment(event.target.value)} />
+                    <button className="btn-primary" type="button" disabled={!comment.trim() || addMessage.isPending} onClick={() => addMessage.mutate()}>
+                      <Send style={{ width: 14, height: 14 }} />
+                      Enviar
+                    </button>
+                  </div>
+                </section>
+
+                {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error) && (
+                  <div className="status-empty" style={{ color: "#f87171", padding: "0.5rem" }}>
+                    {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error)?.message}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {createOpen && (
+        <AdminModal title="Reporte de incidencia" subtitle="Empleado, observación y evidencias" onClose={() => setCreateOpen(false)}>
+          <form
+            className="admin-modal-form"
+            onSubmit={(event) => {
+              event.preventDefault()
+              createIncident.mutate()
+            }}
+          >
+            <input className="form-input" placeholder="Título breve" value={title} onChange={(event) => setTitle(event.target.value)} />
+            <textarea className="form-textarea" placeholder="Observación o descripción de la incidencia" value={description} onChange={(event) => setDescription(event.target.value)} />
+            <div className="admin-form-row">
+              <select className="form-select" value={targetEmployeeId} onChange={(event) => setTargetEmployeeId(event.target.value)}>
+                <option value="">Incidencia general</option>
+                {employees.data?.map((employee) => (
+                  <option key={employee.id} value={employee.id}>{employee.fullName}</option>
+                ))}
+              </select>
+              <select
+                className="form-select"
+                value={branchId}
+                disabled={Boolean(targetEmployeeId) || user?.role === "ENCARGADO"}
+                onChange={(event) => setBranchId(event.target.value)}
+              >
+                <option value="">Sucursal</option>
+                {branches.data?.map((branch) => (
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
+                ))}
+              </select>
+            </div>
+            <input className="form-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={onCreateFileChange} />
+            {createFiles.length > 0 && <div className="incident-empty-inline">{createFiles.length} archivo(s) seleccionados</div>}
+            <button className="btn-primary modal-submit" type="submit" disabled={createIncident.isPending || !title.trim() || !description.trim()}>
+              Guardar incidencia
+            </button>
+            {createIncident.error && <div className="status-empty" style={{ color: "#f87171", padding: "0.5rem" }}>{createIncident.error.message}</div>}
+          </form>
+        </AdminModal>
+      )}
+    </div>
+  )
+}
+
+function EvidenceThumb({ file }: { file: FileAsset }) {
+  const [url, setUrl] = useState("")
+  const blob = useQuery({
+    queryKey: ["file-blob", file.id],
+    queryFn: () => api.fileBlob(file.id),
+    staleTime: Infinity
+  })
+
+  useEffect(() => {
+    if (!blob.data) return
+    const objectUrl = URL.createObjectURL(blob.data)
+    setUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [blob.data])
+
+  return (
+    <div className="incident-evidence-thumb">
+      {url ? <img src={url} alt={file.originalName} /> : <FileImage style={{ width: 28, height: 28 }} />}
+      <div title={file.originalName}>{file.originalName}</div>
+    </div>
+  )
 }
 
 function History() {
