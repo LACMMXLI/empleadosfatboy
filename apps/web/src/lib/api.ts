@@ -1,4 +1,4 @@
-import type { AppConfig, AuditLog, Branch, DashboardSummary, Employee, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, User } from "@/types/domain"
+import type { AppConfig, AuditLog, Branch, DashboardSummary, Employee, FileAsset, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -55,6 +55,38 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>
 }
 
+async function formRequest<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      ...(session.token ? { Authorization: `Bearer ${session.token}` } : {})
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null
+    throw new Error(body?.message ?? "No se pudo completar la operacion")
+  }
+
+  return response.json() as Promise<T>
+}
+
+async function blobRequest(path: string): Promise<Blob> {
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: {
+      ...(session.token ? { Authorization: `Bearer ${session.token}` } : {})
+    }
+  })
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null
+    throw new Error(body?.message ?? "No se pudo completar la operacion")
+  }
+
+  return response.blob()
+}
+
 async function employeeRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -98,6 +130,30 @@ export const api = {
   },
   updateEmployee(id: string, payload: Record<string, unknown>) {
     return request<Employee>(`/employees/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
+  },
+  uploadFile(payload: {
+    file: File
+    module: "incidencias" | "empleados" | "checklists"
+    entityId?: string
+    branchId?: string
+    type?: string
+  }) {
+    const formData = new FormData()
+    formData.append("file", payload.file)
+    formData.append("module", payload.module)
+    if (payload.entityId) formData.append("entityId", payload.entityId)
+    if (payload.branchId) formData.append("branchId", payload.branchId)
+    if (payload.type) formData.append("type", payload.type)
+    return formRequest<FileAsset>("/files/upload", formData)
+  },
+  fileUrl(id: string) {
+    return `${API_URL}/files/${id}`
+  },
+  fileBlob(id: string) {
+    return blobRequest(`/files/${id}`)
+  },
+  deleteFile(id: string) {
+    return request<{ id: string; deleted: true }>(`/files/${id}`, { method: "DELETE" })
   },
   deactivateEmployee(id: string) {
     return request<Employee>(`/employees/${id}`, { method: "DELETE" })

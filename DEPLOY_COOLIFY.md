@@ -28,9 +28,31 @@ JWT_SECRET=usa-un-secreto-largo-y-unico
 VITE_API_URL=/api
 WEB_PORT=80
 WEB_ORIGIN=
+S3_ENDPOINT=http://minio:9000
+S3_ACCESS_KEY=ACCESS_KEY_DE_MINIO
+S3_SECRET_KEY=SECRET_KEY_DE_MINIO
+S3_BUCKET=fatboy-file
+S3_REGION=us-east-1
+S3_FORCE_PATH_STYLE=true
 ```
 
 Si Coolify te asigna dominio HTTPS al servicio `web`, deja `VITE_API_URL=/api`. Esa es la configuracion recomendada.
+
+## MinIO
+
+El frontend no se conecta directo a MinIO. El flujo correcto es:
+
+```text
+Frontend -> /api -> backend NestJS -> MinIO
+```
+
+`S3_ENDPOINT` debe apuntar al hostname interno del servicio MinIO dentro de Docker/Coolify, no a `127.0.0.1`. Si el servicio MinIO esta en la misma red y se llama `minio`, usa:
+
+```env
+S3_ENDPOINT=http://minio:9000
+```
+
+Si Coolify creo el recurso con otro nombre, usa ese nombre interno del servicio en lugar de `minio`. El puerto de API S3 es `9000`; el puerto `9001` es solo para el panel web de MinIO.
 
 ## Pasos en Coolify
 

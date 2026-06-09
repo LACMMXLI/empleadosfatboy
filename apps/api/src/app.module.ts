@@ -11,6 +11,7 @@ import { AuditModule } from "./audit/audit.module"
 import { EmployeePortalModule } from "./employee-portal/employee-portal.module"
 import { PayrollModule } from "./payroll/payroll.module"
 import { AdminUsersModule } from "./admin-users/admin-users.module"
+import { FilesModule } from "./files/files.module"
 import { JwtAuthGuard } from "./auth/jwt-auth.guard"
 import { RolesGuard } from "./auth/roles.guard"
 import { HealthController } from "./health.controller"
@@ -27,7 +28,8 @@ import { HealthController } from "./health.controller"
     DashboardModule,
     ConfigurationModule,
     PayrollModule,
-    AdminUsersModule
+    AdminUsersModule,
+    FilesModule
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

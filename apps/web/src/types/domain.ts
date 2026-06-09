@@ -96,6 +96,23 @@ export type AuditLog = {
   user?: Pick<User, "id" | "fullName" | "role">
 }
 
+export type FileAssetModule = "INCIDENCIAS" | "EMPLEADOS" | "CHECKLISTS"
+
+export type FileAsset = {
+  id: string
+  bucket: string
+  key: string
+  originalName: string
+  mimeType: string
+  size: number
+  module: FileAssetModule
+  entityId?: string | null
+  branchId?: string | null
+  url: string
+  apiUrl: string
+  createdAt: string
+}
+
 export type DashboardSummary = {
   cards: {
     advancesToday: number

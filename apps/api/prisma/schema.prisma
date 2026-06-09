@@ -68,6 +68,12 @@ enum AuditAction {
   LOGIN
 }
 
+enum FileAssetModule {
+  INCIDENCIAS
+  EMPLEADOS
+  CHECKLISTS
+}
+
 model Branch {
   id        String     @id @default(cuid())
   name      String
@@ -76,6 +82,7 @@ model Branch {
   users     User[]
   employees Employee[]
   movements Movement[]
+  fileAssets FileAsset[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
@@ -96,6 +103,7 @@ model User {
   delivered     Movement[] @relation("DeliveredBy")
   generatedPayrolls Payroll[]
   auditLogs     AuditLog[]
+  uploadedFiles FileAsset[] @relation("UploadedFiles")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 }
@@ -271,4 +279,26 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+model FileAsset {
+  id               String          @id @default(cuid())
+  bucket           String
+  key              String          @unique
+  originalName     String
+  mimeType         String
+  size             Int
+  module           FileAssetModule
+  entityId         String?
+  branchId         String?
+  uploadedByUserId String?
+  createdAt        DateTime        @default(now())
+  deletedAt        DateTime?
+  branch           Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  uploadedByUser   User?           @relation("UploadedFiles", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([module, entityId])
+  @@index([branchId, createdAt])
+  @@index([uploadedByUserId, createdAt])
+  @@index([deletedAt])
 }
