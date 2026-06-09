@@ -999,6 +999,12 @@ function IncidentsAdmin({ user }: { user?: User }) {
   const employees = useQuery({ queryKey: ["employees", "incidents"], queryFn: () => api.employees() })
   const branches = useQuery({ queryKey: ["branches"], queryFn: () => api.branches() })
 
+  useEffect(() => {
+    if (!branchId && !targetEmployeeId && branches.data?.[0]?.id) {
+      setBranchId(branches.data[0].id)
+    }
+  }, [branchId, branches.data, targetEmployeeId])
+
   const selectedIncident = incidentDetail.data ?? incidents.data?.find((incident) => incident.id === selectedIncidentId)
 
   const resetCreateForm = () => {
@@ -1282,7 +1288,12 @@ function IncidentsAdmin({ user }: { user?: User }) {
             </div>
             <input className="form-input" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={onCreateFileChange} />
             {createFiles.length > 0 && <div className="incident-empty-inline">{createFiles.length} archivo(s) seleccionados</div>}
-            <button className="btn-primary modal-submit" type="submit" disabled={createIncident.isPending || !title.trim() || !description.trim()}>
+            {!targetEmployeeId && !branchId && <div className="incident-empty-inline">Selecciona una sucursal para incidencia general.</div>}
+            <button
+              className="btn-primary modal-submit"
+              type="submit"
+              disabled={createIncident.isPending || !title.trim() || !description.trim() || (!targetEmployeeId && !branchId)}
+            >
               Guardar incidencia
             </button>
             {createIncident.error && <div className="status-empty" style={{ color: "#f87171", padding: "0.5rem" }}>{createIncident.error.message}</div>}

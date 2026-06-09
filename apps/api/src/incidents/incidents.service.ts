@@ -194,7 +194,15 @@ export class IncidentsService {
     }
 
     const branchId = input.branchId?.trim() || user.branchId
-    if (!branchId) throw new BadRequestException("Selecciona sucursal o empleado")
+    if (!branchId) {
+      const fallbackBranch = await this.prisma.branch.findFirst({
+        where: { active: true },
+        orderBy: { name: "asc" },
+        select: { id: true }
+      })
+      if (!fallbackBranch) throw new BadRequestException("Selecciona sucursal o empleado")
+      return { employeeId: undefined, branchId: fallbackBranch.id }
+    }
 
     if (user.role === Role.ENCARGADO && user.branchId !== branchId) {
       throw new ForbiddenException("No puedes crear incidencias para otra sucursal")

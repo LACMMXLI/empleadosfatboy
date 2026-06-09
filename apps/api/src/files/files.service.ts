@@ -256,15 +256,19 @@ export class FilesService {
 
   private async putObject(key: string, file: Express.Multer.File) {
     const s3Config = this.getS3Config()
-    await this.getS3().send(
-      new PutObjectCommand({
-        Bucket: s3Config.bucket,
-        Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-        ContentLength: file.size
-      })
-    )
+    try {
+      await this.getS3().send(
+        new PutObjectCommand({
+          Bucket: s3Config.bucket,
+          Key: key,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+          ContentLength: file.size
+        })
+      )
+    } catch (error) {
+      throw new ServiceUnavailableException(`No se pudo subir el archivo a MinIO: ${this.storageErrorMessage(error)}`)
+    }
   }
 
   private async getObject(key: string) {
@@ -369,6 +373,28 @@ export class FilesService {
   private isObjectMissing(error: unknown) {
     const name = typeof error === "object" && error !== null && "name" in error ? String((error as { name?: unknown }).name) : ""
     return ["NoSuchKey", "NotFound"].includes(name)
+  }
+
+  private storageErrorMessage(error: unknown) {
+    if (typeof error !== "object" || error === null) return "error desconocido"
+
+    const source = error as {
+      name?: unknown
+      Code?: unknown
+      code?: unknown
+      message?: unknown
+      $metadata?: { httpStatusCode?: unknown }
+    }
+    const code = source.Code ?? source.code ?? source.name
+    const message = typeof source.message === "string" ? source.message : undefined
+    const status = source.$metadata?.httpStatusCode
+    const parts = [
+      code ? `codigo=${String(code)}` : undefined,
+      status ? `status=${String(status)}` : undefined,
+      message
+    ].filter(Boolean)
+
+    return parts.join(" - ") || "revisa S3_ENDPOINT, credenciales y bucket"
   }
 
   private toResponse(asset: FileAsset) {
