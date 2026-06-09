@@ -171,13 +171,21 @@ export class MovementsController {
   @Roles(Role.CAJERO)
   @Post()
   create(@Body() dto: CreateMovementDto, @Req() request: RequestWithUser) {
-    return this.movements.create(dto, request.user, request.ip)
+    return this.movements.create(dto, request.user, {
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] as string | undefined,
+      device: request.headers["x-device-id"] as string | undefined
+    })
   }
 
   @Roles(Role.GERENTE)
   @Post("administrative")
   createAdministrative(@Body() dto: CreateAdministrativeMovementDto, @Req() request: RequestWithUser) {
-    return this.movements.createAdministrative(dto, request.user, request.ip)
+    return this.movements.createAdministrative(dto, request.user, {
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] as string | undefined,
+      device: request.headers["x-device-id"] as string | undefined
+    })
   }
 
   @Roles(Role.ENCARGADO)

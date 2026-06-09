@@ -1,6 +1,9 @@
 export type Role = "ADMINISTRADOR" | "GERENTE" | "ENCARGADO" | "CAJERO" | "EMPLEADO"
 export type SalaryType = "WEEKLY" | "BIWEEKLY" | "DAILY"
 export type PayrollStatus = "BORRADOR" | "GENERADA" | "PAGADA" | "CANCELADA"
+export type TimeClockEventType = "ENTRY" | "EXIT"
+export type TimeClockEntryStatus = "VALID" | "MANUAL" | "VOIDED"
+export type WorkSessionStatus = "ACTIVE" | "CLOSED" | "ADJUSTED"
 
 export type MovementKind =
   | "SALARY_ADVANCE"
@@ -96,7 +99,7 @@ export type AuditLog = {
   user?: Pick<User, "id" | "fullName" | "role">
 }
 
-export type FileAssetModule = "INCIDENCIAS" | "EMPLEADOS" | "CHECKLISTS"
+export type FileAssetModule = "INCIDENCIAS" | "EMPLEADOS" | "CHECKLISTS" | "TIMECLOCK"
 
 export type FileAsset = {
   id: string
@@ -236,4 +239,83 @@ export type Payroll = {
   generatedByAdmin?: Pick<User, "id" | "fullName" | "role">
   itemCount?: number
   items?: PayrollItem[]
+}
+
+export type TimeClockDevice = {
+  id: string
+  name: string
+  branchId: string
+  tokenLast4: string
+  active: boolean
+  branch: Branch
+  createdAt: string
+  updatedAt?: string
+  setupToken?: string
+}
+
+export type TimeClockEntry = {
+  id: string
+  employeeId: string
+  branchId: string
+  deviceId?: string | null
+  type: TimeClockEventType
+  occurredAt: string
+  localDate: string
+  localTime: string
+  timeZone: string
+  evidenceFileId?: string | null
+  status: TimeClockEntryStatus
+  notes?: string | null
+  requestIp?: string | null
+  requestUserAgent?: string | null
+  employee?: Employee
+  branch?: Branch
+  device?: Pick<TimeClockDevice, "id" | "name" | "tokenLast4" | "active"> | null
+  evidenceFile?: FileAsset | null
+  createdByUser?: Pick<User, "id" | "fullName" | "role"> | null
+  createdAt: string
+}
+
+export type WorkSession = {
+  id: string
+  employeeId: string
+  branchId: string
+  deviceId?: string | null
+  startedAt: string
+  endedAt?: string | null
+  localDate: string
+  status: WorkSessionStatus
+  totalMinutes?: number | null
+  startEntry?: TimeClockEntry
+  endEntry?: TimeClockEntry | null
+}
+
+export type AttendanceRow = {
+  employee: Employee
+  branch: Branch
+  date: string
+  status: "IN_SHIFT" | "EXITED" | "NO_SHOW"
+  activeSession?: WorkSession | null
+  lastEntry?: TimeClockEntry | null
+  entries: TimeClockEntry[]
+  sessions: WorkSession[]
+}
+
+export type AttendanceAdjustment = {
+  id: string
+  employeeId: string
+  branchId: string
+  entryId?: string | null
+  workSessionId?: string | null
+  action: string
+  reason: string
+  oldValue?: unknown
+  newValue?: unknown
+  ipAddress?: string | null
+  employee?: Employee
+  branch?: Branch
+  adjustedBy?: Pick<User, "id" | "fullName" | "role">
+  entry?: TimeClockEntry | null
+  workSession?: WorkSession | null
+  createdAt: string
 }

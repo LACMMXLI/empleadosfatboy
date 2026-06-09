@@ -19,7 +19,7 @@ function createService() {
   }
 
   return {
-    service: new MovementsService(prisma as never, {} as never),
+    service: new MovementsService(prisma as never, {} as never, {} as never),
     captured
   }
 }

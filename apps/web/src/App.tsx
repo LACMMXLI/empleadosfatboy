@@ -6,6 +6,7 @@ import { clearPwa, PWA_UPDATE_EVENT, syncAdminPwa, syncEmployeePwa, type PwaUpda
 import { AdminLogin, EmployeeLogin, PortalSelector } from "@/features/auth/PortalAuth"
 import { Shell } from "@/features/admin/AdminShell"
 import { EmployeePortal } from "@/features/employee/EmployeePortal"
+import { TimeClockKiosk } from "@/features/time-clock/TimeClockKiosk"
 import type { PortalRoute, View } from "@/lib/ledger-ui"
 
 function usePwaUpdateNotification() {
@@ -107,6 +108,8 @@ function App() {
     content = <Shell activeView={activeView} onViewChange={setActiveView} onLogout={() => setTokenState(null)} />
   } else if (route === "admin") {
     content = <AdminLogin onLoggedIn={(token) => setTokenState(token)} />
+  } else if (route === "timeClock") {
+    content = <TimeClockKiosk />
   } else {
     content = <PortalSelector onNavigate={setRoute} />
   }
@@ -121,6 +124,7 @@ function App() {
 
 function resolvePortalRoute(): PortalRoute {
   const path = window.location.pathname.toLowerCase()
+  if (path.startsWith("/checador")) return "timeClock"
   if (path.startsWith("/employee")) return "employee"
   if (path.startsWith("/admin")) return "admin"
   return "home"

@@ -66,12 +66,14 @@ enum AuditAction {
   STATUS_CHANGE
   LIMIT_CHANGE
   LOGIN
+  BLOCKED
 }
 
 enum FileAssetModule {
   INCIDENCIAS
   EMPLEADOS
   CHECKLISTS
+  TIMECLOCK
 }
 
 enum IncidentStatus {
@@ -80,6 +82,23 @@ enum IncidentStatus {
   EN_PROCESO
   RESUELTA
   CERRADA
+}
+
+enum TimeClockEventType {
+  ENTRY
+  EXIT
+}
+
+enum TimeClockEntryStatus {
+  VALID
+  MANUAL
+  VOIDED
+}
+
+enum WorkSessionStatus {
+  ACTIVE
+  CLOSED
+  ADJUSTED
 }
 
 model Branch {
@@ -92,6 +111,10 @@ model Branch {
   movements Movement[]
   fileAssets FileAsset[]
   incidents Incident[]
+  timeClockDevices TimeClockDevice[]
+  timeClockEntries TimeClockEntry[]
+  workSessions WorkSession[]
+  attendanceAdjustments AttendanceAdjustment[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
@@ -115,6 +138,9 @@ model User {
   uploadedFiles FileAsset[] @relation("UploadedFiles")
   reportedIncidents Incident[] @relation("IncidentReporter")
   incidentMessages IncidentMessage[] @relation("IncidentMessageAuthor")
+  createdTimeClockDevices TimeClockDevice[] @relation("TimeClockDeviceCreator")
+  createdTimeClockEntries TimeClockEntry[] @relation("TimeClockEntryCreator")
+  attendanceAdjustments AttendanceAdjustment[] @relation("AttendanceAdjustmentUser")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 }
@@ -136,6 +162,9 @@ model Employee {
   payrollItems PayrollItem[]
   auditLogs    AuditLog[]  @relation("AffectedEmployee")
   incidents    Incident[]
+  timeClockEntries TimeClockEntry[]
+  workSessions WorkSession[]
+  attendanceAdjustments AttendanceAdjustment[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -346,9 +375,113 @@ model FileAsset {
   deletedAt        DateTime?
   branch           Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
   uploadedByUser   User?           @relation("UploadedFiles", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  timeClockEntries TimeClockEntry[] @relation("TimeClockEvidence")
 
   @@index([module, entityId])
   @@index([branchId, createdAt])
   @@index([uploadedByUserId, createdAt])
   @@index([deletedAt])
+}
+
+model TimeClockDevice {
+  id          String           @id @default(cuid())
+  name        String
+  branchId    String
+  tokenHash   String           @unique
+  tokenLast4  String
+  active      Boolean          @default(true)
+  createdById String?
+  branch      Branch           @relation(fields: [branchId], references: [id])
+  createdBy   User?            @relation("TimeClockDeviceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  entries     TimeClockEntry[]
+  sessions    WorkSession[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([branchId, active])
+  @@index([createdById])
+}
+
+model TimeClockEntry {
+  id               String               @id @default(cuid())
+  employeeId       String
+  branchId         String
+  deviceId         String?
+  type             TimeClockEventType
+  occurredAt       DateTime
+  localDate        String
+  localTime        String
+  timeZone         String               @default("America/Tijuana")
+  evidenceFileId   String?
+  status           TimeClockEntryStatus @default(VALID)
+  notes            String?
+  requestIp        String?
+  requestUserAgent String?
+  createdByUserId  String?
+  employee         Employee             @relation(fields: [employeeId], references: [id])
+  branch           Branch               @relation(fields: [branchId], references: [id])
+  device           TimeClockDevice?     @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  evidenceFile     FileAsset?           @relation("TimeClockEvidence", fields: [evidenceFileId], references: [id], onDelete: SetNull)
+  createdByUser    User?                @relation("TimeClockEntryCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  startedSession   WorkSession?         @relation("WorkSessionStartEntry")
+  endedSession     WorkSession?         @relation("WorkSessionEndEntry")
+  adjustments      AttendanceAdjustment[]
+  createdAt        DateTime             @default(now())
+
+  @@index([employeeId, localDate])
+  @@index([branchId, localDate])
+  @@index([deviceId, createdAt])
+  @@index([status, createdAt])
+}
+
+model WorkSession {
+  id             String            @id @default(cuid())
+  employeeId     String
+  branchId       String
+  deviceId       String?
+  startEntryId   String            @unique
+  endEntryId     String?           @unique
+  startedAt      DateTime
+  endedAt        DateTime?
+  localDate      String
+  timeZone       String            @default("America/Tijuana")
+  status         WorkSessionStatus @default(ACTIVE)
+  totalMinutes   Int?
+  notes          String?
+  employee       Employee          @relation(fields: [employeeId], references: [id])
+  branch         Branch            @relation(fields: [branchId], references: [id])
+  device         TimeClockDevice?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  startEntry     TimeClockEntry    @relation("WorkSessionStartEntry", fields: [startEntryId], references: [id])
+  endEntry       TimeClockEntry?   @relation("WorkSessionEndEntry", fields: [endEntryId], references: [id])
+  adjustments    AttendanceAdjustment[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([employeeId, status])
+  @@index([branchId, localDate])
+  @@index([startedAt])
+}
+
+model AttendanceAdjustment {
+  id            String          @id @default(cuid())
+  employeeId    String
+  branchId      String
+  entryId       String?
+  workSessionId String?
+  action        String
+  reason        String
+  oldValue      Json?
+  newValue      Json?
+  adjustedById  String
+  ipAddress     String?
+  employee      Employee        @relation(fields: [employeeId], references: [id])
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  entry         TimeClockEntry? @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  workSession   WorkSession?    @relation(fields: [workSessionId], references: [id], onDelete: SetNull)
+  adjustedBy    User            @relation("AttendanceAdjustmentUser", fields: [adjustedById], references: [id])
+  createdAt     DateTime        @default(now())
+
+  @@index([employeeId, createdAt])
+  @@index([branchId, createdAt])
+  @@index([adjustedById, createdAt])
 }

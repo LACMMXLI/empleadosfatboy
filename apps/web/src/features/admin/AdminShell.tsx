@@ -7,6 +7,7 @@ import {
   Building2,
   CheckCircle2,
   ClipboardList,
+  Clock3,
   Download,
   Eye,
   FileImage,
@@ -32,6 +33,7 @@ import type { Employee, FileAsset, Incident, IncidentStatus, Movement, MovementK
 import { useScrollDirection } from "@/hooks/useScrollDirection"
 import { StatusEmpty, StatusText } from "@/components/common/Status"
 import { AdminModal, DetailLine, GuidedBlock } from "@/components/common/AdminPrimitives"
+import { AttendanceAdmin } from "@/features/admin/AttendanceAdmin"
 import {
   adminMovementSchema,
   administrativeMovementKinds,
@@ -102,6 +104,7 @@ export function Shell({
       { id: "historial" as const, label: "Historial", icon: ClipboardList },
       { id: "empleados" as const, label: "Empleados", icon: UsersRound },
       { id: "nomina" as const, label: "Nómina", icon: WalletCards },
+      { id: "asistencia" as const, label: "Asistencia", icon: Clock3 },
       { id: "adminMovements" as const, label: "Movimientos", icon: Building2 },
       { id: "incidencias" as const, label: "Incidencias", icon: MessageSquareText },
       { id: "dashboard" as const, label: "Resumen", icon: LayoutDashboard },
@@ -183,6 +186,7 @@ export function Shell({
             {activeView === "incidencias" && <IncidentsAdmin user={me.data} />}
             {activeView === "historial" && <History />}
             {activeView === "nomina" && <PayrollAdmin />}
+            {activeView === "asistencia" && <AttendanceAdmin user={me.data} />}
             {activeView === "configuracion" && <Configuration />}
             {activeView === "entregas" && <Deliveries />}
           </div>
@@ -217,6 +221,7 @@ function MobileBottomNav({
     incidencias: "Incid.",
     empleados: "Empleados",
     nomina: "Nómina",
+    asistencia: "Asist.",
     adminMovements: "Movim.",
     dashboard: "Resumen",
     configuracion: "Config",

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs"
 import { PrismaService } from "../prisma/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { roleMeets } from "../auth/role-rank"
+import { TimeClockService } from "../time-clock/time-clock.service"
 import type { AuthUser } from "../auth/auth.types"
 
 type CreateMovementInput = {
@@ -100,7 +101,8 @@ const settlementStatuses: MovementStatus[] = [
 export class MovementsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly timeClock: TimeClockService
   ) {}
 
   async list(filters: MovementFilters, user: AuthUser) {
@@ -161,7 +163,7 @@ export class MovementsService {
     })
   }
 
-  async create(dto: CreateMovementInput, user: AuthUser, ipAddress?: string) {
+  async create(dto: CreateMovementInput, user: AuthUser, metadata: RequestMetadata = {}) {
     if (!standardMovementKinds.includes(dto.kind)) {
       throw new BadRequestException("Tipo de movimiento no permitido")
     }
@@ -181,6 +183,12 @@ export class MovementsService {
     if (dto.kind !== MovementKind.DRINK && (!dto.reason || dto.reason.trim().length === 0)) {
       throw new BadRequestException("El motivo es requerido")
     }
+
+    await this.timeClock.ensureEmployeeHasActiveShiftToday(employee.id, dto.kind, {
+      ...metadata,
+      userId: user.sub,
+      context: "admin-movement"
+    })
 
     const config = await this.getConfig()
     const amount = this.resolveAmount(dto, config)
@@ -206,7 +214,9 @@ export class MovementsService {
         unitPrice: dto.kind === MovementKind.DRINK ? config.beveragePrice : dto.unitPrice,
         evidenceNote: dto.evidenceNote,
         receiptText: config.receiptLegalText,
-        requestIp: ipAddress,
+        requestIp: metadata.ipAddress,
+        requestUserAgent: metadata.userAgent,
+        requestDevice: metadata.device,
         registeredById: user.sub
       }
     })
@@ -218,13 +228,13 @@ export class MovementsService {
       entityId: movement.id,
       affectedEmployeeId: employee.id,
       newValue: this.toJson(movement),
-      ipAddress
+      ipAddress: metadata.ipAddress
     })
 
     return movement
   }
 
-  async createAdministrative(dto: CreateAdministrativeMovementInput, user: AuthUser, ipAddress?: string) {
+  async createAdministrative(dto: CreateAdministrativeMovementInput, user: AuthUser, metadata: RequestMetadata = {}) {
     if (!administrativeKinds.includes(dto.kind)) {
       throw new BadRequestException("Tipo administrativo no permitido")
     }
@@ -235,6 +245,12 @@ export class MovementsService {
     if (dto.kind !== MovementKind.DRINK && (!dto.reason || dto.reason.trim().length === 0)) {
       throw new BadRequestException("El motivo es requerido")
     }
+
+    await this.timeClock.ensureEmployeeHasActiveShiftToday(employee.id, dto.kind, {
+      ...metadata,
+      userId: user.sub,
+      context: "admin-administrative-movement"
+    })
 
     const config = await this.getConfig()
     const amount = this.resolveAmount(dto, config)
@@ -260,7 +276,9 @@ export class MovementsService {
         unitPrice: dto.unitPrice,
         evidenceNote: dto.evidenceNote,
         receiptText: config.receiptLegalText,
-        requestIp: ipAddress,
+        requestIp: metadata.ipAddress,
+        requestUserAgent: metadata.userAgent,
+        requestDevice: metadata.device,
         registeredById: user.sub
       }
     })
@@ -272,7 +290,7 @@ export class MovementsService {
       entityId: movement.id,
       affectedEmployeeId: employee.id,
       newValue: this.toJson(movement),
-      ipAddress
+      ipAddress: metadata.ipAddress
     })
 
     return movement
@@ -292,6 +310,11 @@ export class MovementsService {
     const isAdvance = dto.kind === MovementKind.SALARY_ADVANCE
     const status = isAdvance ? MovementStatus.PENDING : MovementStatus.AUTHORIZED
     const authorizedAt = status === MovementStatus.AUTHORIZED ? new Date() : null
+
+    await this.timeClock.ensureEmployeeHasActiveShiftToday(employee.id, dto.kind, {
+      ...metadata,
+      context: "employee-portal-request"
+    })
 
     const movement = await this.prisma.movement.create({
       data: {

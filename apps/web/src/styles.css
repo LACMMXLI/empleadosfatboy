@@ -1048,6 +1048,349 @@
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   }
 
+  .timeclock-shell {
+    min-height: 100vh;
+    padding: 1rem;
+    display: grid;
+    place-items: center;
+    background:
+      radial-gradient(circle at top left, rgba(0, 229, 255, 0.14), transparent 34rem),
+      linear-gradient(135deg, #071018 0%, #101820 46%, #20150f 100%);
+    color: #f8fafc;
+  }
+
+  .timeclock-panel {
+    width: min(1120px, 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 1rem;
+    background: rgba(7, 16, 24, 0.9);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+    padding: 1rem;
+  }
+
+  .timeclock-panel.narrow {
+    max-width: 440px;
+    text-align: center;
+  }
+
+  .timeclock-main-icon {
+    width: 3rem;
+    height: 3rem;
+    margin: 0 auto 1rem;
+    color: #f59e0b;
+  }
+
+  .timeclock-header,
+  .timeclock-actions,
+  .timeclock-device,
+  .timeclock-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .timeclock-header {
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .timeclock-kicker {
+    color: #67e8f9;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .timeclock-header h1,
+  .timeclock-panel h1 {
+    margin: 0;
+    font-size: clamp(1.3rem, 2vw, 2rem);
+    font-weight: 900;
+    letter-spacing: 0;
+  }
+
+  .timeclock-device {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.75rem;
+    padding: 0.65rem 0.8rem;
+    background: rgba(255, 255, 255, 0.06);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .timeclock-device svg {
+    width: 1rem;
+    height: 1rem;
+    color: #fbbf24;
+  }
+
+  .timeclock-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 1rem;
+  }
+
+  .timeclock-section {
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.875rem;
+    background: rgba(255, 255, 255, 0.055);
+    padding: 0.9rem;
+  }
+
+  .timeclock-section-title {
+    margin-bottom: 0.75rem;
+    color: #cbd5e1;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .timeclock-employee-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.55rem;
+  }
+
+  .timeclock-employee,
+  .timeclock-toggle button,
+  .timeclock-primary,
+  .timeclock-secondary {
+    min-height: 3.15rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.75rem;
+    background: rgba(15, 23, 42, 0.72);
+    color: #f8fafc;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .timeclock-employee {
+    text-align: left;
+    padding: 0.7rem;
+  }
+
+  .timeclock-employee strong,
+  .timeclock-employee span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .timeclock-employee span {
+    margin-top: 0.2rem;
+    color: #94a3b8;
+    font-size: 0.75rem;
+  }
+
+  .timeclock-employee.active,
+  .timeclock-toggle button.active {
+    border-color: rgba(251, 191, 36, 0.7);
+    background: rgba(251, 191, 36, 0.17);
+  }
+
+  .timeclock-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .timeclock-toggle button,
+  .timeclock-actions button {
+    display: inline-flex;
+    justify-content: center;
+  }
+
+  .timeclock-toggle svg,
+  .timeclock-actions svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .timeclock-pin {
+    width: 100%;
+    height: 3.25rem;
+    margin-top: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 0.75rem;
+    background: rgba(0, 0, 0, 0.24);
+    color: #f8fafc;
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 0;
+  }
+
+  .timeclock-camera {
+    position: relative;
+    overflow: hidden;
+    margin-top: 0.75rem;
+    border-radius: 0.85rem;
+    aspect-ratio: 4 / 3;
+    background: #020617;
+  }
+
+  .timeclock-camera video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .timeclock-photo-ready,
+  .timeclock-camera-error {
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    border-radius: 0.65rem;
+    padding: 0.55rem 0.7rem;
+    background: rgba(15, 23, 42, 0.82);
+    color: #bbf7d0;
+    font-size: 0.8rem;
+    font-weight: 800;
+  }
+
+  .timeclock-camera-error {
+    color: #fecaca;
+  }
+
+  .timeclock-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 0.75rem;
+  }
+
+  .timeclock-primary {
+    background: #f59e0b;
+    color: #111827;
+  }
+
+  .timeclock-primary:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .timeclock-selected,
+  .timeclock-message,
+  .timeclock-alert {
+    margin-top: 0.75rem;
+    border-radius: 0.65rem;
+    padding: 0.6rem 0.7rem;
+    background: rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .timeclock-message {
+    color: #fef3c7;
+  }
+
+  .spin {
+    animation: spin 0.8s linear infinite;
+  }
+
+  .attendance-table,
+  .attendance-adjustment-list {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 0.75rem;
+  }
+
+  .attendance-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.1fr) 112px minmax(220px, 1fr) auto;
+    gap: 0.65rem;
+    align-items: center;
+    border: 1px solid rgb(var(--surface-line) / 0.42);
+    border-radius: 0.7rem;
+    background: rgb(var(--surface-control) / 0.86);
+    padding: 0.65rem;
+  }
+
+  .attendance-main,
+  .attendance-times,
+  .attendance-adjustment-list div {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .attendance-main span,
+  .attendance-times span,
+  .attendance-adjustment-list span {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.76rem;
+    font-weight: 650;
+  }
+
+  .attendance-status {
+    border-radius: 999px;
+    padding: 0.35rem 0.55rem;
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 900;
+  }
+
+  .attendance-status.in_shift {
+    background: rgba(34, 197, 94, 0.14);
+    color: #4ade80;
+  }
+
+  .attendance-status.exited {
+    background: rgba(14, 165, 233, 0.14);
+    color: #38bdf8;
+  }
+
+  .attendance-status.no_show {
+    background: rgba(148, 163, 184, 0.14);
+    color: #cbd5e1;
+  }
+
+  .attendance-evidence {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+
+  .attendance-token-box {
+    display: grid;
+    gap: 0.4rem;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 0.7rem;
+    background: rgba(251, 191, 36, 0.1);
+    padding: 0.7rem;
+  }
+
+  .attendance-token-box span {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .attendance-token-box code {
+    word-break: break-all;
+    font-size: 0.82rem;
+  }
+
+  .attendance-token-box a {
+    color: #67e8f9;
+    font-weight: 800;
+  }
+
+  @media (max-width: 900px) {
+    .timeclock-grid,
+    .attendance-row {
+      grid-template-columns: 1fr;
+    }
+
+    .timeclock-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+
   .employee-card:hover {
     border-color: rgba(0, 229, 255, 0.28);
     background: rgb(var(--surface-panel-strong) / 0.95);

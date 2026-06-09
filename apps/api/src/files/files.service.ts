@@ -140,6 +140,56 @@ export class FilesService {
     await this.deleteObject(key)
   }
 
+  async uploadTimeClockEvidence(file: Express.Multer.File | undefined, branchId: string, ipAddress?: string) {
+    if (!file) throw new BadRequestException("Foto obligatoria")
+    this.validateImage(file)
+
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: branchId, active: true },
+      select: { id: true }
+    })
+    if (!branch) throw new NotFoundException("Sucursal no encontrada")
+
+    const target = this.buildTimeClockTarget(file, branch.id)
+    const s3Config = this.getS3Config()
+
+    await this.putObject(target.key, file)
+
+    try {
+      const asset = await this.prisma.fileAsset.create({
+        data: {
+          bucket: s3Config.bucket,
+          key: target.key,
+          originalName: this.cleanOriginalName(file.originalname || "checador.jpg"),
+          mimeType: file.mimetype,
+          size: file.size,
+          module: FileAssetModule.TIMECLOCK,
+          branchId: branch.id
+        }
+      })
+
+      await this.audit.log({
+        action: AuditAction.CREATE,
+        entity: "FileAsset",
+        entityId: asset.id,
+        newValue: this.toJson({ id: asset.id, module: asset.module, branchId: asset.branchId, source: "time-clock" }),
+        ipAddress
+      })
+
+      return this.toResponse(asset)
+    } catch (error) {
+      await this.deleteObjectQuietly(target.key)
+      throw error
+    }
+  }
+
+  async attachTimeClockEvidence(assetId: string, entryId: string) {
+    return this.prisma.fileAsset.update({
+      where: { id: assetId },
+      data: { entityId: entryId }
+    })
+  }
+
   private validateImage(file: Express.Multer.File) {
     if (!allowedImageMimeTypes.includes(file.mimetype as (typeof allowedImageMimeTypes)[number])) {
       throw new BadRequestException("Solo se permiten imagenes JPEG, PNG o WEBP")
@@ -190,6 +240,18 @@ export class FilesService {
     }
 
     throw new BadRequestException("Modulo de archivo no permitido")
+  }
+
+  private buildTimeClockTarget(file: Express.Multer.File, branchId: string) {
+    const ext = mimeExtension[file.mimetype as (typeof allowedImageMimeTypes)[number]]
+    const id = randomUUID()
+    const now = new Date()
+    const year = String(now.getFullYear())
+    const month = String(now.getMonth() + 1).padStart(2, "0")
+
+    return {
+      key: `timeclock/${branchId}/${year}/${month}/${id}.${ext}`
+    }
   }
 
   private async resolveBranchForWrite(branchId: string | undefined, user: AuthUser) {

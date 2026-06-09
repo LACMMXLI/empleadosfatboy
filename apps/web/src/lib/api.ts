@@ -1,4 +1,4 @@
-import type { AppConfig, AuditLog, Branch, DashboardSummary, Employee, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, User } from "@/types/domain"
+import type { AppConfig, AttendanceAdjustment, AttendanceRow, AuditLog, Branch, DashboardSummary, Employee, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, TimeClockDevice, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -34,6 +34,16 @@ export const employeeSession = {
   set token(value: string | null) {
     if (value) localStorage.setItem("fatboy-employee-portal-token", value)
     else localStorage.removeItem("fatboy-employee-portal-token")
+  }
+}
+
+export const timeClockDeviceSession = {
+  get token() {
+    return localStorage.getItem("fatboy-time-clock-device-token")
+  },
+  set token(value: string | null) {
+    if (value) localStorage.setItem("fatboy-time-clock-device-token", value)
+    else localStorage.removeItem("fatboy-time-clock-device-token")
   }
 }
 
@@ -95,6 +105,41 @@ async function employeeRequest<T>(path: string, options: RequestInit = {}): Prom
       ...(employeeSession.token ? { Authorization: `Bearer ${employeeSession.token}` } : {}),
       ...options.headers
     }
+  })
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null
+    throw new Error(body?.message ?? "No se pudo completar la operacion")
+  }
+
+  return response.json() as Promise<T>
+}
+
+async function timeClockRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(timeClockDeviceSession.token ? { "X-Time-Clock-Device": timeClockDeviceSession.token } : {}),
+      ...options.headers
+    }
+  })
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null
+    throw new Error(body?.message ?? "No se pudo completar la operacion")
+  }
+
+  return response.json() as Promise<T>
+}
+
+async function timeClockFormRequest<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      ...(timeClockDeviceSession.token ? { "X-Time-Clock-Device": timeClockDeviceSession.token } : {})
+    },
+    body: formData
   })
 
   if (!response.ok) {
@@ -292,6 +337,60 @@ export const api = {
   },
   createRule(payload: Record<string, unknown>) {
     return request("/configuration/authorization-rules", { method: "POST", body: JSON.stringify(payload) })
+  },
+  timeClock: {
+    device() {
+      return timeClockRequest<{ id: string; name: string; branch: Branch }>("/time-clock/public/device")
+    },
+    employees() {
+      return timeClockRequest<Array<Pick<Employee, "id" | "fullName" | "position">>>("/time-clock/public/employees")
+    },
+    registerEntry(payload: { employeeId: string; type: TimeClockEventType; pin: string; photo: Blob }) {
+      const formData = new FormData()
+      formData.append("employeeId", payload.employeeId)
+      formData.append("type", payload.type)
+      formData.append("pin", payload.pin)
+      formData.append("photo", payload.photo, "checador.jpg")
+      return timeClockFormRequest<{ ok: boolean; message: string; entry: TimeClockEntry }>("/time-clock/public/entries", formData)
+    }
+  },
+  adminTimeClock: {
+    devices() {
+      return request<TimeClockDevice[]>("/admin/time-clock/devices")
+    },
+    createDevice(payload: { name: string; branchId: string }) {
+      return request<TimeClockDevice>("/admin/time-clock/devices", { method: "POST", body: JSON.stringify(payload) })
+    },
+    updateDevice(id: string, payload: Partial<{ name: string; branchId: string; active: boolean; rotateToken: boolean }>) {
+      return request<TimeClockDevice>(`/admin/time-clock/devices/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
+    },
+    attendance(params?: Partial<{ date: string; branchId: string; employeeId: string }>) {
+      const query = new URLSearchParams(
+        Object.fromEntries(Object.entries(params ?? {}).filter(([, value]) => Boolean(value))) as Record<string, string>
+      ).toString()
+      return request<AttendanceRow[]>(`/admin/time-clock/attendance${query ? `?${query}` : ""}`)
+    },
+    exportAttendance(params?: Partial<{ date: string; branchId: string; employeeId: string }>) {
+      const query = new URLSearchParams(
+        Object.fromEntries(Object.entries(params ?? {}).filter(([, value]) => Boolean(value))) as Record<string, string>
+      ).toString()
+      return blobRequest(`/admin/time-clock/export${query ? `?${query}` : ""}`)
+    },
+    employeeHistory(employeeId: string, params?: Partial<{ from: string; to: string }>) {
+      const query = new URLSearchParams(
+        Object.fromEntries(Object.entries(params ?? {}).filter(([, value]) => Boolean(value))) as Record<string, string>
+      ).toString()
+      return request<TimeClockEntry[]>(`/admin/time-clock/employees/${employeeId}/history${query ? `?${query}` : ""}`)
+    },
+    adjustments(params?: Partial<{ employeeId: string; branchId: string }>) {
+      const query = new URLSearchParams(
+        Object.fromEntries(Object.entries(params ?? {}).filter(([, value]) => Boolean(value))) as Record<string, string>
+      ).toString()
+      return request<AttendanceAdjustment[]>(`/admin/time-clock/adjustments${query ? `?${query}` : ""}`)
+    },
+    createAdjustment(payload: { employeeId: string; branchId?: string; type: TimeClockEventType; occurredAt?: string; reason: string; notes?: string }) {
+      return request<{ entry: TimeClockEntry }>("/admin/time-clock/adjustments", { method: "POST", body: JSON.stringify(payload) })
+    }
   },
   employeePortal: {
     login(phone: string, pin: string) {
