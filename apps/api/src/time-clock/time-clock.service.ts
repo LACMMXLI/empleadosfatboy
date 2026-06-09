@@ -4,6 +4,7 @@ import {
   MovementKind,
   Prisma,
   Role,
+  TimeClockDeviceRequestStatus,
   TimeClockEntryStatus,
   TimeClockEventType,
   WorkSessionStatus
@@ -21,6 +22,15 @@ type RequestMetadata = {
 }
 
 type CreateDeviceInput = {
+  name: string
+  branchId: string
+}
+
+type CreateDeviceRegistrationInput = {
+  requestToken: string
+}
+
+type ApproveDeviceRegistrationInput = {
   name: string
   branchId: string
 }
@@ -54,6 +64,7 @@ type ManualAdjustmentInput = {
 }
 
 const timeZone = "America/Tijuana"
+const deviceRequestMinutes = 30
 const movementKindsThatRequireActiveShift = new Set<MovementKind>([
   MovementKind.SALARY_ADVANCE,
   MovementKind.ADMIN_SALARY_ADVANCE,
@@ -81,6 +92,199 @@ export class TimeClockService {
     })
 
     return devices.map(({ tokenHash, ...device }) => device)
+  }
+
+  async listDeviceRequests(user: AuthUser) {
+    await this.expireOldDeviceRequests()
+    return this.prisma.timeClockDeviceRequest.findMany({
+      where: {
+        status: TimeClockDeviceRequestStatus.PENDING,
+        expiresAt: { gt: new Date() }
+      },
+      include: {
+        branch: true,
+        authorizedBy: { select: { id: true, fullName: true, role: true } },
+        authorizedDevice: { include: { branch: true } }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 30
+    })
+  }
+
+  async createDeviceRegistration(input: CreateDeviceRegistrationInput, metadata: RequestMetadata) {
+    const requestToken = input.requestToken.trim()
+    if (!this.isValidDeviceToken(requestToken)) {
+      throw new BadRequestException("Identificador de dispositivo invalido")
+    }
+
+    const requestTokenHash = this.hashDeviceToken(requestToken)
+    const existingDevice = await this.prisma.timeClockDevice.findUnique({
+      where: { tokenHash: requestTokenHash },
+      include: { branch: true }
+    })
+    if (existingDevice?.active && existingDevice.branch.active) {
+      return {
+        status: TimeClockDeviceRequestStatus.AUTHORIZED,
+        device: {
+          id: existingDevice.id,
+          name: existingDevice.name,
+          branch: existingDevice.branch
+        }
+      }
+    }
+
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + deviceRequestMinutes * 60_000)
+    const existing = await this.prisma.timeClockDeviceRequest.findUnique({
+      where: { requestTokenHash },
+      include: { authorizedDevice: { include: { branch: true } } }
+    })
+
+    if (existing?.status === TimeClockDeviceRequestStatus.AUTHORIZED && existing.authorizedDevice?.active) {
+      return {
+        id: existing.id,
+        code: existing.code,
+        status: existing.status,
+        expiresAt: existing.expiresAt,
+        device: {
+          id: existing.authorizedDevice.id,
+          name: existing.authorizedDevice.name,
+          branch: existing.authorizedDevice.branch
+        }
+      }
+    }
+
+    if (existing?.status === TimeClockDeviceRequestStatus.PENDING && existing.expiresAt > now) {
+      return {
+        id: existing.id,
+        code: existing.code,
+        status: existing.status,
+        expiresAt: existing.expiresAt
+      }
+    }
+
+    const code = await this.nextDeviceRequestCode()
+    const data = {
+      code,
+      requestTokenHash,
+      requestTokenLast4: requestToken.slice(-4),
+      status: TimeClockDeviceRequestStatus.PENDING,
+      requestIp: metadata.ipAddress,
+      requestUserAgent: metadata.userAgent,
+      expiresAt
+    }
+
+    const request = existing
+      ? await this.prisma.timeClockDeviceRequest.update({
+          where: { id: existing.id },
+          data
+        })
+      : await this.prisma.timeClockDeviceRequest.create({
+          data
+        })
+
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: "TimeClockDeviceRequest",
+      entityId: request.id,
+      newValue: this.toJson({ code: request.code, status: request.status, tokenLast4: request.requestTokenLast4 }),
+      ipAddress: metadata.ipAddress
+    })
+
+    return {
+      id: request.id,
+      code: request.code,
+      status: request.status,
+      expiresAt: request.expiresAt
+    }
+  }
+
+  async approveDeviceRegistration(id: string, input: ApproveDeviceRegistrationInput, user: AuthUser, ipAddress?: string) {
+    const name = input.name.trim()
+    if (name.length < 2) throw new BadRequestException("Nombre de dispositivo requerido")
+    const branch = await this.resolveBranchForAdmin(input.branchId, user)
+
+    const request = await this.prisma.timeClockDeviceRequest.findUnique({ where: { id } })
+    if (!request) throw new NotFoundException("Solicitud de dispositivo no encontrada")
+    if (request.status !== TimeClockDeviceRequestStatus.PENDING || request.expiresAt <= new Date()) {
+      throw new BadRequestException("La solicitud ya no esta pendiente")
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const device = await tx.timeClockDevice.create({
+        data: {
+          name,
+          branchId: branch.id,
+          tokenHash: request.requestTokenHash,
+          tokenLast4: request.requestTokenLast4,
+          createdById: user.sub
+        },
+        include: { branch: true }
+      })
+
+      const updatedRequest = await tx.timeClockDeviceRequest.update({
+        where: { id: request.id },
+        data: {
+          status: TimeClockDeviceRequestStatus.AUTHORIZED,
+          branchId: branch.id,
+          deviceName: name,
+          authorizedDeviceId: device.id,
+          authorizedById: user.sub
+        },
+        include: {
+          branch: true,
+          authorizedBy: { select: { id: true, fullName: true, role: true } },
+          authorizedDevice: { include: { branch: true } }
+        }
+      })
+
+      await tx.auditLog.create({
+        data: {
+          userId: user.sub,
+          action: AuditAction.CREATE,
+          entity: "TimeClockDevice",
+          entityId: device.id,
+          newValue: this.toJson({
+            deviceId: device.id,
+            requestId: request.id,
+            requestCode: request.code,
+            branchId: branch.id
+          }),
+          ipAddress
+        }
+      })
+
+      return { device, request: updatedRequest }
+    })
+
+    const { tokenHash, ...safeDevice } = result.device
+    return { ...result.request, authorizedDevice: safeDevice }
+  }
+
+  async rejectDeviceRegistration(id: string, user: AuthUser, ipAddress?: string) {
+    const request = await this.prisma.timeClockDeviceRequest.findUnique({ where: { id } })
+    if (!request) throw new NotFoundException("Solicitud de dispositivo no encontrada")
+    if (request.status !== TimeClockDeviceRequestStatus.PENDING) return request
+
+    const updated = await this.prisma.timeClockDeviceRequest.update({
+      where: { id },
+      data: {
+        status: TimeClockDeviceRequestStatus.REJECTED,
+        authorizedById: user.sub
+      }
+    })
+
+    await this.audit.log({
+      userId: user.sub,
+      action: AuditAction.UPDATE,
+      entity: "TimeClockDeviceRequest",
+      entityId: id,
+      oldValue: this.toJson({ status: request.status, code: request.code }),
+      newValue: this.toJson({ status: updated.status, code: updated.code }),
+      ipAddress
+    })
+
+    return updated
   }
 
   async createDevice(input: CreateDeviceInput, user: AuthUser, ipAddress?: string) {
@@ -682,6 +886,29 @@ export class TimeClockService {
 
   private hashDeviceToken(token: string) {
     return createHash("sha256").update(token.trim()).digest("hex")
+  }
+
+  private isValidDeviceToken(token: string) {
+    return /^[A-Za-z0-9_-]{32,160}$/.test(token)
+  }
+
+  private async nextDeviceRequestCode() {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const code = `TC-${String(randomBytes(3).readUIntBE(0, 3) % 1_000_000).padStart(6, "0")}`
+      const existing = await this.prisma.timeClockDeviceRequest.findUnique({ where: { code }, select: { id: true } })
+      if (!existing) return code
+    }
+    throw new BadRequestException("No se pudo generar codigo de dispositivo")
+  }
+
+  private async expireOldDeviceRequests() {
+    await this.prisma.timeClockDeviceRequest.updateMany({
+      where: {
+        status: TimeClockDeviceRequestStatus.PENDING,
+        expiresAt: { lte: new Date() }
+      },
+      data: { status: TimeClockDeviceRequestStatus.EXPIRED }
+    })
   }
 
   private minutesBetween(start: Date, end: Date) {

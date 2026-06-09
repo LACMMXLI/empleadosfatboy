@@ -1261,6 +1261,10 @@
     margin-top: 0.75rem;
   }
 
+  .timeclock-actions.single {
+    grid-template-columns: 1fr 1fr;
+  }
+
   .timeclock-primary {
     background: #f59e0b;
     color: #111827;
@@ -1285,6 +1289,25 @@
 
   .timeclock-message {
     color: #fef3c7;
+  }
+
+  .timeclock-registration-code {
+    margin: 1rem auto 0.35rem;
+    width: min(100%, 18rem);
+    border: 1px solid rgba(251, 191, 36, 0.6);
+    border-radius: 0.9rem;
+    background: rgba(251, 191, 36, 0.14);
+    padding: 0.95rem;
+    color: #fef3c7;
+    font-size: clamp(2rem, 8vw, 3.3rem);
+    font-weight: 950;
+    letter-spacing: 0;
+  }
+
+  .timeclock-registration-meta {
+    color: #94a3b8;
+    font-size: 0.82rem;
+    font-weight: 750;
   }
 
   .spin {
@@ -1379,9 +1402,44 @@
     font-weight: 800;
   }
 
+  .attendance-pending-box {
+    border: 1px solid rgba(251, 191, 36, 0.22);
+    border-radius: 0.75rem;
+    background: rgba(251, 191, 36, 0.06);
+    padding: 0.65rem;
+  }
+
+  .attendance-pending-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.55rem;
+    color: hsl(var(--foreground));
+    font-size: 0.82rem;
+    font-weight: 850;
+  }
+
+  .attendance-pending-head span {
+    border-radius: 999px;
+    background: rgba(251, 191, 36, 0.16);
+    padding: 0.15rem 0.45rem;
+    color: #fbbf24;
+  }
+
+  .attendance-request-card {
+    grid-template-columns: minmax(120px, 1fr) minmax(130px, 1fr) minmax(120px, 0.8fr) auto;
+  }
+
+  .attendance-request-code {
+    color: #fbbf24;
+    font-size: 1.1rem;
+    font-weight: 950;
+  }
+
   @media (max-width: 900px) {
     .timeclock-grid,
-    .attendance-row {
+    .attendance-row,
+    .attendance-request-card {
       grid-template-columns: 1fr;
     }
 

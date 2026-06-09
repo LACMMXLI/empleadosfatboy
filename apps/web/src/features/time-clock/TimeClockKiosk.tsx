@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Camera, CheckCircle2, Clock3, LogIn, LogOut, RefreshCw, ShieldAlert } from "lucide-react"
-import { api, timeClockDeviceSession } from "@/lib/api"
+import { Camera, CheckCircle2, Clock3, Copy, LogIn, LogOut, RefreshCw, ShieldAlert } from "lucide-react"
+import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
 import type { TimeClockEventType } from "@/types/domain"
 
 export function TimeClockKiosk() {
@@ -10,6 +10,14 @@ export function TimeClockKiosk() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const [deviceToken, setDeviceToken] = useState(timeClockDeviceSession.token)
+  const [requestToken, setRequestToken] = useState(() => {
+    const current = timeClockDeviceRequestSession.token
+    if (current) return current
+    const created = createLocalDeviceRequestToken()
+    timeClockDeviceRequestSession.token = created
+    return created
+  })
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
   const [type, setType] = useState<TimeClockEventType>("ENTRY")
   const [pin, setPin] = useState("")
@@ -20,13 +28,29 @@ export function TimeClockKiosk() {
   useEffect(() => {
     if (setupToken) {
       timeClockDeviceSession.token = setupToken
+      setDeviceToken(setupToken)
       window.history.replaceState({}, "", "/checador")
     }
   }, [setupToken])
 
-  const hasToken = Boolean(timeClockDeviceSession.token)
-  const device = useQuery({ queryKey: ["timeClock", "device"], queryFn: api.timeClock.device, enabled: hasToken })
-  const employees = useQuery({ queryKey: ["timeClock", "employees"], queryFn: api.timeClock.employees, enabled: hasToken })
+  const hasToken = Boolean(deviceToken)
+  const device = useQuery({ queryKey: ["timeClock", "device", deviceToken], queryFn: api.timeClock.device, enabled: hasToken, retry: false })
+  const needsAuthorization = !hasToken || Boolean(device.error)
+  const deviceRequest = useQuery({
+    queryKey: ["timeClock", "device-request", requestToken],
+    queryFn: () => api.timeClock.requestDeviceAuthorization(requestToken),
+    enabled: needsAuthorization,
+    refetchInterval: (query) => query.state.data?.status === "AUTHORIZED" ? false : 5000
+  })
+  const employees = useQuery({ queryKey: ["timeClock", "employees", deviceToken], queryFn: api.timeClock.employees, enabled: hasToken && !device.error })
+
+  useEffect(() => {
+    if (deviceRequest.data?.status !== "AUTHORIZED") return
+    timeClockDeviceSession.token = requestToken
+    timeClockDeviceRequestSession.token = null
+    setDeviceToken(requestToken)
+    void queryClient.invalidateQueries({ queryKey: ["timeClock"] })
+  }, [deviceRequest.data?.status, queryClient, requestToken])
 
   useEffect(() => {
     let cancelled = false
@@ -48,13 +72,13 @@ export function TimeClockKiosk() {
       }
     }
 
-    if (hasToken) void startCamera()
+    if (hasToken && !device.error) void startCamera()
     return () => {
       cancelled = true
       streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = null
     }
-  }, [hasToken])
+  }, [hasToken, device.error])
 
   const register = useMutation({
     mutationFn: () => {
@@ -86,13 +110,48 @@ export function TimeClockKiosk() {
     if (blob) setPhoto(blob)
   }
 
-  if (!hasToken) {
+  function regenerateRequestCode() {
+    const created = createLocalDeviceRequestToken()
+    timeClockDeviceRequestSession.token = created
+    setRequestToken(created)
+  }
+
+  async function copyCode() {
+    const code = deviceRequest.data?.code
+    if (!code) return
+    await navigator.clipboard?.writeText(code).catch(() => undefined)
+    setMessage("Codigo copiado")
+    window.setTimeout(() => setMessage(null), 1800)
+  }
+
+  if (needsAuthorization) {
     return (
       <main className="timeclock-shell">
         <section className="timeclock-panel narrow">
           <ShieldAlert className="timeclock-main-icon" />
           <h1>Dispositivo no registrado</h1>
-          <p>Solicita al administrador configurar esta tablet desde el panel de asistencia.</p>
+          <p>Entrega este codigo al administrador para autorizar esta tablet desde Asistencia.</p>
+          <div className="timeclock-registration-code">
+            {deviceRequest.isLoading ? "Generando..." : deviceRequest.data?.code ?? "Sin codigo"}
+          </div>
+          <div className="timeclock-registration-meta">
+            {deviceRequest.data?.expiresAt ? `Expira: ${formatLocalTime(deviceRequest.data.expiresAt)}` : "Pendiente de autorizacion"}
+          </div>
+          <div className="timeclock-actions single">
+            <button className="timeclock-secondary" type="button" onClick={copyCode} disabled={!deviceRequest.data?.code}>
+              <Copy />
+              Copiar codigo
+            </button>
+            <button className="timeclock-secondary" type="button" onClick={regenerateRequestCode}>
+              <RefreshCw />
+              Nuevo codigo
+            </button>
+          </div>
+          <div className="timeclock-selected">
+            {deviceRequest.data?.status === "AUTHORIZED" ? "Dispositivo autorizado. Cargando..." : "Esperando autorizacion del administrador"}
+          </div>
+          {deviceRequest.error && <div className="timeclock-alert">{deviceRequest.error.message}</div>}
+          {message && <div className="timeclock-message">{message}</div>}
         </section>
       </main>
     )
@@ -192,4 +251,19 @@ export function TimeClockKiosk() {
       </section>
     </main>
   )
+}
+
+function createLocalDeviceRequestToken() {
+  const bytes = new Uint8Array(32)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")
+}
+
+function formatLocalTime(value: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit"
+  }).format(new Date(value))
 }

@@ -34,6 +34,20 @@ class CreateDeviceDto {
   branchId!: string
 }
 
+class CreateDeviceRegistrationDto {
+  @IsString()
+  requestToken!: string
+}
+
+class ApproveDeviceRegistrationDto {
+  @IsString()
+  @MinLength(2)
+  name!: string
+
+  @IsString()
+  branchId!: string
+}
+
 class UpdateDeviceDto {
   @IsOptional()
   @IsString()
@@ -127,6 +141,14 @@ export class TimeClockPublicController {
     return this.timeClock.publicEmployees(token)
   }
 
+  @Post("device-requests")
+  deviceRequest(@Body() dto: CreateDeviceRegistrationDto, @Req() request: RequestWithUser) {
+    return this.timeClock.createDeviceRegistration(dto, {
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] as string | undefined
+    })
+  }
+
   @Post("entries")
   @UseInterceptors(
     FileInterceptor("photo", {
@@ -167,6 +189,21 @@ export class TimeClockAdminController {
   @Post("devices")
   createDevice(@Body() dto: CreateDeviceDto, @Req() request: RequestWithUser) {
     return this.timeClock.createDevice(dto, request.user, request.ip)
+  }
+
+  @Get("device-requests")
+  deviceRequests(@Req() request: RequestWithUser) {
+    return this.timeClock.listDeviceRequests(request.user)
+  }
+
+  @Patch("device-requests/:id/approve")
+  approveDeviceRequest(@Param("id") id: string, @Body() dto: ApproveDeviceRegistrationDto, @Req() request: RequestWithUser) {
+    return this.timeClock.approveDeviceRegistration(id, dto, request.user, request.ip)
+  }
+
+  @Patch("device-requests/:id/reject")
+  rejectDeviceRequest(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.timeClock.rejectDeviceRegistration(id, request.user, request.ip)
   }
 
   @Patch("devices/:id")

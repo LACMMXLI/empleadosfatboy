@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Camera, Clock3, Download, KeyRound, Plus, RefreshCw, RotateCw, Save, Wrench } from "lucide-react"
+import { Camera, CheckCircle2, Clock3, Download, KeyRound, Plus, RefreshCw, RotateCw, Save, Wrench, X } from "lucide-react"
 import { api } from "@/lib/api"
 import type { AttendanceRow, Branch, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
 
@@ -18,6 +18,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
   const [employeeId, setEmployeeId] = useState("")
   const [deviceName, setDeviceName] = useState("")
   const [deviceBranchId, setDeviceBranchId] = useState("")
+  const [requestDrafts, setRequestDrafts] = useState<Record<string, { name: string; branchId: string }>>({})
   const [setupToken, setSetupToken] = useState<string | null>(null)
   const [adjustment, setAdjustment] = useState({
     employeeId: "",
@@ -36,6 +37,11 @@ export function AttendanceAdmin({ user }: { user?: User }) {
     queryFn: () => api.adminTimeClock.attendance({ date, branchId, employeeId })
   })
   const devices = useQuery({ queryKey: ["time-clock-devices"], queryFn: api.adminTimeClock.devices })
+  const deviceRequests = useQuery({
+    queryKey: ["time-clock-device-requests"],
+    queryFn: api.adminTimeClock.deviceRequests,
+    refetchInterval: 5000
+  })
   const adjustments = useQuery({
     queryKey: ["attendance-adjustments", branchId, employeeId],
     queryFn: () => api.adminTimeClock.adjustments({ branchId, employeeId })
@@ -64,6 +70,25 @@ export function AttendanceAdmin({ user }: { user?: User }) {
     onSuccess: async (device) => {
       if (device.setupToken) setSetupToken(device.setupToken)
       await queryClient.invalidateQueries({ queryKey: ["time-clock-devices"] })
+    },
+    onError: (error: Error) => setMessage(error.message)
+  })
+
+  const approveRequest = useMutation({
+    mutationFn: ({ id, name, branchId }: { id: string; name: string; branchId: string }) =>
+      api.adminTimeClock.approveDeviceRequest(id, { name, branchId }),
+    onSuccess: async () => {
+      setMessage("Dispositivo autorizado")
+      await queryClient.invalidateQueries({ queryKey: ["time-clock-device-requests"] })
+      await queryClient.invalidateQueries({ queryKey: ["time-clock-devices"] })
+    },
+    onError: (error: Error) => setMessage(error.message)
+  })
+
+  const rejectRequest = useMutation({
+    mutationFn: (id: string) => api.adminTimeClock.rejectDeviceRequest(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["time-clock-device-requests"] })
     },
     onError: (error: Error) => setMessage(error.message)
   })
@@ -154,6 +179,79 @@ export function AttendanceAdmin({ user }: { user?: User }) {
             </div>
           </div>
           <div className="admin-card-body space-y-3">
+            <div className="attendance-pending-box">
+              <div className="attendance-pending-head">
+                <strong>Solicitudes pendientes</strong>
+                <span>{deviceRequests.data?.length ?? 0}</span>
+              </div>
+              <div className="settings-list-grid">
+                {deviceRequests.data?.map((request) => {
+                  const draft = requestDrafts[request.id] ?? {
+                    name: request.deviceName ?? `Tablet ${request.code}`,
+                    branchId: user?.role === "ENCARGADO" && user.branch?.id ? user.branch.id : ""
+                  }
+                  const canApprove = draft.name.trim().length >= 2 && Boolean(draft.branchId) && !approveRequest.isPending
+                  return (
+                    <div key={request.id} className="settings-list-card attendance-request-card">
+                      <div className="settings-list-main">
+                        <div className="attendance-request-code">{request.code}</div>
+                        <div className="settings-list-meta">
+                          Token ****{request.requestTokenLast4 ?? "----"} · {request.requestIp ?? "IP no disponible"}
+                        </div>
+                      </div>
+                      <input
+                        className="form-input"
+                        placeholder="Nombre de tablet"
+                        value={draft.name}
+                        onChange={(event) =>
+                          setRequestDrafts((current) => ({
+                            ...current,
+                            [request.id]: { ...draft, name: event.target.value }
+                          }))
+                        }
+                      />
+                      <select
+                        className="form-select"
+                        value={draft.branchId}
+                        onChange={(event) =>
+                          setRequestDrafts((current) => ({
+                            ...current,
+                            [request.id]: { ...draft, branchId: event.target.value }
+                          }))
+                        }
+                      >
+                        <option value="">Sucursal</option>
+                        {visibleBranchesForUser(activeBranches, user).map((branch) => (
+                          <option key={branch.id} value={branch.id}>{branch.name}</option>
+                        ))}
+                      </select>
+                      <div className="settings-row-actions">
+                        <button
+                          className="btn-icon"
+                          type="button"
+                          title="Autorizar"
+                          disabled={!canApprove}
+                          onClick={() => approveRequest.mutate({ id: request.id, name: draft.name, branchId: draft.branchId })}
+                        >
+                          <CheckCircle2 style={{ width: 13, height: 13 }} />
+                        </button>
+                        <button
+                          className="btn-icon danger"
+                          type="button"
+                          title="Rechazar"
+                          disabled={rejectRequest.isPending}
+                          onClick={() => rejectRequest.mutate(request.id)}
+                        >
+                          <X style={{ width: 13, height: 13 }} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+                {!deviceRequests.data?.length && <div className="status-empty">Sin tablets esperando autorizacion.</div>}
+              </div>
+            </div>
+
             <div className="admin-form-row">
               <input className="form-input" placeholder="Nombre de tablet" value={deviceName} onChange={(event) => setDeviceName(event.target.value)} />
               <select className="form-select" value={deviceBranchId} onChange={(event) => setDeviceBranchId(event.target.value)}>

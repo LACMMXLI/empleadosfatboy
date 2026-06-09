@@ -101,6 +101,13 @@ enum WorkSessionStatus {
   ADJUSTED
 }
 
+enum TimeClockDeviceRequestStatus {
+  PENDING
+  AUTHORIZED
+  REJECTED
+  EXPIRED
+}
+
 model Branch {
   id        String     @id @default(cuid())
   name      String
@@ -112,6 +119,7 @@ model Branch {
   fileAssets FileAsset[]
   incidents Incident[]
   timeClockDevices TimeClockDevice[]
+  timeClockDeviceRequests TimeClockDeviceRequest[]
   timeClockEntries TimeClockEntry[]
   workSessions WorkSession[]
   attendanceAdjustments AttendanceAdjustment[]
@@ -139,6 +147,7 @@ model User {
   reportedIncidents Incident[] @relation("IncidentReporter")
   incidentMessages IncidentMessage[] @relation("IncidentMessageAuthor")
   createdTimeClockDevices TimeClockDevice[] @relation("TimeClockDeviceCreator")
+  authorizedTimeClockDeviceRequests TimeClockDeviceRequest[] @relation("TimeClockDeviceRequestAuthorizer")
   createdTimeClockEntries TimeClockEntry[] @relation("TimeClockEntryCreator")
   attendanceAdjustments AttendanceAdjustment[] @relation("AttendanceAdjustmentUser")
   createdAt     DateTime   @default(now())
@@ -393,6 +402,7 @@ model TimeClockDevice {
   createdById String?
   branch      Branch           @relation(fields: [branchId], references: [id])
   createdBy   User?            @relation("TimeClockDeviceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  registrationRequest TimeClockDeviceRequest? @relation("TimeClockDeviceFromRequest")
   entries     TimeClockEntry[]
   sessions    WorkSession[]
   createdAt   DateTime         @default(now())
@@ -400,6 +410,30 @@ model TimeClockDevice {
 
   @@index([branchId, active])
   @@index([createdById])
+}
+
+model TimeClockDeviceRequest {
+  id                 String                       @id @default(cuid())
+  code               String                       @unique
+  requestTokenHash   String                       @unique
+  requestTokenLast4  String
+  status             TimeClockDeviceRequestStatus @default(PENDING)
+  branchId           String?
+  deviceName         String?
+  authorizedDeviceId String?                      @unique
+  authorizedById     String?
+  requestIp          String?
+  requestUserAgent   String?
+  expiresAt          DateTime
+  branch             Branch?                      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  authorizedDevice   TimeClockDevice?             @relation("TimeClockDeviceFromRequest", fields: [authorizedDeviceId], references: [id], onDelete: SetNull)
+  authorizedBy       User?                        @relation("TimeClockDeviceRequestAuthorizer", fields: [authorizedById], references: [id], onDelete: SetNull)
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  @@index([status, expiresAt])
+  @@index([branchId, createdAt])
+  @@index([authorizedById, createdAt])
 }
 
 model TimeClockEntry {

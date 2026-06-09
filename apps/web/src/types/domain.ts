@@ -4,6 +4,7 @@ export type PayrollStatus = "BORRADOR" | "GENERADA" | "PAGADA" | "CANCELADA"
 export type TimeClockEventType = "ENTRY" | "EXIT"
 export type TimeClockEntryStatus = "VALID" | "MANUAL" | "VOIDED"
 export type WorkSessionStatus = "ACTIVE" | "CLOSED" | "ADJUSTED"
+export type TimeClockDeviceRequestStatus = "PENDING" | "AUTHORIZED" | "REJECTED" | "EXPIRED"
 
 export type MovementKind =
   | "SALARY_ADVANCE"
@@ -251,6 +252,24 @@ export type TimeClockDevice = {
   createdAt: string
   updatedAt?: string
   setupToken?: string
+}
+
+export type TimeClockDeviceRequest = {
+  id: string
+  code: string
+  requestTokenLast4?: string
+  status: TimeClockDeviceRequestStatus
+  branchId?: string | null
+  deviceName?: string | null
+  authorizedDeviceId?: string | null
+  authorizedById?: string | null
+  requestIp?: string | null
+  requestUserAgent?: string | null
+  expiresAt?: string
+  branch?: Branch | null
+  authorizedDevice?: TimeClockDevice | null
+  createdAt?: string
+  updatedAt?: string
 }
 
 export type TimeClockEntry = {

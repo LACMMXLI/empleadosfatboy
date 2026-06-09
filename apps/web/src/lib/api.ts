@@ -1,4 +1,4 @@
-import type { AppConfig, AttendanceAdjustment, AttendanceRow, AuditLog, Branch, DashboardSummary, Employee, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, TimeClockDevice, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
+import type { AppConfig, AttendanceAdjustment, AttendanceRow, AuditLog, Branch, DashboardSummary, Employee, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, TimeClockDevice, TimeClockDeviceRequest, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -44,6 +44,16 @@ export const timeClockDeviceSession = {
   set token(value: string | null) {
     if (value) localStorage.setItem("fatboy-time-clock-device-token", value)
     else localStorage.removeItem("fatboy-time-clock-device-token")
+  }
+}
+
+export const timeClockDeviceRequestSession = {
+  get token() {
+    return localStorage.getItem("fatboy-time-clock-device-request-token")
+  },
+  set token(value: string | null) {
+    if (value) localStorage.setItem("fatboy-time-clock-device-request-token", value)
+    else localStorage.removeItem("fatboy-time-clock-device-request-token")
   }
 }
 
@@ -352,6 +362,12 @@ export const api = {
       formData.append("pin", payload.pin)
       formData.append("photo", payload.photo, "checador.jpg")
       return timeClockFormRequest<{ ok: boolean; message: string; entry: TimeClockEntry }>("/time-clock/public/entries", formData)
+    },
+    requestDeviceAuthorization(requestToken: string) {
+      return request<TimeClockDeviceRequest & { device?: { id: string; name: string; branch: Branch } }>("/time-clock/public/device-requests", {
+        method: "POST",
+        body: JSON.stringify({ requestToken })
+      })
     }
   },
   adminTimeClock: {
@@ -363,6 +379,18 @@ export const api = {
     },
     updateDevice(id: string, payload: Partial<{ name: string; branchId: string; active: boolean; rotateToken: boolean }>) {
       return request<TimeClockDevice>(`/admin/time-clock/devices/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
+    },
+    deviceRequests() {
+      return request<TimeClockDeviceRequest[]>("/admin/time-clock/device-requests")
+    },
+    approveDeviceRequest(id: string, payload: { name: string; branchId: string }) {
+      return request<TimeClockDeviceRequest>(`/admin/time-clock/device-requests/${id}/approve`, {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      })
+    },
+    rejectDeviceRequest(id: string) {
+      return request<TimeClockDeviceRequest>(`/admin/time-clock/device-requests/${id}/reject`, { method: "PATCH" })
     },
     attendance(params?: Partial<{ date: string; branchId: string; employeeId: string }>) {
       const query = new URLSearchParams(
