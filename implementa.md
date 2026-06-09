@@ -1,96 +1,58 @@
-Integra carga de imágenes con MinIO en mi sistema.
+Quiero agregar un módulo de reloj checador dentro del sistema actual de empleados, adelantos y consumos.
 
-Contexto:
+Debe reutilizar los empleados, sucursales, roles y autenticación existentes.
 
-- Mi sistema tiene frontend + backend NestJS + PostgreSQL en Coolify.
-- El frontend actualmente consume el backend usando rutas /api.
-- Ya tengo MinIO corriendo en Coolify.
-- Ya pude entrar al panel de MinIO por IP local:9001.
-- Ya creé un bucket llamado: fatboy-file
-- No quiero que el frontend se conecte directo a MinIO.
-- El flujo correcto debe ser:
-  Frontend → /api → Backend NestJS → MinIO
-- PostgreSQL solo debe guardar referencias de las imágenes, no guardar archivos binarios.
+Crear una pantalla pública/controlada para tablet fija en la ruta /checador, diseñada para usarse únicamente como reloj checador. Esta pantalla no debe mostrar información sensible como ventas, adelantos, saldos, consumos, totales ni panel administrativo.
 
-Objetivo:
-Permitir subir imágenes desde la aplicación para usarlas en incidencias, empleados, checklists y evidencias.
+Flujo:
 
-Tareas:
+1. Mostrar empleados activos de la sucursal asignada al dispositivo.
+2. El empleado selecciona su nombre.
+3. Selecciona tipo de checada: Entrada o Salida.
+4. Captura su PIN personal.
+5. La cámara de la tablet toma una foto obligatoria.
+6. El backend valida PIN, empleado activo, sucursal y dispositivo autorizado.
+7. Se guarda el registro con empleado, sucursal, dispositivo, tipo de evento, fecha/hora local de Mexicali, foto/evidencia, IP/User-Agent y estado válido.
+8. Mostrar confirmación visual simple.
 
-1. Revisar la estructura actual del backend NestJS.
-2. Crear un módulo FilesModule.
-3. Configurar conexión a MinIO usando AWS SDK v3 compatible con S3.
-4. Leer estas variables de entorno:
+Agregar modelo/tablas para:
 
-S3_ENDPOINT=http://NOMBRE_INTERNO_DEL_SERVICIO_MINIO:9000
-S3_ACCESS_KEY=ACCESS_KEY_DE_MINIO
-S3_SECRET_KEY=SECRET_KEY_DE_MINIO
-S3_BUCKET=fatboy-file
-S3_REGION=us-east-1
-S3_FORCE_PATH_STYLE=true
+- TimeClockDevice: dispositivo autorizado, nombre, sucursal, token, activo.
+- TimeClockEntry: empleado, sucursal, dispositivo, tipo ENTRY/EXIT, fecha/hora, foto/evidencia, estado, notas, creadoPor.
+- AttendanceShift o WorkSession: jornada activa calculada desde entrada hasta salida.
+- AttendanceAdjustment: correcciones manuales con motivo, usuario que corrige y auditoría.
 
-5. Detectar cuál es el hostname interno correcto del servicio MinIO dentro de Docker/Coolify. No usar 127.0.0.1.
-6. Crear endpoint:
+Reglas:
 
-POST /api/files/upload
+- Solo dispositivos autorizados pueden usar /checador.
+- No permitir checar si el dispositivo no está registrado.
+- No permitir salida si no existe entrada activa.
+- No permitir doble entrada si ya hay turno activo.
+- Permitir corrección manual solo a ADMIN/SUPERADMIN/ENCARGADO autorizado.
+- Toda corrección debe quedar auditada.
+- La foto es obligatoria.
+- No usar reconocimiento facial en esta primera versión, solo foto como evidencia.
 
-Debe recibir multipart/form-data con un archivo llamado file.
+Integración con adelantos/consumos:
 
-7. Validar:
+- Antes de permitir registrar adelantos o consumos de empleado, validar que el empleado tenga turno activo hoy.
+- Si no tiene entrada activa o ya registró salida, bloquear el movimiento y mostrar mensaje: “El empleado no tiene turno activo registrado.”
+- Registrar en auditoría cuando se bloquee un intento.
 
-- Solo permitir image/jpeg, image/png, image/webp
-- Máximo 5 MB
-- Rechazar cualquier otro archivo
+Panel admin:
 
-8. Guardar los archivos en MinIO con estructura:
+- Vista de asistencia del día por sucursal.
+- Estado actual: en turno / salió / sin checar.
+- Historial por empleado.
+- Vista de fotos de evidencia.
+- Filtros por fecha, sucursal y empleado.
+- Exportación a Excel.
+- Correcciones manuales con motivo obligatorio.
 
-incidencias/{branchId}/{year}/{month}/{uuid}.{ext}
-empleados/{employeeId}/{uuid}.{ext}
-checklists/{branchId}/{type}/{year}/{month}/{uuid}.{ext}
+Seguridad:
 
-9. Crear modelo Prisma FileAsset con campos:
-
-- id
-- bucket
-- key
-- originalName
-- mimeType
-- size
-- module
-- entityId
-- branchId
-- uploadedByUserId
-- createdAt
-
-10. Al subir una imagen:
-
-- Guardarla en MinIO
-- Guardar su referencia en PostgreSQL
-- Retornar el id del archivo y una URL interna para consultarlo
-
-11. Crear endpoint:
-
-GET /api/files/:id
-
-Este endpoint debe:
-
-- Buscar el archivo en PostgreSQL
-- Validar permisos del usuario
-- Leerlo desde MinIO
-- Devolver la imagen al frontend
-
-12. Crear endpoint:
-
-DELETE /api/files/:id
-
-Debe:
-
-- Eliminar el objeto de MinIO
-- Eliminar o marcar como eliminado el registro en PostgreSQL
-
-13. No hacer público el bucket de MinIO.
-14. No exponer access key ni secret key al frontend.
-15. Actualizar .env.example con las variables necesarias.
-16. Probar subiendo una imagen real desde el frontend.
-17. No romper los módulos existentes.
-18. Entregar resumen de archivos modificados y cómo probarlo.
+- El token del dispositivo no debe estar expuesto como variable editable por empleados.
+- La pantalla /checador debe tener permisos mínimos.
+- No mostrar datos sensibles.
+- Validar todo en backend, no confiar en frontend.
+- Usar la zona horaria local de Mexicali para los registros.
