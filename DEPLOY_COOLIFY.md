@@ -115,6 +115,18 @@ Variable opcional:
 COOLIFY_DB_WAIT_TIMEOUT=60000
 ```
 
+## Diagnostico rapido de 502 en `/api/auth/login`
+
+Si el frontend abre pero el login responde 502, el problema esta entre Nginx del servicio `web` y el servicio `api`.
+
+Verifica en Coolify:
+
+1. El servicio `api` debe estar `running` y con healthcheck sano.
+2. En logs de `api`, confirma que aparezca `API listening on http://localhost:3001`.
+3. Si `api` se apaga antes de iniciar, revisa primero `DATABASE_URL`, `JWT_SECRET` y errores de `prisma migrate deploy`.
+4. Deja `VITE_API_URL=/api` en el build del servicio `web`; no uses una IP LAN para produccion.
+5. No expongas `api` al exterior si `web` y `api` estan en el mismo compose; Nginx usa el hostname interno `api:3001`.
+
 ## Verificar migraciones
 
 Desde la consola del contenedor `api`:
