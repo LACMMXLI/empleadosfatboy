@@ -169,7 +169,7 @@ export function syncAdminPwa(enabled: boolean) {
   appendLink("apple-touch-icon", "/pwa/employee-apple-touch-180.png", { sizes: "180x180" })
   appendMeta("theme-color", "#050710")
   appendMeta("apple-mobile-web-app-capable", "yes")
-  appendMeta("apple-mobile-web-app-title", "Fatboy Admin")
+  appendMeta("apple-mobile-web-app-title", "Fatboy RH")
   appendMeta("apple-mobile-web-app-status-bar-style", "black-translucent")
   
   if (!adminServiceWorkerRegistered) {

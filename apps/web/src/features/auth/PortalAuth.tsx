@@ -93,7 +93,7 @@ export function PortalSelector({ onNavigate }: { onNavigate: (route: PortalRoute
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-3xl space-y-4">
         <div className="space-y-1 text-center">
-          <h1 className="text-2xl font-semibold">Fatboy Control Empleados</h1>
+          <h1 className="text-2xl font-semibold">Fatboy RH</h1>
           <p className="text-sm text-muted-foreground">Selecciona el portal que quieres abrir</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -115,9 +115,9 @@ export function PortalSelector({ onNavigate }: { onNavigate: (route: PortalRoute
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <KeyRound className="h-4 w-4" />
-                Portal Administrativo
+                Administración RH
               </CardTitle>
-              <p className="text-sm text-muted-foreground">Autorizaciones, empleados y movimientos administrativos.</p>
+              <p className="text-sm text-muted-foreground">Adelantos, empleados y control interno de recursos humanos.</p>
             </CardHeader>
             <CardContent>
               <Button className="h-12 w-full" onClick={() => goToPortal("admin", onNavigate)}>
@@ -152,7 +152,7 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
         <CardHeader className="space-y-4 p-5 pb-3">
           <LoginLogo />
           <div>
-            <CardTitle className="text-xl">Portal Administrativo</CardTitle>
+            <CardTitle className="text-xl">Fatboy RH</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">Correo electrónico y contraseña</p>
           </div>
         </CardHeader>
@@ -172,7 +172,7 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
                 type="button"
               >
                 <Download className="h-4 w-4" />
-                Instalar App Administrativa
+                Instalar Fatboy RH
               </Button>
             )}
 
@@ -188,10 +188,6 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
                 </button>
               </div>
             )}
-
-            <Button className="h-11 w-full rounded-xl hover:bg-white/10" type="button" variant="ghost" onClick={() => goToPortal("home", () => window.location.reload())}>
-              Volver
-            </Button>
           </form>
         </CardContent>
       </Card>

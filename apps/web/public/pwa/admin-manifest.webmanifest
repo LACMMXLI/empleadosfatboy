@@ -1,8 +1,8 @@
 {
   "id": "/admin",
-  "name": "Fatboy Admin",
-  "short_name": "Fatboy Admin",
-  "description": "Portal administrativo de Fatboy POS para autorizaciones, nómina y configuración.",
+  "name": "Fatboy RH",
+  "short_name": "Fatboy RH",
+  "description": "Sistema interno Fatboy RH para adelantos, nómina y configuración de recursos humanos.",
   "lang": "es-MX",
   "start_url": "/admin",
   "scope": "/admin",

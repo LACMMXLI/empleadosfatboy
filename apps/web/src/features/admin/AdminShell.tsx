@@ -85,6 +85,11 @@ export function Shell({
   const me = useQuery({ queryKey: ["me"], queryFn: api.me })
   const { scrollDir, isNearTop } = useScrollDirection()
   const showNav = isNearTop || scrollDir === "up"
+  const handleLogout = () => {
+    if (!window.confirm("¿Cerrar sesión del administrador?")) return
+    session.token = null
+    onLogout()
+  }
 
   const views = useMemo(() => {
     if (me.data?.role === "CAJERO") {
@@ -112,8 +117,8 @@ export function Shell({
           <div className="admin-sidebar-brand">
             <img src={fatboyLogo} alt="Fatboy" className="admin-sidebar-logo" />
             <div>
-              <div className="admin-sidebar-title">Fatboy POS</div>
-              <div className="admin-sidebar-subtitle">Admin</div>
+              <div className="admin-sidebar-title">Fatboy RH</div>
+              <div className="admin-sidebar-subtitle">Adelantos internos</div>
             </div>
           </div>
           <nav className="flex flex-col gap-0.5 p-2 flex-1">
@@ -132,7 +137,7 @@ export function Shell({
           <div className="p-2 border-t border-white/5">
             <button
               className="nav-item w-full"
-              onClick={() => { session.token = null; onLogout() }}
+              onClick={handleLogout}
               type="button"
             >
               <LogOut className="nav-icon" />
@@ -163,7 +168,7 @@ export function Shell({
             </div>
             <button
               className="btn-icon lg:hidden"
-              onClick={() => { session.token = null; onLogout() }}
+              onClick={handleLogout}
               type="button"
               aria-label="Cerrar sesión"
             >
@@ -2199,6 +2204,7 @@ function Configuration() {
   const [selectedUserId, setSelectedUserId] = useState("")
   const [editRuleId, setEditRuleId] = useState("")
   const [editBranchId, setEditBranchId] = useState("")
+  const [settingsTab, setSettingsTab] = useState<"general" | "branches" | "users" | "rules">("general")
 
   const configuration = useQuery({ queryKey: ["configuration"], queryFn: api.configuration })
   const rules = useQuery({ queryKey: ["rules"], queryFn: api.rules })
@@ -2368,301 +2374,323 @@ function Configuration() {
           <Settings style={{ width: 16, height: 16, color: '#00e5ff' }} />
           Configuración
         </div>
-      </div>
-
-      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-        {/* Beverage price */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div className="admin-card-title">
-              <Banknote style={{ width: 14, height: 14, color: '#fbbf24' }} />
-              Precio de bebida
-            </div>
-          </div>
-          <div className="admin-card-body">
-            <p style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))', marginBottom: '0.75rem' }}>Se aplica automáticamente al solicitar bebida.</p>
-            <form className="space-y-2.5" onSubmit={configForm.handleSubmit((values) => updateConfig.mutate(values))}>
-              <input className="form-input" type="number" step="0.01" placeholder="Precio" {...configForm.register("beveragePrice")} />
-              <button className="btn-primary" style={{ width: '100%' }} disabled={updateConfig.isPending} type="submit">Guardar precio</button>
-            </form>
-          </div>
-        </div>
-
-        {/* New admin rule */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div className="admin-card-title">
-              <ShieldCheck style={{ width: 14, height: 14, color: '#a855f7' }} />
-              Nueva regla de autorización
-            </div>
-          </div>
-          <div className="admin-card-body">
-            <form className="space-y-2.5" onSubmit={form.handleSubmit((values) => createRule.mutate(values))}>
-              <select className="form-select" {...form.register("kind")}>
-                <option value="">Todos los tipos</option>
-                {Object.entries(movementLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <input className="form-input" type="number" step="0.01" placeholder="Monto mínimo" {...form.register("minAmount")} />
-                <input className="form-input" type="number" step="0.01" placeholder="Monto máximo" {...form.register("maxAmount")} />
-              </div>
-              <select className="form-select" {...form.register("requiredRole")}>
-                {["ENCARGADO", "GERENTE", "ADMINISTRADOR"].map((role) => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
-              <button className="btn-primary" style={{ width: '100%' }} type="submit">Guardar regla</button>
-            </form>
-          </div>
-        </div>
-
-        {/* New Branch */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div className="admin-card-title">
-              <Building2 style={{ width: 14, height: 14, color: '#00e5ff' }} />
-              Nueva sucursal
-            </div>
-          </div>
-          <div className="admin-card-body">
-            <form className="space-y-2.5" onSubmit={branchForm.handleSubmit((values) => createBranch.mutate(values))}>
-              <input className="form-input" placeholder="Nombre de sucursal" {...branchForm.register("name")} />
-              <input className="form-input" placeholder="Código único (ej. NORTE)" {...branchForm.register("code")} />
-              <button className="btn-primary" style={{ width: '100%' }} disabled={createBranch.isPending} type="submit">Crear sucursal</button>
-              {createBranch.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{createBranch.error.message}</div>}
-            </form>
-          </div>
-        </div>
-
-        {/* New admin user */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div className="admin-card-title">
-              <UserRoundPlus style={{ width: 14, height: 14, color: '#00e5ff' }} />
-              Nuevo usuario del sistema
-            </div>
-          </div>
-          <div className="admin-card-body">
-            <form className="space-y-2.5" onSubmit={userForm.handleSubmit((values) => createUser.mutate(values))}>
-              <input className="form-input" placeholder="Nombre completo" {...userForm.register("fullName")} />
-              <input className="form-input" placeholder="Correo electrónico" type="email" {...userForm.register("email")} />
-              <input className="form-input" placeholder="Contraseña temporal" type="password" {...userForm.register("password")} />
-              <select className="form-select" {...userForm.register("role")}>
-                {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
-              <select className="form-select" {...userForm.register("branchId")}>
-                <option value="">Sin sucursal (Matriz/Global)</option>
-                {activeBranches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-              <button className="btn-primary" style={{ width: '100%' }} disabled={createUser.isPending} type="submit">Crear usuario</button>
-              {createUser.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{createUser.error.message}</div>}
-            </form>
-          </div>
-        </div>
-
-        {/* Edit user */}
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <div className="admin-card-title">
-              <KeyRound style={{ width: 14, height: 14, color: '#00e5ff' }} />
-              Editar acceso de usuario
-            </div>
-          </div>
-          <div className="admin-card-body">
-            {!selectedUser && <StatusEmpty text="Selecciona un usuario de la lista para editarlo." />}
-            {selectedUser && (
-              <form
-                className="space-y-2.5"
-                onSubmit={userEditForm.handleSubmit((values) => updateUser.mutate({ id: selectedUser.id, values }))}
-              >
-                <input className="form-input" placeholder="Nombre completo" {...userEditForm.register("fullName")} />
-                <input className="form-input" placeholder="Correo" type="email" {...userEditForm.register("email")} />
-                <input className="form-input" placeholder="Nueva contraseña (opcional)" type="password" {...userEditForm.register("password")} />
-                <select className="form-select" {...userEditForm.register("role")}>
-                  {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
-                </select>
-                <select className="form-select" {...userEditForm.register("branchId")}>
-                  <option value="">Sin sucursal (Matriz/Global)</option>
-                  {activeBranches.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <button className="btn-primary" disabled={updateUser.isPending} type="submit">Guardar</button>
-                  <button
-                    className={selectedUser.active ? "btn-reject" : "btn-authorize"}
-                    type="button"
-                    disabled={toggleUser.isPending}
-                    onClick={() => toggleUser.mutate(selectedUser)}
-                  >
-                    {selectedUser.active ? "Desactivar" : "Activar"}
-                  </button>
-                </div>
-                {updateUser.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{updateUser.error.message}</div>}
-                {toggleUser.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{toggleUser.error.message}</div>}
-              </form>
-            )}
-          </div>
+        <div className="section-actions">
+          {configuration.data && <span className="section-count">Sistema activo</span>}
         </div>
       </div>
 
-      {/* Admin branches list */}
-      <div className="admin-card">
-        <div className="admin-card-header">
-          <div className="admin-card-title">
-            <Building2 style={{ width: 15, height: 15, color: '#00e5ff' }} />
-            Catálogo de sucursales
-          </div>
-          {branches.data && <span className="section-count">{branches.data.length}</span>}
-        </div>
-        <div className="admin-card-body">
-          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
-            {branches.data?.map((branch) => (
-              <div
-                key={branch.id}
-                className={`employee-card ${editBranchId === branch.id ? "selected" : ""}`}
-                style={{ padding: '0.75rem', cursor: 'default' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '3px' }}>
-                  <div className="employee-card-name" style={{ fontWeight: 700 }}>{branch.name}</div>
-                  <span className={branch.active ? "badge-status badge-authorized" : "badge-status badge-canceled"} style={{ flexShrink: 0 }}>
-                    {branch.active ? "Activa" : "Inact."}
-                  </span>
-                </div>
-                <div className="employee-card-info font-mono text-cyan-300" style={{ fontSize: '0.75rem' }}>{branch.code}</div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '10px', justifyContent: 'flex-end' }}>
-                  <button
-                    className="btn-ghost"
-                    style={{ height: '1.75rem', padding: '0 0.5rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                    onClick={() => setEditBranchId(branch.id)}
-                    type="button"
-                  >
-                    <Pencil style={{ width: 11, height: 11 }} />
-                    Editar
-                  </button>
-                  {branch.active && (
-                    <button
-                      className="btn-reject"
-                      style={{ height: '1.75rem', padding: '0 0.5rem', fontSize: '0.75rem', borderRadius: '0.375rem' }}
-                      onClick={() => {
-                        if (confirm(`¿Estás seguro de que deseas desactivar la sucursal ${branch.name}?`)) {
-                          deleteBranch.mutate(branch.id)
-                        }
-                      }}
-                      type="button"
-                    >
-                      Desactivar
-                    </button>
-                  )}
+      <div className="settings-tabs" role="tablist" aria-label="Secciones de configuración">
+        {[
+          { id: "general", label: "General", icon: Banknote, count: "Base" },
+          { id: "branches", label: "Sucursales", icon: Building2, count: String(branches.data?.length ?? 0) },
+          { id: "users", label: "Usuarios", icon: KeyRound, count: String(adminUsers.data?.length ?? 0) },
+          { id: "rules", label: "Reglas", icon: ShieldCheck, count: String(rules.data?.length ?? 0) }
+        ].map((item) => {
+          const Icon = item.icon
+          return (
+            <button
+              key={item.id}
+              className={`settings-tab ${settingsTab === item.id ? "active" : ""}`}
+              type="button"
+              onClick={() => setSettingsTab(item.id as typeof settingsTab)}
+            >
+              <Icon style={{ width: 15, height: 15 }} />
+              <span>{item.label}</span>
+              <strong>{item.count}</strong>
+            </button>
+          )
+        })}
+      </div>
+
+      {settingsTab === "general" && (
+        <div className="settings-layout">
+          <div className="settings-primary-column">
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div className="admin-card-title">
+                  <Banknote style={{ width: 14, height: 14, color: '#fbbf24' }} />
+                  Precio de bebida
                 </div>
               </div>
-            ))}
-            {!branches.data?.length && <StatusEmpty text="Sin sucursales registradas." />}
+              <div className="admin-card-body">
+                <form className="settings-form" onSubmit={configForm.handleSubmit((values) => updateConfig.mutate(values))}>
+                  <div className="form-field">
+                    <label className="form-label">Precio que se descuenta al empleado</label>
+                    <input className="form-input" type="number" step="0.01" placeholder="Precio" {...configForm.register("beveragePrice")} />
+                  </div>
+                  <button className="btn-primary modal-submit" disabled={updateConfig.isPending} type="submit">
+                    Guardar precio
+                  </button>
+                  {updateConfig.error && <div className="status-empty compact-error">{updateConfig.error.message}</div>}
+                </form>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Admin users list */}
-      <div className="admin-card">
-        <div className="admin-card-header">
-          <div className="admin-card-title">Usuarios administrativos</div>
-          {adminUsers.data && <span className="section-count">{adminUsers.data.length}</span>}
-        </div>
-        <div className="admin-card-body">
-          <div style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-            {adminUsers.data?.map((user) => (
-              <button
-                key={user.id}
-                className={`employee-card ${selectedUserId === user.id ? "selected" : ""}`}
-                type="button"
-                onClick={() => setSelectedUserId(user.id)}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '3px' }}>
-                  <div className="employee-card-name">{user.fullName}</div>
-                  <span className={user.active ? "badge-status badge-authorized" : "badge-status badge-canceled"} style={{ flexShrink: 0 }}>
-                    {user.active ? "Activo" : "Inact."}
-                  </span>
-                </div>
-                <div className="employee-card-info">{user.email}</div>
-                <div className="employee-card-info" style={{ marginTop: '4px', color: '#a855f7', fontWeight: 600 }}>
-                  {user.role} {user.branch ? `• ${user.branch.name}` : ""}
-                </div>
+          <div className="settings-secondary-column">
+            <div className="settings-metric-grid">
+              <button className="settings-action-tile" type="button" onClick={() => setSettingsTab("branches")}>
+                <Building2 style={{ width: 17, height: 17 }} />
+                <span>Gestionar sucursales</span>
+                <strong>{activeBranches.length} activas</strong>
               </button>
-            ))}
-            {!adminUsers.data?.length && <StatusEmpty text="Sin usuarios administrativos." />}
+              <button className="settings-action-tile" type="button" onClick={() => setSettingsTab("users")}>
+                <KeyRound style={{ width: 17, height: 17 }} />
+                <span>Administrar usuarios</span>
+                <strong>{adminUsers.data?.filter((item) => item.active).length ?? 0} activos</strong>
+              </button>
+              <button className="settings-action-tile" type="button" onClick={() => setSettingsTab("rules")}>
+                <ShieldCheck style={{ width: 17, height: 17 }} />
+                <span>Control de autorización</span>
+                <strong>{rules.data?.length ?? 0} reglas</strong>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Rules */}
-      <div className="admin-card">
-        <div className="admin-card-header">
-          <div className="admin-card-title">Reglas de autorización activas</div>
-          {rules.data && <span className="section-count">{rules.data.length}</span>}
-        </div>
-        <div className="admin-card-body">
-          <div className="space-y-2">
-            {rules.data?.map((rule) => (
-              <div
-                key={rule.id}
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                  padding: '0.625rem 0.75rem',
-                  borderRadius: '0.625rem',
-                  border: '1px solid rgba(168,85,247,0.15)',
-                  background: 'rgba(168,85,247,0.04)',
-                  fontSize: '0.8rem'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
-                  <span style={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}>
-                    {rule.kind ? movementLabels[rule.kind as MovementKind] : "Todos los tipos"}
-                  </span>
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
-                    {money.format(Number(rule.minAmount))} – {rule.maxAmount ? money.format(Number(rule.maxAmount)) : "∞"}
-                  </span>
-                  <span className="badge-status badge-discounted" style={{ marginLeft: 'auto' }}>{rule.requiredRole}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '0.35rem' }}>
-                  <button
-                    className="btn-icon"
-                    style={{ width: '1.75rem', height: '1.75rem', borderRadius: '0.375rem' }}
-                    onClick={() => setEditRuleId(rule.id)}
-                    type="button"
-                  >
-                    <Pencil style={{ width: 11, height: 11 }} />
-                  </button>
-                  <button
-                    className="btn-reject"
-                    style={{ width: '1.75rem', height: '1.75rem', borderRadius: '0.375rem', padding: 0 }}
-                    onClick={() => {
-                      if (confirm("¿Estás seguro de que deseas eliminar esta regla de autorización?")) {
-                        deleteRule.mutate(rule.id)
-                      }
-                    }}
-                    type="button"
-                  >
-                    <Trash2 style={{ width: 11, height: 11 }} />
-                  </button>
+      {settingsTab === "branches" && (
+        <div className="settings-layout">
+          <div className="settings-primary-column">
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div className="admin-card-title">
+                  <Building2 style={{ width: 14, height: 14, color: '#00e5ff' }} />
+                  Nueva sucursal
                 </div>
               </div>
-            ))}
-            {!rules.data?.length && <StatusEmpty text="Sin reglas de autorización configuradas." />}
+              <div className="admin-card-body">
+                <form className="settings-form" onSubmit={branchForm.handleSubmit((values) => createBranch.mutate(values))}>
+                  <input className="form-input" placeholder="Nombre de sucursal" {...branchForm.register("name")} />
+                  <input className="form-input" placeholder="Código único (ej. NORTE)" {...branchForm.register("code")} />
+                  <button className="btn-primary modal-submit" disabled={createBranch.isPending} type="submit">Crear sucursal</button>
+                  {createBranch.error && <div className="status-empty compact-error">{createBranch.error.message}</div>}
+                </form>
+              </div>
+            </div>
+          </div>
+          <div className="settings-secondary-column">
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div className="admin-card-title">Catálogo de sucursales</div>
+                {branches.data && <span className="section-count">{branches.data.length}</span>}
+              </div>
+              <div className="admin-card-body">
+                <div className="settings-list-grid">
+                  {branches.data?.map((branch) => (
+                    <div key={branch.id} className={`settings-list-card ${editBranchId === branch.id ? "selected" : ""}`}>
+                      <div className="settings-list-main">
+                        <div className="settings-list-title">{branch.name}</div>
+                        <div className="settings-list-meta">{branch.code}</div>
+                      </div>
+                      <span className={branch.active ? "badge-status badge-authorized" : "badge-status badge-canceled"}>
+                        {branch.active ? "Activa" : "Inact."}
+                      </span>
+                      <div className="settings-row-actions">
+                        <button className="btn-icon" onClick={() => setEditBranchId(branch.id)} type="button" title="Editar sucursal">
+                          <Pencil style={{ width: 13, height: 13 }} />
+                        </button>
+                        {branch.active && (
+                          <button
+                            className="btn-icon danger"
+                            onClick={() => {
+                              if (confirm(`¿Estás seguro de que deseas desactivar la sucursal ${branch.name}?`)) {
+                                deleteBranch.mutate(branch.id)
+                              }
+                            }}
+                            type="button"
+                            title="Desactivar sucursal"
+                          >
+                            <Trash2 style={{ width: 13, height: 13 }} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {!branches.data?.length && <StatusEmpty text="Sin sucursales registradas." />}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {settingsTab === "users" && (
+        <div className="settings-layout">
+          <div className="settings-primary-column">
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div className="admin-card-title">
+                  <UserRoundPlus style={{ width: 14, height: 14, color: '#00e5ff' }} />
+                  Nuevo usuario
+                </div>
+              </div>
+              <div className="admin-card-body">
+                <form className="settings-form" onSubmit={userForm.handleSubmit((values) => createUser.mutate(values))}>
+                  <input className="form-input" placeholder="Nombre completo" {...userForm.register("fullName")} />
+                  <input className="form-input" placeholder="Correo electrónico" type="email" {...userForm.register("email")} />
+                  <input className="form-input" placeholder="Contraseña temporal" type="password" {...userForm.register("password")} />
+                  <select className="form-select" {...userForm.register("role")}>
+                    {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                  <select className="form-select" {...userForm.register("branchId")}>
+                    <option value="">Sin sucursal (Matriz/Global)</option>
+                    {activeBranches.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                  <button className="btn-primary modal-submit" disabled={createUser.isPending} type="submit">Crear usuario</button>
+                  {createUser.error && <div className="status-empty compact-error">{createUser.error.message}</div>}
+                </form>
+              </div>
+            </div>
+          </div>
+          <div className="settings-secondary-column">
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div className="admin-card-title">Usuarios administrativos</div>
+                {adminUsers.data && <span className="section-count">{adminUsers.data.length}</span>}
+              </div>
+              <div className="admin-card-body">
+                <div className="settings-list-grid">
+                  {adminUsers.data?.map((user) => (
+                    <button
+                      key={user.id}
+                      className={`settings-list-card interactive ${selectedUserId === user.id ? "selected" : ""}`}
+                      type="button"
+                      onClick={() => setSelectedUserId(user.id)}
+                    >
+                      <div className="settings-list-main">
+                        <div className="settings-list-title">{user.fullName}</div>
+                        <div className="settings-list-meta">{user.email}</div>
+                        <div className="settings-list-meta accent">{user.role} {user.branch ? `- ${user.branch.name}` : ""}</div>
+                      </div>
+                      <span className={user.active ? "badge-status badge-authorized" : "badge-status badge-canceled"}>
+                        {user.active ? "Activo" : "Inact."}
+                      </span>
+                    </button>
+                  ))}
+                  {!adminUsers.data?.length && <StatusEmpty text="Sin usuarios administrativos." />}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {settingsTab === "rules" && (
+        <div className="settings-layout">
+          <div className="settings-primary-column">
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div className="admin-card-title">
+                  <ShieldCheck style={{ width: 14, height: 14, color: '#a855f7' }} />
+                  Nueva regla
+                </div>
+              </div>
+              <div className="admin-card-body">
+                <form className="settings-form" onSubmit={form.handleSubmit((values) => createRule.mutate(values))}>
+                  <select className="form-select" {...form.register("kind")}>
+                    <option value="">Todos los tipos</option>
+                    {Object.entries(movementLabels).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <div className="admin-form-row">
+                    <input className="form-input" type="number" step="0.01" placeholder="Monto mínimo" {...form.register("minAmount")} />
+                    <input className="form-input" type="number" step="0.01" placeholder="Monto máximo" {...form.register("maxAmount")} />
+                  </div>
+                  <select className="form-select" {...form.register("requiredRole")}>
+                    {["ENCARGADO", "GERENTE", "ADMINISTRADOR"].map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                  <button className="btn-primary modal-submit" disabled={createRule.isPending} type="submit">Guardar regla</button>
+                  {createRule.error && <div className="status-empty compact-error">{createRule.error.message}</div>}
+                </form>
+              </div>
+            </div>
+          </div>
+          <div className="settings-secondary-column">
+            <div className="admin-card">
+              <div className="admin-card-header">
+                <div className="admin-card-title">Reglas de autorización activas</div>
+                {rules.data && <span className="section-count">{rules.data.length}</span>}
+              </div>
+              <div className="admin-card-body">
+                <div className="settings-list-grid">
+                  {rules.data?.map((rule) => (
+                    <div key={rule.id} className="settings-rule-row">
+                      <div className="settings-list-main">
+                        <div className="settings-list-title">{rule.kind ? movementLabels[rule.kind as MovementKind] : "Todos los tipos"}</div>
+                        <div className="settings-list-meta">{money.format(Number(rule.minAmount))} - {rule.maxAmount ? money.format(Number(rule.maxAmount)) : "sin límite"}</div>
+                      </div>
+                      <span className="badge-status badge-discounted">{rule.requiredRole}</span>
+                      <div className="settings-row-actions">
+                        <button className="btn-icon" onClick={() => setEditRuleId(rule.id)} type="button" title="Editar regla">
+                          <Pencil style={{ width: 13, height: 13 }} />
+                        </button>
+                        <button
+                          className="btn-icon danger"
+                          onClick={() => {
+                            if (confirm("¿Estás seguro de que deseas eliminar esta regla de autorización?")) {
+                              deleteRule.mutate(rule.id)
+                            }
+                          }}
+                          type="button"
+                          title="Eliminar regla"
+                        >
+                          <Trash2 style={{ width: 13, height: 13 }} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!rules.data?.length && <StatusEmpty text="Sin reglas de autorización configuradas." />}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {selectedUser && (
+        <AdminModal title="Editar acceso de usuario" subtitle={selectedUser.fullName} onClose={() => setSelectedUserId("")}>
+          <form
+            className="admin-modal-form"
+            onSubmit={userEditForm.handleSubmit((values) => updateUser.mutate({ id: selectedUser.id, values }))}
+          >
+            <input className="form-input" placeholder="Nombre completo" {...userEditForm.register("fullName")} />
+            <input className="form-input" placeholder="Correo" type="email" {...userEditForm.register("email")} />
+            <input className="form-input" placeholder="Nueva contraseña (opcional)" type="password" {...userEditForm.register("password")} />
+            <select className="form-select" {...userEditForm.register("role")}>
+              {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
+            <select className="form-select" {...userEditForm.register("branchId")}>
+              <option value="">Sin sucursal (Matriz/Global)</option>
+              {activeBranches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+            <div className="admin-form-row">
+              <button className="btn-primary" disabled={updateUser.isPending} type="submit">Guardar</button>
+              <button
+                className={selectedUser.active ? "btn-reject" : "btn-authorize"}
+                type="button"
+                disabled={toggleUser.isPending}
+                onClick={() => toggleUser.mutate(selectedUser)}
+              >
+                {selectedUser.active ? "Desactivar" : "Activar"}
+              </button>
+            </div>
+            {updateUser.error && <div className="status-empty compact-error">{updateUser.error.message}</div>}
+            {toggleUser.error && <div className="status-empty compact-error">{toggleUser.error.message}</div>}
+          </form>
+        </AdminModal>
+      )}
 
       {/* Edit Rule Modal */}
       {editRuleId && selectedRuleForEdit && (
