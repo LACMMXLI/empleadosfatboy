@@ -195,7 +195,7 @@ export type AdminUserEditFormInput = z.input<typeof adminUserEditSchema>
 export type AdminUserEditFormOutput = z.output<typeof adminUserEditSchema>
 
 export const employeeRequestKinds: MovementKind[] = ["SALARY_ADVANCE", "DRINK", "INTERNAL_CONSUMPTION"]
-export const quickRequestReasons = ["Emergencia", "Transporte", "Familiar", "Médico", "Otro"]
+export const quickRequestReasons = ["Personal", "Emergencia", "Otro"]
 export const administrativeMovementKinds: MovementKind[] = [
   "ADMIN_ADJUSTMENT",
   "SHORTAGE_DISCOUNT",

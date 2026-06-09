@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Banknote, Building2, CheckCircle2, ClipboardList, KeyRound, LayoutDashboard, LogOut, Phone, UserRound, WalletCards, X } from "lucide-react"
+import { AlertTriangle, Banknote, Building2, CheckCircle2, ClipboardList, KeyRound, LayoutDashboard, LogOut, Phone, Sparkles, UserRound, WalletCards, X } from "lucide-react"
 import { api, employeeSession } from "@/lib/api"
 import type { Movement, MovementKind, MovementSettlementTicket } from "@/types/domain"
 import { useScrollDirection } from "@/hooks/useScrollDirection"
 import { StatusEmpty } from "@/components/common/Status"
-import { DetailLine, GuidedBlock } from "@/components/common/AdminPrimitives"
+import { DetailLine } from "@/components/common/AdminPrimitives"
 import {
   employeeRequestKinds,
   employeeRequestSchema,
@@ -31,6 +31,8 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const [requestError, setRequestError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [codeMessage, setCodeMessage] = useState<string | null>(null)
+  const [reasonType, setReasonType] = useState<(typeof quickRequestReasons)[number]>("Personal")
+  const [customReason, setCustomReason] = useState("")
   const me = useQuery({ queryKey: ["employeePortal", "me"], queryFn: api.employeePortal.me })
   const balance = useQuery({ queryKey: ["employeePortal", "balance"], queryFn: api.employeePortal.balance })
   const movements = useQuery({ queryKey: ["employeePortal", "movements"], queryFn: api.employeePortal.movements })
@@ -38,7 +40,7 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const options = useQuery({ queryKey: ["employeePortal", "options"], queryFn: api.employeePortal.options })
   const form = useForm<EmployeeRequestFormInput, unknown, EmployeeRequestFormOutput>({
     resolver: zodResolver(employeeRequestSchema),
-    defaultValues: { kind: "SALARY_ADVANCE", amount: 0, reason: "" }
+    defaultValues: { kind: "SALARY_ADVANCE", amount: 0, reason: "Personal" }
   })
   const codeForm = useForm({ defaultValues: { currentCode: "", newCode: "" } })
   const selectedKind = form.watch("kind")
@@ -47,6 +49,7 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const isDrink = selectedKind === "DRINK"
   const requestAmount = isDrink ? beveragePrice : Number(values.amount || 0)
   const requestReason = values.reason?.trim() ?? ""
+  const needsCustomReason = reasonType === "Otro"
 
   const { scrollDir, isNearTop } = useScrollDirection()
   const showNav = isNearTop || scrollDir === "up"
@@ -79,23 +82,38 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
       setRequestError("El monto debe ser mayor a $0")
       return
     }
-    if (payload.kind !== "DRINK" && !payload.reason?.trim()) {
-      setRequestError("Agrega un motivo para continuar")
+    if (payload.kind !== "DRINK" && needsCustomReason && !customReason.trim()) {
+      setRequestError("Describe el motivo personalizado")
       return
+    }
+    if (payload.kind !== "DRINK") {
+      form.setValue("reason", resolveRequestReason(), { shouldDirty: true, shouldValidate: true })
     }
     setMessage(null)
     setRequestError(null)
     setConfirming(true)
   }
 
-  const appendQuickReason = (reason: string) => {
-    const currentReason = form.getValues("reason")?.trim()
-    const nextReason = currentReason
-      ? currentReason.toLowerCase().includes(reason.toLowerCase())
-        ? currentReason
-        : `${currentReason}, ${reason}`
-      : reason
-    form.setValue("reason", nextReason, { shouldDirty: true, shouldValidate: true })
+  const resolveRequestReason = () => {
+    if (reasonType === "Otro") return `Otro: ${customReason.trim()}`
+    return reasonType
+  }
+
+  const selectRequestReason = (reason: (typeof quickRequestReasons)[number]) => {
+    setReasonType(reason)
+    if (reason !== "Otro") {
+      setCustomReason("")
+      form.setValue("reason", reason, { shouldDirty: true, shouldValidate: true })
+    } else {
+      form.setValue("reason", customReason.trim() ? `Otro: ${customReason.trim()}` : "Otro", { shouldDirty: true, shouldValidate: true })
+    }
+    setConfirming(false)
+    setRequestError(null)
+  }
+
+  const updateCustomReason = (value: string) => {
+    setCustomReason(value)
+    form.setValue("reason", value.trim() ? `Otro: ${value.trim()}` : "", { shouldDirty: true, shouldValidate: true })
     setConfirming(false)
     setRequestError(null)
   }
@@ -111,7 +129,9 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
       setMessage(`Solicitud ${movement.folio} enviada`)
       setConfirming(false)
       setRequestError(null)
-      form.reset({ kind: "SALARY_ADVANCE", amount: 0, reason: "" })
+      setReasonType("Personal")
+      setCustomReason("")
+      form.reset({ kind: "SALARY_ADVANCE", amount: 0, reason: "Personal" })
       await queryClient.invalidateQueries({ queryKey: ["employeePortal"] })
     },
     onError: (err: Error) => {
@@ -244,60 +264,68 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
         )}
 
         {activeTab === "request" && (
-          <div className="admin-card">
-            <div className="admin-card-header">
-              <div className="admin-card-title">
-                <Banknote style={{ width: 16, height: 16, color: '#00e5ff' }} />
-                Nueva Solicitud
+          <section className="employee-request-panel">
+            <div className="employee-request-hero">
+              <div className="employee-request-kicker">
+                <Sparkles style={{ width: 14, height: 14 }} />
+                Solicitud interna
               </div>
+              <h2>Solicitar adelanto</h2>
+              <p>Elige tipo, monto y motivo en un solo flujo. Antes de enviar verás una confirmación.</p>
             </div>
-            <div className="admin-card-body">
-              <form
-                className="space-y-4"
-                noValidate
-                onSubmit={form.handleSubmit(prepareRequestConfirmation, handleInvalidRequest)}
-              >
-                <GuidedBlock step="1" title="Tipo de Adelanto" detail="Selecciona la categoría de tu solicitud">
-                  <div className="employee-action-grid">
-                    {employeeRequestKinds.map((k) => {
-                      const active = selectedKind === k
-                      const Icon = k === "SALARY_ADVANCE" ? Banknote : k === "DRINK" ? WalletCards : Building2
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          className={`employee-action-btn ${active ? "active" : ""}`}
-                          onClick={() => {
-                            form.setValue("kind", k as EmployeeRequestFormInput["kind"])
-                            setConfirming(false)
-                            setRequestError(null)
-                          }}
-                        >
-                          <Icon />
-                          <span className="employee-action-label" style={{ fontSize: '0.675rem' }}>{movementLabels[k]}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </GuidedBlock>
 
-                <GuidedBlock
-                  step="2"
-                  title={isDrink ? "Consumo de bebida" : "Monto de la Solicitud"}
-                  detail={isDrink ? "Precio fijo configurado por administración" : "Captura el monto a solicitar"}
-                >
-                  {isDrink ? (
-                    <div className="flex h-12 items-center justify-between rounded-xl border border-border bg-background/70 px-4 text-sm">
-                      <span className="text-muted-foreground">Bebida consumida</span>
-                      <span className="font-mono text-base font-bold text-foreground">{money.format(beveragePrice)}</span>
-                    </div>
-                  ) : (
+            <form
+              className="employee-request-form"
+              noValidate
+              onSubmit={form.handleSubmit(prepareRequestConfirmation, handleInvalidRequest)}
+            >
+              <div className="employee-request-section">
+                <div className="employee-request-section-head">
+                  <span>Tipo</span>
+                  <strong>{movementLabels[selectedKind as MovementKind]}</strong>
+                </div>
+                <div className="employee-action-grid premium">
+                  {employeeRequestKinds.map((k) => {
+                    const active = selectedKind === k
+                    const Icon = k === "SALARY_ADVANCE" ? Banknote : k === "DRINK" ? WalletCards : Building2
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        className={`employee-action-btn premium ${active ? "active" : ""}`}
+                        onClick={() => {
+                          form.setValue("kind", k as EmployeeRequestFormInput["kind"])
+                          setConfirming(false)
+                          setRequestError(null)
+                        }}
+                      >
+                        <Icon />
+                        <span className="employee-action-label">{movementLabels[k]}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="employee-request-section">
+                <div className="employee-request-section-head">
+                  <span>{isDrink ? "Consumo" : "Monto"}</span>
+                  <strong>{money.format(Number.isFinite(requestAmount) ? requestAmount : 0)}</strong>
+                </div>
+                {isDrink ? (
+                  <div className="employee-request-readonly">
+                    <span>Bebida consumida</span>
+                    <strong>{money.format(beveragePrice)}</strong>
+                  </div>
+                ) : (
+                  <div className="employee-amount-input-wrap">
+                    <span>$</span>
                     <input
-                      className="form-input h-12"
+                      className="employee-amount-input"
                       type="number"
                       step="0.01"
                       min="0.01"
-                      placeholder="Monto ($)"
+                      placeholder="0.00"
                       {...form.register("amount", {
                         onChange: () => {
                           setConfirming(false)
@@ -305,84 +333,88 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                         }
                       })}
                     />
-                  )}
-                  <div className="flex items-center justify-between rounded-xl border border-border bg-secondary/30 px-4 py-2.5 text-xs">
-                    <span className="text-muted-foreground">Total de la solicitud</span>
-                    <span className="font-mono text-sm font-bold text-primary">{money.format(Number.isFinite(requestAmount) ? requestAmount : 0)}</span>
                   </div>
-                </GuidedBlock>
-
-                {!isDrink && (
-                  <GuidedBlock step="3" title="Motivo" detail="Razón corta obligatoria para la solicitud">
-                    <div className="flex flex-wrap gap-1.5">
-                      {quickRequestReasons.map((reason) => (
-                        <button
-                          key={reason}
-                          className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[0.675rem] font-semibold text-primary transition active:bg-primary/20"
-                          type="button"
-                          onClick={() => appendQuickReason(reason)}
-                        >
-                          {reason}
-                        </button>
-                      ))}
-                    </div>
-                    <textarea
-                      className="form-textarea mt-2"
-                      placeholder="Escribe brevemente tu motivo..."
-                      {...form.register("reason", {
-                        onChange: () => {
-                          setConfirming(false)
-                          setRequestError(null)
-                        }
-                      })}
-                    />
-                  </GuidedBlock>
                 )}
+              </div>
+
+              {!isDrink && (
+                <div className="employee-request-section">
+                  <div className="employee-request-section-head">
+                    <span>Motivo</span>
+                    <strong>{needsCustomReason ? "Personalizado" : reasonType}</strong>
+                  </div>
+                  <div className="employee-reason-segment">
+                    {quickRequestReasons.map((reason) => (
+                      <button
+                        key={reason}
+                        className={reasonType === reason ? "active" : ""}
+                        type="button"
+                        onClick={() => selectRequestReason(reason)}
+                      >
+                        {reason === "Emergencia" && <AlertTriangle style={{ width: 13, height: 13 }} />}
+                        {reason}
+                      </button>
+                    ))}
+                  </div>
+                  {needsCustomReason && (
+                    <textarea
+                      className="employee-reason-textarea"
+                      placeholder="Describe brevemente tu motivo personalizado..."
+                      value={customReason}
+                      onChange={(event) => updateCustomReason(event.target.value)}
+                    />
+                  )}
+                </div>
+              )}
 
                 {requestError && (
-                  <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive-foreground text-center">
+                  <div className="employee-request-error">
                     {requestError}
                   </div>
                 )}
                 
-                <button className="btn-primary h-12 w-full rounded-xl text-sm" disabled={create.isPending} type="submit">
+                <button className="employee-request-submit" disabled={create.isPending} type="submit">
                   {create.isPending ? "Procesando..." : isDrink ? "Revisar consumo de bebida" : "Continuar"}
                 </button>
-                <p className="px-1 text-center text-[10px] text-muted-foreground leading-relaxed">
+                <p className="employee-request-footnote">
                   *Las solicitudes se envían al panel de administración para su aprobación y posterior deducción de nómina.
                 </p>
                 {message && (
-                  <div className="rounded-xl border border-border bg-secondary/30 p-3 text-xs text-center text-muted-foreground mt-2">
+                  <div className="employee-request-message">
                     {message}
                   </div>
                 )}
               </form>
-            </div>
-          </div>
+          </section>
         )}
 
         {confirming && activeTab === "request" && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" onClick={() => setConfirming(false)}>
-            <div className="w-full max-w-md rounded-3xl border border-border bg-card p-5 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
-              <div className="space-y-1">
-                <div className="text-base font-bold text-foreground">{isDrink ? "Confirmar consumo de bebida" : "Confirmar Solicitud"}</div>
-                <p className="text-xs text-muted-foreground">
+          <div className="employee-confirm-backdrop" role="dialog" aria-modal="true" onClick={() => setConfirming(false)}>
+            <div className="employee-confirm-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="employee-confirm-hero">
+                <div className="employee-confirm-icon">
+                  <CheckCircle2 style={{ width: 22, height: 22 }} />
+                </div>
+                <div>
+                  <div className="employee-confirm-title">{isDrink ? "Confirmar consumo" : "Confirmar solicitud"}</div>
+                  <p>
                   {isDrink
                     ? "Confirma que estás solicitando el descuento por esta bebida consumida."
                     : "Verifica que los datos sean correctos antes de enviarla."}
-                </p>
+                  </p>
+                </div>
               </div>
-              <div className="mt-4 space-y-2.5 rounded-2xl border border-border bg-secondary/30 p-4 text-xs">
+              <div className="employee-confirm-summary">
                 <DetailLine label={isDrink ? "Concepto" : "Categoría de adelanto"} value={movementLabels[values.kind as MovementKind]} />
                 <DetailLine label="Importe total" value={money.format(Number.isFinite(requestAmount) ? requestAmount : 0)} />
                 {!isDrink && <DetailLine label="Motivo especificado" value={requestReason || "Sin motivo"} />}
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button className="btn-secondary h-12 rounded-xl text-xs" type="button" onClick={() => setConfirming(false)}>
+              <div className="employee-confirm-actions">
+                <button className="btn-secondary" type="button" onClick={() => setConfirming(false)}>
                   Cancelar
                 </button>
                 <button
-                  className="btn-primary h-12 rounded-xl text-xs"
+                  className="btn-primary"
                   type="button"
                   disabled={create.isPending}
                   onClick={form.handleSubmit((payload) => {
