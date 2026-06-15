@@ -6,7 +6,7 @@ import type { TimeClockEventType } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
-const KIOSK_PIN_LENGTH = 4
+const KIOSK_PIN_LENGTH = 6
 
 type KioskStatus = "idle" | "validating_pin" | "capturing_photo" | "registering" | "success" | "error"
 type VerifiedEmployee = {
