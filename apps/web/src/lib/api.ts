@@ -365,6 +365,12 @@ export const api = {
       formData.append("photo", payload.photo, "checador.jpg")
       return timeClockFormRequest<{ ok: boolean; message: string; entry: TimeClockEntry }>("/time-clock/public/entries", formData)
     },
+    registerDrink(employeeCode: string) {
+      return timeClockRequest<{ ok: boolean; message: string; amount: number; movement: Movement; employee: Pick<Employee, "id" | "fullName" | "position"> }>("/time-clock/public/drink", {
+        method: "POST",
+        body: JSON.stringify({ employeeCode })
+      })
+    },
     requestDeviceAuthorization(requestToken: string) {
       return request<TimeClockDeviceRequest & { device?: { id: string; name: string; branch: Branch } }>("/time-clock/public/device-requests", {
         method: "POST",

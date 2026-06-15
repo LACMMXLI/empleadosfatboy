@@ -3886,16 +3886,18 @@
   }
 
   .timeclock-kiosk-btn-entry,
-  .timeclock-kiosk-btn-exit {
+  .timeclock-kiosk-btn-exit,
+  .timeclock-kiosk-btn-drink {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     width: 100%;
-    height: 40%;
+    min-height: 0;
+    flex: 1 1 0;
     border-radius: 1rem;
-    font-size: 1.25rem;
+    font-size: 1.05rem;
     font-weight: 900;
     cursor: pointer;
     transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -3925,14 +3927,27 @@
     transform: translateY(-2px);
   }
 
+  .timeclock-kiosk-btn-drink {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.22);
+  }
+
+  .timeclock-kiosk-btn-drink:hover:not(:disabled) {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.36);
+    transform: translateY(-2px);
+  }
+
   .timeclock-kiosk-btn-entry:active:not(:disabled),
-  .timeclock-kiosk-btn-exit:active:not(:disabled) {
+  .timeclock-kiosk-btn-exit:active:not(:disabled),
+  .timeclock-kiosk-btn-drink:active:not(:disabled) {
     transform: translateY(0);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   }
 
   .timeclock-kiosk-btn-entry:disabled,
-  .timeclock-kiosk-btn-exit:disabled {
+  .timeclock-kiosk-btn-exit:disabled,
+  .timeclock-kiosk-btn-drink:disabled {
     opacity: 0.35;
     cursor: not-allowed;
     transform: none;
@@ -3940,13 +3955,14 @@
   }
 
   .timeclock-kiosk-btn-entry svg,
-  .timeclock-kiosk-btn-exit svg {
-    width: 2rem;
-    height: 2rem;
+  .timeclock-kiosk-btn-exit svg,
+  .timeclock-kiosk-btn-drink svg {
+    width: 1.65rem;
+    height: 1.65rem;
   }
 
   .timeclock-kiosk-status-card {
-    height: 20%;
+    height: 18%;
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 0.85rem;
@@ -4009,7 +4025,7 @@
   }
 
   .timeclock-kiosk-last-success {
-    height: 35%;
+    height: 24%;
     border: 1px dashed rgba(34, 197, 94, 0.3);
     background: rgba(34, 197, 94, 0.03);
     border-radius: 0.85rem;
@@ -4070,4 +4086,3 @@
     to { opacity: 1; transform: translateY(0); }
   }
 }
-

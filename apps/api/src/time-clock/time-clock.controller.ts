@@ -75,6 +75,11 @@ class RegisterEntryDto {
   type!: TimeClockEventType
 }
 
+class RegisterDrinkDto {
+  @IsString()
+  employeeCode!: string
+}
+
 class VerifyEmployeeCodeDto {
   @IsString()
   employeeCode!: string
@@ -179,6 +184,18 @@ export class TimeClockPublicController {
     @Req() request: RequestWithUser
   ) {
     return this.timeClock.registerEntry(token, dto, photo, {
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] as string | undefined
+    })
+  }
+
+  @Post("drink")
+  drink(
+    @Headers("x-time-clock-device") token: string | undefined,
+    @Body() dto: RegisterDrinkDto,
+    @Req() request: RequestWithUser
+  ) {
+    return this.timeClock.registerDrink(token, dto, {
       ipAddress: request.ip,
       userAgent: request.headers["user-agent"] as string | undefined
     })

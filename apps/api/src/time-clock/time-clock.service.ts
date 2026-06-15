@@ -2,6 +2,8 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException,
 import {
   AuditAction,
   MovementKind,
+  MovementOrigin,
+  MovementStatus,
   Prisma,
   Role,
   TimeClockDeviceRequestStatus,
@@ -48,6 +50,10 @@ type RegisterEntryInput = {
   type: TimeClockEventType
 }
 
+type RegisterDrinkInput = {
+  employeeCode: string
+}
+
 type VerifyEmployeeCodeInput = {
   employeeCode: string
 }
@@ -70,6 +76,7 @@ type ManualAdjustmentInput = {
 const timeZone = "America/Tijuana"
 const deviceRequestMinutes = 30
 const minimumTimeClockGapMs = 2 * 60 * 1000
+const minimumDrinkGapMs = 2 * 60 * 1000
 const movementKindsThatRequireActiveShift = new Set<MovementKind>([
   MovementKind.SALARY_ADVANCE,
   MovementKind.ADMIN_SALARY_ADVANCE,
@@ -518,6 +525,87 @@ export class TimeClockService {
     }
   }
 
+  async registerDrink(token: string | undefined, input: RegisterDrinkInput, metadata: RequestMetadata) {
+    const device = await this.validateDeviceToken(token)
+    const employeeCode = this.normalizeEmployeeCode(input.employeeCode)
+    if (!employeeCode) throw new BadRequestException("Codigo de empleado requerido")
+
+    const throttleId = this.timeClockThrottleIdentifier(device.id, employeeCode, metadata.ipAddress)
+    await this.loginThrottle.assertCanAttempt("time-clock", throttleId)
+
+    const employee = await this.findEmployeeByCode(device.branchId, employeeCode)
+    if (!employee) {
+      await this.loginThrottle.recordFailure("time-clock", throttleId, metadata)
+      throw new BadRequestException("Codigo de empleado invalido")
+    }
+
+    await this.loginThrottle.recordSuccess("time-clock", throttleId)
+
+    await this.ensureEmployeeHasActiveShiftToday(employee.id, MovementKind.DRINK, {
+      ...metadata,
+      device: `time-clock:${device.id}`,
+      context: "time-clock-drink"
+    })
+    await this.assertDrinkGap(employee.id, device.id, new Date())
+
+    const config = await this.prisma.systemConfig.upsert({
+      where: { id: "default" },
+      update: {},
+      create: { id: "default" }
+    })
+    const amount = Number(config.beveragePrice)
+    const folio = await this.nextMovementFolio()
+
+    const movement = await this.prisma.movement.create({
+      data: {
+        folio,
+        employeeId: employee.id,
+        branchId: device.branchId,
+        kind: MovementKind.DRINK,
+        origin: MovementOrigin.EMPLOYEE_REQUEST,
+        amount,
+        reason: "Bebida",
+        status: MovementStatus.AUTHORIZED,
+        authorizedAt: new Date(),
+        productName: "Bebida",
+        quantity: 1,
+        unitPrice: amount,
+        receiptText: config.receiptLegalText,
+        requestIp: metadata.ipAddress,
+        requestUserAgent: metadata.userAgent,
+        requestDevice: `time-clock:${device.id}`
+      },
+      include: {
+        employee: { include: { branch: true } }
+      }
+    })
+
+    await this.audit.log({
+      action: AuditAction.CREATE,
+      entity: "Movement",
+      entityId: movement.id,
+      affectedEmployeeId: employee.id,
+      newValue: this.toJson({
+        ...movement,
+        source: "time-clock-drink",
+        deviceId: device.id
+      }),
+      ipAddress: metadata.ipAddress
+    })
+
+    return {
+      ok: true,
+      message: "Bebida registrada",
+      amount,
+      movement,
+      employee: {
+        id: employee.id,
+        fullName: employee.fullName,
+        position: employee.position
+      }
+    }
+  }
+
   async attendance(filters: AttendanceFilters, user: AuthUser) {
     const date = filters.date || this.localParts(new Date()).localDate
     const branchId = this.effectiveBranchFilter(filters.branchId, user)
@@ -801,6 +889,26 @@ export class TimeClockService {
     throw new BadRequestException(`Espera ${remainingSeconds} segundos antes de registrar otra checada`)
   }
 
+  private async assertDrinkGap(employeeId: string, deviceId: string, now: Date) {
+    const lastDrink = await this.prisma.movement.findFirst({
+      where: {
+        employeeId,
+        kind: MovementKind.DRINK,
+        status: { not: MovementStatus.CANCELED },
+        requestDevice: `time-clock:${deviceId}`
+      },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true }
+    })
+    if (!lastDrink) return
+
+    const elapsedMs = now.getTime() - lastDrink.createdAt.getTime()
+    if (elapsedMs >= minimumDrinkGapMs) return
+
+    const remainingSeconds = Math.ceil((minimumDrinkGapMs - elapsedMs) / 1000)
+    throw new BadRequestException(`Bebida ya registrada. Espera ${remainingSeconds} segundos para registrar otra.`)
+  }
+
   private async validateDeviceToken(token: string | undefined) {
     const cleanToken = token?.trim()
     if (!cleanToken) throw new UnauthorizedException("Dispositivo no registrado")
@@ -974,6 +1082,20 @@ export class TimeClockService {
       if (!existing) return code
     }
     throw new BadRequestException("No se pudo generar codigo de dispositivo")
+  }
+
+  private async nextMovementFolio() {
+    const now = new Date()
+    const prefix = `MOV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
+    const count = await this.prisma.movement.count({
+      where: {
+        createdAt: {
+          gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+          lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+        }
+      }
+    })
+    return `${prefix}-${String(count + 1).padStart(4, "0")}`
   }
 
   private async expireOldDeviceRequests() {

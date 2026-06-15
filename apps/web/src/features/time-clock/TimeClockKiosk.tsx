@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { AlertCircle, CheckCircle2, Clock3, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, ShieldAlert } from "lucide-react"
+import { CheckCircle2, Clock3, Coffee, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, ShieldAlert } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
 import type { TimeClockEventType } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
+const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
+
+type KioskStatus = "idle" | "validating_pin" | "capturing_photo" | "registering" | "success" | "error"
+type LastKioskSuccess = {
+  employeeName: string
+  type: TimeClockEventType | "DRINK"
+  time: string
+  amount?: number
+}
 
 export function TimeClockKiosk() {
   const queryClient = useQueryClient()
@@ -30,9 +39,10 @@ export function TimeClockKiosk() {
   const [now, setNow] = useState<Date>(() => new Date())
 
   // States for the registration flow
-  const [status, setStatus] = useState<'idle' | 'validating_pin' | 'capturing_photo' | 'registering' | 'success' | 'error'>('idle')
+  const [status, setStatus] = useState<KioskStatus>("idle")
   const [statusMessage, setStatusMessage] = useState<string>("Ingresa tu PIN para comenzar")
-  const [lastSuccess, setLastSuccess] = useState<{ employeeName: string; type: TimeClockEventType; time: string } | null>(null)
+  const [lastSuccess, setLastSuccess] = useState<LastKioskSuccess | null>(null)
+  const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
 
   // Fullscreen event listener
   useEffect(() => {
@@ -186,7 +196,7 @@ export function TimeClockKiosk() {
   }
 
   const handleKeyPress = (key: string) => {
-    if (status === 'validating_pin' || status === 'capturing_photo' || status === 'registering') return
+    if (isProcessing) return
 
     if (status === 'success' || status === 'error') {
       setStatus('idle')
@@ -240,7 +250,7 @@ export function TimeClockKiosk() {
       setStatus('registering')
       setStatusMessage("Guardando registro de asistencia...")
 
-      const registerRes = await api.timeClock.registerEntry({ employeeCode, type, photo })
+      await api.timeClock.registerEntry({ employeeCode, type, photo })
 
       // 4. Handle success
       setStatus('success')
@@ -283,6 +293,60 @@ export function TimeClockKiosk() {
       setEmployeeCode("")
       window.setTimeout(() => {
         setStatus('idle')
+        setStatusMessage("Ingresa tu PIN para comenzar")
+      }, 5000)
+    }
+  }
+
+  const handleRegisterDrink = async () => {
+    if (!employeeCode || employeeCode.length < 4) {
+      setStatus("error")
+      setStatusMessage("PIN inválido. Mínimo 4 dígitos.")
+      window.setTimeout(() => {
+        setStatus("idle")
+        setStatusMessage("Ingresa tu PIN para comenzar")
+      }, 4000)
+      return
+    }
+
+    setStatus("registering")
+    setStatusMessage("Registrando bebida...")
+
+    try {
+      const result = await api.timeClock.registerDrink(employeeCode)
+      const amount = Number(result.amount)
+      const formattedAmount = money.format(Number.isFinite(amount) ? amount : 0)
+      const timeStr = new Intl.DateTimeFormat("es-MX", {
+        timeZone: "America/Tijuana",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      }).format(new Date())
+
+      setStatus("success")
+      setStatusMessage(`Bebida registrada - ${formattedAmount}`)
+      setLastSuccess({
+        employeeName: result.employee.fullName,
+        type: "DRINK",
+        amount,
+        time: timeStr
+      })
+      setEmployeeCode("")
+
+      window.setTimeout(() => {
+        setStatus("idle")
+        setStatusMessage("Ingresa tu PIN para comenzar")
+      }, 6000)
+
+      window.setTimeout(() => {
+        setLastSuccess(null)
+      }, 10000)
+    } catch (error: any) {
+      setStatus("error")
+      setStatusMessage(error.message || "Error al registrar bebida")
+      setEmployeeCode("")
+      window.setTimeout(() => {
+        setStatus("idle")
         setStatusMessage("Ingresa tu PIN para comenzar")
       }, 5000)
     }
@@ -402,7 +466,7 @@ export function TimeClockKiosk() {
                     type="button"
                     className={`timeclock-kiosk-key ${isAction ? "action-key" : ""}`}
                     onClick={() => handleKeyPress(key)}
-                    disabled={status === "validating_pin" || status === "capturing_photo" || status === "registering"}
+                    disabled={isProcessing}
                   >
                     {key}
                   </button>
@@ -415,12 +479,12 @@ export function TimeClockKiosk() {
           <div className="timeclock-kiosk-column">
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem", height: "100%", justifyContent: "space-between", width: "100%" }}>
               {/* Giant check-in/out buttons */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", height: "45%" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", height: "50%", minHeight: 0 }}>
                 <button
                   type="button"
                   className="timeclock-kiosk-btn-entry"
                   onClick={() => handleRegister("ENTRY")}
-                  disabled={employeeCode.length < 4 || status === "validating_pin" || status === "capturing_photo" || status === "registering"}
+                  disabled={employeeCode.length < 4 || isProcessing}
                 >
                   <LogIn />
                   <span>REGISTRAR ENTRADA</span>
@@ -429,10 +493,19 @@ export function TimeClockKiosk() {
                   type="button"
                   className="timeclock-kiosk-btn-exit"
                   onClick={() => handleRegister("EXIT")}
-                  disabled={employeeCode.length < 4 || status === "validating_pin" || status === "capturing_photo" || status === "registering"}
+                  disabled={employeeCode.length < 4 || isProcessing}
                 >
                   <LogOut />
                   <span>REGISTRAR SALIDA</span>
+                </button>
+                <button
+                  type="button"
+                  className="timeclock-kiosk-btn-drink"
+                  onClick={handleRegisterDrink}
+                  disabled={employeeCode.length < 4 || isProcessing}
+                >
+                  <Coffee />
+                  <span>REGISTRAR BEBIDA</span>
                 </button>
               </div>
 
@@ -453,12 +526,14 @@ export function TimeClockKiosk() {
                     {lastSuccess.employeeName}
                   </div>
                   <div className="timeclock-kiosk-last-success-meta">
-                    {lastSuccess.type === "ENTRY" ? "Entrada" : "Salida"} • {lastSuccess.time}
+                    {lastSuccess.type === "DRINK"
+                      ? `Bebida • ${money.format(lastSuccess.amount ?? 0)} • ${lastSuccess.time}`
+                      : `${lastSuccess.type === "ENTRY" ? "Entrada" : "Salida"} • ${lastSuccess.time}`}
                   </div>
                 </div>
               ) : (
                 <div style={{
-                  height: "35%",
+                  height: "24%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
