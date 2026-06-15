@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { CheckCircle2, Clock3, Coffee, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, ShieldAlert } from "lucide-react"
+import { CheckCircle2, CircleHelp, Clock3, Coffee, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, Settings, ShieldAlert, ShieldCheck, Tag, UserRound } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
 import type { TimeClockEventType } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
+const KIOSK_PIN_LENGTH = 4
 
 type KioskStatus = "idle" | "validating_pin" | "capturing_photo" | "registering" | "success" | "error"
+type VerifiedEmployee = {
+  id: string
+  fullName: string
+  position: string
+}
 type LastKioskSuccess = {
   employeeName: string
   type: TimeClockEventType | "DRINK"
@@ -42,7 +48,9 @@ export function TimeClockKiosk() {
   const [status, setStatus] = useState<KioskStatus>("idle")
   const [statusMessage, setStatusMessage] = useState<string>("Ingresa tu PIN para comenzar")
   const [lastSuccess, setLastSuccess] = useState<LastKioskSuccess | null>(null)
+  const [verifiedEmployee, setVerifiedEmployee] = useState<VerifiedEmployee | null>(null)
   const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
+  const canUseActions = Boolean(verifiedEmployee) && !isProcessing
 
   // Fullscreen event listener
   useEffect(() => {
@@ -143,6 +151,8 @@ export function TimeClockKiosk() {
     }
   }, [serverNow])
 
+  const beveragePrice = 30
+
   // Device authorization status listener
   useEffect(() => {
     if (deviceRequest.data?.status !== "AUTHORIZED") return
@@ -151,6 +161,47 @@ export function TimeClockKiosk() {
     setDeviceToken(requestToken)
     void queryClient.invalidateQueries({ queryKey: ["timeClock"] })
   }, [deviceRequest.data?.status, queryClient, requestToken])
+
+  useEffect(() => {
+    if (needsAuthorization) return
+    if (employeeCode.length !== KIOSK_PIN_LENGTH) {
+      setVerifiedEmployee(null)
+      if (status === "validating_pin") {
+        setStatus("idle")
+        setStatusMessage("Ingresa tu PIN para comenzar")
+      }
+      return
+    }
+
+    let cancelled = false
+    setVerifiedEmployee(null)
+    setStatus("validating_pin")
+    setStatusMessage("Validando PIN...")
+
+    api.timeClock.verifyEmployeeCode(employeeCode)
+      .then((result) => {
+        if (cancelled) return
+        setVerifiedEmployee(result.employee)
+        setStatus("idle")
+        setStatusMessage(`PIN confirmado: ${result.employee.fullName}`)
+      })
+      .catch((error: Error) => {
+        if (cancelled) return
+        setVerifiedEmployee(null)
+        setStatus("error")
+        setStatusMessage(error.message || "PIN inválido")
+        window.setTimeout(() => {
+          if (cancelled) return
+          setEmployeeCode("")
+          setStatus("idle")
+          setStatusMessage("Ingresa tu PIN para comenzar")
+        }, 1600)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [employeeCode, needsAuthorization])
 
   // Initialize and run the camera stream in background (hidden video element)
   useEffect(() => {
@@ -205,19 +256,21 @@ export function TimeClockKiosk() {
 
     if (key === "Limpiar") {
       setEmployeeCode("")
+      setVerifiedEmployee(null)
     } else if (key === "Borrar") {
       setEmployeeCode((prev) => prev.slice(0, -1))
+      setVerifiedEmployee(null)
     } else {
-      if (employeeCode.length < 12) {
+      if (employeeCode.length < KIOSK_PIN_LENGTH) {
         setEmployeeCode((prev) => prev + key)
       }
     }
   }
 
   const handleRegister = async (type: TimeClockEventType) => {
-    if (!employeeCode || employeeCode.length < 4) {
+    if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
       setStatus('error')
-      setStatusMessage("PIN inválido. Mínimo 4 dígitos.")
+      setStatusMessage("Ingresa un PIN válido para habilitar el registro.")
       window.setTimeout(() => {
         setStatus('idle')
         setStatusMessage("Ingresa tu PIN para comenzar")
@@ -226,16 +279,12 @@ export function TimeClockKiosk() {
     }
 
     setStatus('validating_pin')
-    setStatusMessage("Buscando empleado...")
+    setStatusMessage("Preparando registro...")
 
     try {
-      // 1. Verify employee code
-      const verifyRes = await api.timeClock.verifyEmployeeCode(employeeCode)
-      const employee = verifyRes.employee
-
       // 2. Prepare capturing photo state
       setStatus('capturing_photo')
-      setStatusMessage(`Capturando evidencia para ${employee.fullName}...`)
+      setStatusMessage(`Capturando evidencia para ${verifiedEmployee.fullName}...`)
 
       // Brief delay to ensure camera stream frame is completely synced
       await new Promise((resolve) => setTimeout(resolve, 300))
@@ -255,8 +304,8 @@ export function TimeClockKiosk() {
       // 4. Handle success
       setStatus('success')
       const successMsg = type === "ENTRY"
-        ? `¡Entrada registrada! Bienvenido, ${employee.fullName}`
-        : `¡Salida registrada! Adiós, ${employee.fullName}`
+        ? `Entrada registrada - ${verifiedEmployee.fullName}`
+        : `Salida registrada - ${verifiedEmployee.fullName}`
       setStatusMessage(successMsg)
 
       // Time formatting for Mexican border
@@ -268,13 +317,14 @@ export function TimeClockKiosk() {
       }).format(new Date())
 
       setLastSuccess({
-        employeeName: employee.fullName,
+        employeeName: verifiedEmployee.fullName,
         type,
         time: timeStr
       })
 
       // Clean input automatically
       setEmployeeCode("")
+      setVerifiedEmployee(null)
 
       // Reset status to idle after 6 seconds
       window.setTimeout(() => {
@@ -291,6 +341,7 @@ export function TimeClockKiosk() {
       setStatus('error')
       setStatusMessage(error.message || "Error al registrar asistencia")
       setEmployeeCode("")
+      setVerifiedEmployee(null)
       window.setTimeout(() => {
         setStatus('idle')
         setStatusMessage("Ingresa tu PIN para comenzar")
@@ -299,9 +350,9 @@ export function TimeClockKiosk() {
   }
 
   const handleRegisterDrink = async () => {
-    if (!employeeCode || employeeCode.length < 4) {
+    if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
       setStatus("error")
-      setStatusMessage("PIN inválido. Mínimo 4 dígitos.")
+      setStatusMessage("Ingresa un PIN válido para habilitar bebida.")
       window.setTimeout(() => {
         setStatus("idle")
         setStatusMessage("Ingresa tu PIN para comenzar")
@@ -332,6 +383,7 @@ export function TimeClockKiosk() {
         time: timeStr
       })
       setEmployeeCode("")
+      setVerifiedEmployee(null)
 
       window.setTimeout(() => {
         setStatus("idle")
@@ -345,6 +397,7 @@ export function TimeClockKiosk() {
       setStatus("error")
       setStatusMessage(error.message || "Error al registrar bebida")
       setEmployeeCode("")
+      setVerifiedEmployee(null)
       window.setTimeout(() => {
         setStatus("idle")
         setStatusMessage("Ingresa tu PIN para comenzar")
@@ -403,14 +456,25 @@ export function TimeClockKiosk() {
     <main className="timeclock-shell-kiosk">
       <section className="timeclock-panel-kiosk">
         <header className="timeclock-kiosk-header">
-          <div className="timeclock-kiosk-brand">
-            <div className="timeclock-kicker">Reloj Checador</div>
-            <h1 className="timeclock-kiosk-logo-text">Fatboy</h1>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <div className="timeclock-device">
+          <div className="timeclock-kiosk-brand-block">
+            <div className="timeclock-kiosk-clock-mark">
               <Clock3 />
-              <span>{device.data?.branch.name ?? "Sucursal"} - {device.data?.name ?? "Tablet"}</span>
+            </div>
+            <div>
+              <h1>Reloj Checador</h1>
+              <span>{device.data?.branch.name ?? "Sucursal"}</span>
+            </div>
+          </div>
+
+          <div className="timeclock-kiosk-time-block">
+            <div className="timeclock-kiosk-time">{timeString}</div>
+            <div className="timeclock-kiosk-date">{dateString}</div>
+          </div>
+
+          <div className="timeclock-kiosk-device-block">
+            <div className="timeclock-kiosk-authorized">
+              <CheckCircle2 />
+              <span>Dispositivo autorizado</span>
             </div>
             <button
               type="button"
@@ -420,137 +484,172 @@ export function TimeClockKiosk() {
             >
               {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
             </button>
+            <div className="timeclock-kiosk-device-name">Dispositivo: {device.data?.name ?? "Tablet"}</div>
           </div>
         </header>
 
         {device.error && <div className="timeclock-alert">{device.error.message}</div>}
 
         <div className="timeclock-kiosk-body">
-          {/* Left Column: Clock and Info */}
-          <div className="timeclock-kiosk-column">
-            <div className="timeclock-kiosk-clock-section">
-              <div className="timeclock-kiosk-time">{timeString}</div>
-              <div className="timeclock-kiosk-date">{dateString}</div>
-            </div>
-            <div className="timeclock-kiosk-welcome">
-              <h3>Registra tu asistencia</h3>
-              <p>Al registrar asistencia se tomará una fotografía como evidencia de forma automática.</p>
-            </div>
+          <div className="timeclock-kiosk-left-actions">
+            <button
+              type="button"
+              className="timeclock-kiosk-action-card entry"
+              onClick={() => handleRegister("ENTRY")}
+              disabled={!canUseActions}
+            >
+              <span className="timeclock-kiosk-action-icon">
+                <LogIn />
+              </span>
+              <strong>Registrar<br />Entrada</strong>
+              <small>Iniciar jornada</small>
+            </button>
+
+            <button
+              type="button"
+              className="timeclock-kiosk-action-card exit"
+              onClick={() => handleRegister("EXIT")}
+              disabled={!canUseActions}
+            >
+              <span className="timeclock-kiosk-action-icon">
+                <LogOut />
+              </span>
+              <strong>Registrar<br />Salida</strong>
+              <small>Finalizar jornada</small>
+            </button>
           </div>
 
-          {/* Center Column: Keypad & Input */}
-          <div className="timeclock-kiosk-column">
-            <div className="timeclock-kiosk-pin-display-wrapper">
-              <div className={`timeclock-kiosk-pin-display ${employeeCode.length > 0 ? "active" : ""}`}>
-                {employeeCode.length === 0 ? (
-                  <span style={{ color: "#64748b", fontWeight: 800, letterSpacing: "0.05em", fontSize: "0.85rem" }}>
-                    INGRESA TU PIN
-                  </span>
-                ) : (
-                  Array.from({ length: Math.min(12, Math.max(6, employeeCode.length)) }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`timeclock-kiosk-pin-dot ${i < employeeCode.length ? "filled" : ""}`}
-                    />
-                  ))
-                )}
-              </div>
+          <div className="timeclock-kiosk-pin-panel">
+            <div className={`timeclock-kiosk-employee-icon ${verifiedEmployee ? "active" : ""}`}>
+              <UserRound />
+            </div>
+            <div className="timeclock-kiosk-pin-title">
+              <h2>{verifiedEmployee ? verifiedEmployee.fullName : "Ingresa tu PIN"}</h2>
+              <p>{verifiedEmployee ? "Opciones habilitadas" : "para continuar"}</p>
+            </div>
+
+            <div className={`timeclock-kiosk-pin-dots ${verifiedEmployee ? "verified" : ""}`}>
+              {Array.from({ length: KIOSK_PIN_LENGTH }).map((_, i) => (
+                <span key={i} className={i < employeeCode.length ? "filled" : ""} />
+              ))}
             </div>
 
             <div className="timeclock-kiosk-keypad">
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "Borrar", "0", "Limpiar"].map((key) => {
-                const isAction = key === "Borrar" || key === "Limpiar"
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    className={`timeclock-kiosk-key ${isAction ? "action-key" : ""}`}
-                    onClick={() => handleKeyPress(key)}
-                    disabled={isProcessing}
-                  >
-                    {key}
-                  </button>
-                )
-              })}
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className="timeclock-kiosk-key"
+                  onClick={() => handleKeyPress(key)}
+                  disabled={isProcessing || employeeCode.length >= KIOSK_PIN_LENGTH}
+                >
+                  {key}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="timeclock-kiosk-key action-key"
+                onClick={() => handleKeyPress("Limpiar")}
+                disabled={isProcessing}
+                aria-label="Limpiar PIN"
+              >
+                ×
+              </button>
+              <button
+                type="button"
+                className="timeclock-kiosk-key"
+                onClick={() => handleKeyPress("0")}
+                disabled={isProcessing || employeeCode.length >= KIOSK_PIN_LENGTH}
+              >
+                0
+              </button>
+              <button
+                type="button"
+                className="timeclock-kiosk-key action-key"
+                onClick={() => handleKeyPress("Borrar")}
+                disabled={isProcessing}
+                aria-label="Borrar último dígito"
+              >
+                ⌫
+              </button>
+            </div>
+
+            <div className={`timeclock-kiosk-status-card ${status}`}>
+              <span className="timeclock-kiosk-status-text">{statusMessage}</span>
+            </div>
+
+            <div className="timeclock-kiosk-photo-note">
+              <ShieldCheck />
+              <span>Tu foto será tomada al registrar entrada o salida.</span>
             </div>
           </div>
 
-          {/* Right Column: Actions, Status & History */}
-          <div className="timeclock-kiosk-column">
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", height: "100%", justifyContent: "space-between", width: "100%" }}>
-              {/* Giant check-in/out buttons */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", height: "50%", minHeight: 0 }}>
-                <button
-                  type="button"
-                  className="timeclock-kiosk-btn-entry"
-                  onClick={() => handleRegister("ENTRY")}
-                  disabled={employeeCode.length < 4 || isProcessing}
-                >
-                  <LogIn />
-                  <span>REGISTRAR ENTRADA</span>
-                </button>
-                <button
-                  type="button"
-                  className="timeclock-kiosk-btn-exit"
-                  onClick={() => handleRegister("EXIT")}
-                  disabled={employeeCode.length < 4 || isProcessing}
-                >
-                  <LogOut />
-                  <span>REGISTRAR SALIDA</span>
-                </button>
-                <button
-                  type="button"
-                  className="timeclock-kiosk-btn-drink"
-                  onClick={handleRegisterDrink}
-                  disabled={employeeCode.length < 4 || isProcessing}
-                >
-                  <Coffee />
-                  <span>REGISTRAR BEBIDA</span>
-                </button>
-              </div>
+          <div className="timeclock-kiosk-right-panel">
+            <button
+              type="button"
+              className="timeclock-kiosk-drink-card"
+              onClick={handleRegisterDrink}
+              disabled={!canUseActions}
+            >
+              <span className="timeclock-kiosk-drink-icon">
+                <Coffee />
+              </span>
+              <strong>Registrar<br />Bebida</strong>
+              <small>Consumo interno</small>
+              <span className="timeclock-kiosk-drink-divider" />
+              <span className="timeclock-kiosk-price-box">
+                <Tag />
+                <span>
+                  <small>Precio por bebida</small>
+                  <b>{money.format(lastSuccess?.type === "DRINK" ? lastSuccess.amount ?? beveragePrice : beveragePrice)}</b>
+                </span>
+              </span>
+            </button>
 
-              {/* Status Display */}
-              <div className={`timeclock-kiosk-status-card ${status}`}>
-                <span className="timeclock-kiosk-status-title">Estado del Reloj</span>
-                <span className="timeclock-kiosk-status-text">{statusMessage}</span>
-              </div>
-
-              {/* Last successful registration */}
-              {lastSuccess ? (
-                <div className="timeclock-kiosk-last-success">
-                  <div className="timeclock-kiosk-last-success-title">
-                    <CheckCircle2 size={16} />
-                    <span>Último Registro</span>
+            <div className="timeclock-kiosk-last-consumption">
+              <h3>Último consumo</h3>
+              {lastSuccess?.type === "DRINK" ? (
+                <div className="timeclock-kiosk-consumption-row">
+                  <span className="timeclock-kiosk-consumption-icon">
+                    <Coffee />
+                  </span>
+                  <div>
+                    <strong>{lastSuccess.time}</strong>
+                    <span>Bebida registrada</span>
+                    <small>{lastSuccess.employeeName}</small>
                   </div>
-                  <div className="timeclock-kiosk-last-success-name">
-                    {lastSuccess.employeeName}
-                  </div>
-                  <div className="timeclock-kiosk-last-success-meta">
-                    {lastSuccess.type === "DRINK"
-                      ? `Bebida • ${money.format(lastSuccess.amount ?? 0)} • ${lastSuccess.time}`
-                      : `${lastSuccess.type === "ENTRY" ? "Entrada" : "Salida"} • ${lastSuccess.time}`}
-                  </div>
+                  <b>{money.format(lastSuccess.amount ?? 0)}</b>
                 </div>
               ) : (
-                <div style={{
-                  height: "24%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#475569",
-                  fontSize: "0.8rem",
-                  border: "1px dashed rgba(255,255,255,0.06)",
-                  borderRadius: "0.85rem",
-                  textAlign: "center",
-                  padding: "1rem",
-                  boxSizing: "border-box"
-                }}>
-                  <span>Sin registros recientes en esta sesión</span>
-                </div>
+                <div className="timeclock-kiosk-empty-consumption">Sin consumo reciente en esta sesión</div>
               )}
             </div>
           </div>
         </div>
+
+        <footer className="timeclock-kiosk-footer">
+          <div>
+            <CircleHelp />
+            <span>
+              <strong>¿Problemas con tu registro?</strong>
+              <small>Notifica a tu administrador.</small>
+            </span>
+          </div>
+          <div>
+            <ShieldCheck />
+            <span>
+              <strong>Fatboy®</strong>
+              <small>Sistema interno de control</small>
+            </span>
+          </div>
+          <div>
+            <Settings />
+            <span>
+              <strong>Soporte técnico</strong>
+              <small>Ext. 1000</small>
+            </span>
+          </div>
+        </footer>
 
         {/* Hidden Camera Elements */}
         <video
