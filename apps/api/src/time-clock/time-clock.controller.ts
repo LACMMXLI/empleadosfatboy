@@ -2,6 +2,7 @@ import {
   Body,
   BadRequestException,
   Controller,
+  Delete,
   Get,
   Header,
   Headers,
@@ -235,6 +236,12 @@ export class TimeClockAdminController {
   @Patch("devices/:id")
   updateDevice(@Param("id") id: string, @Body() dto: UpdateDeviceDto, @Req() request: RequestWithUser) {
     return this.timeClock.updateDevice(id, dto, request.user, request.ip)
+  }
+
+  @Roles(Role.ADMINISTRADOR)
+  @Delete("devices/:id/purge")
+  purgeDevice(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.timeClock.purgeDeviceForDeveloper(id, request.user, request.ip)
   }
 
   @Get("attendance")

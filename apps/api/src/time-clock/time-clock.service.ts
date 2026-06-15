@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common"
+import { ConfigService } from "@nestjs/config"
 import {
   AuditAction,
   MovementKind,
@@ -91,7 +92,8 @@ export class TimeClockService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly files: FilesService,
-    private readonly loginThrottle: LoginThrottleService
+    private readonly loginThrottle: LoginThrottleService,
+    private readonly config: ConfigService
   ) {}
 
   async listDevices(user: AuthUser) {
@@ -369,6 +371,53 @@ export class TimeClockService {
 
     const { tokenHash, ...safeDevice } = updated
     return setupToken ? { ...safeDevice, setupToken } : safeDevice
+  }
+
+  async purgeDeviceForDeveloper(id: string, user: AuthUser, ipAddress?: string) {
+    if (!this.isDeveloperMaintenanceEnabled()) {
+      throw new ForbiddenException("Mantenimiento de desarrollador deshabilitado")
+    }
+
+    const before = await this.findVisibleDevice(id, user)
+
+    return this.prisma.$transaction(async (tx) => {
+      const entries = await tx.timeClockEntry.updateMany({
+        where: { deviceId: id },
+        data: { deviceId: null }
+      })
+      const sessions = await tx.workSession.updateMany({
+        where: { deviceId: id },
+        data: { deviceId: null }
+      })
+      const requests = await tx.timeClockDeviceRequest.updateMany({
+        where: { authorizedDeviceId: id },
+        data: { authorizedDeviceId: null }
+      })
+
+      await tx.timeClockDevice.delete({ where: { id } })
+
+      const summary = {
+        deviceId: id,
+        deviceDeleted: true,
+        entriesDetached: entries.count,
+        sessionsDetached: sessions.count,
+        requestsDetached: requests.count
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: user.sub,
+          action: AuditAction.DELETE,
+          entity: "DeveloperTimeClockDevicePurge",
+          entityId: id,
+          oldValue: this.toJson(this.safeDevice(before)),
+          newValue: this.toJson(summary),
+          ipAddress
+        }
+      })
+
+      return summary
+    })
   }
 
   async publicDevice(token: string | undefined) {
@@ -950,6 +999,11 @@ export class TimeClockService {
     })
     if (!device) throw new NotFoundException("Dispositivo no encontrado")
     return device
+  }
+
+  private isDeveloperMaintenanceEnabled() {
+    const value = this.config.get<string>("ENABLE_DEVELOPER_MAINTENANCE")
+    return ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase())
   }
 
   private async resolveBranchForAdmin(branchId: string, user: AuthUser) {

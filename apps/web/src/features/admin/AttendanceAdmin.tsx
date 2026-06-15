@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Camera, CheckCircle2, Clock3, Download, KeyRound, Plus, RefreshCw, RotateCw, Save, Wrench, X } from "lucide-react"
+import { Camera, CheckCircle2, Clock3, Download, KeyRound, Plus, RefreshCw, RotateCw, Save, Trash2, Wrench, X } from "lucide-react"
 import { api } from "@/lib/api"
-import type { AttendanceRow, Branch, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
+import type { AttendanceRow, Branch, TimeClockDevice, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
 
 const statusLabels: Record<AttendanceRow["status"], string> = {
   IN_SHIFT: "En turno",
@@ -74,6 +74,17 @@ export function AttendanceAdmin({ user }: { user?: User }) {
     onError: (error: Error) => setMessage(error.message)
   })
 
+  const purgeDevice = useMutation({
+    mutationFn: (device: TimeClockDevice) => api.adminTimeClock.purgeDeviceForDeveloper(device.id),
+    onSuccess: async (summary) => {
+      setMessage(`Dispositivo eliminado. Registros desvinculados: ${summary.entriesDetached + summary.sessionsDetached}`)
+      await queryClient.invalidateQueries({ queryKey: ["time-clock-devices"] })
+      await queryClient.invalidateQueries({ queryKey: ["time-clock-device-requests"] })
+      await queryClient.invalidateQueries({ queryKey: ["attendance"] })
+    },
+    onError: (error: Error) => setMessage(error.message)
+  })
+
   const approveRequest = useMutation({
     mutationFn: ({ id, name, branchId }: { id: string; name: string; branchId: string }) =>
       api.adminTimeClock.approveDeviceRequest(id, { name, branchId }),
@@ -112,6 +123,13 @@ export function AttendanceAdmin({ user }: { user?: User }) {
     anchor.download = `asistencia-${date}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
+  }
+
+  function confirmDevicePurge(device: TimeClockDevice) {
+    const confirmation = window.prompt(`Borrado definitivo del dispositivo ${device.name}. Escribe BORRAR para confirmar.`)
+    if (confirmation === "BORRAR") {
+      purgeDevice.mutate(device)
+    }
   }
 
   return (
@@ -291,10 +309,22 @@ export function AttendanceAdmin({ user }: { user?: User }) {
                     <button className="btn-icon" type="button" title={device.active ? "Desactivar" : "Activar"} onClick={() => updateDevice.mutate({ id: device.id, active: !device.active })}>
                       <RefreshCw style={{ width: 13, height: 13 }} />
                     </button>
+                    {user?.role === "ADMINISTRADOR" && (
+                      <button
+                        className="btn-icon danger"
+                        type="button"
+                        title="Purga dev"
+                        disabled={purgeDevice.isPending}
+                        onClick={() => confirmDevicePurge(device)}
+                      >
+                        <Trash2 style={{ width: 13, height: 13 }} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
+            {purgeDevice.error && <div className="status-empty compact-error">{purgeDevice.error.message}</div>}
           </div>
         </div>
 

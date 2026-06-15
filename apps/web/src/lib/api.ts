@@ -388,6 +388,15 @@ export const api = {
     updateDevice(id: string, payload: Partial<{ name: string; branchId: string; active: boolean; rotateToken: boolean }>) {
       return request<TimeClockDevice>(`/admin/time-clock/devices/${id}`, { method: "PATCH", body: JSON.stringify(payload) })
     },
+    purgeDeviceForDeveloper(id: string) {
+      return request<{
+        deviceId: string
+        deviceDeleted: boolean
+        entriesDetached: number
+        sessionsDetached: number
+        requestsDetached: number
+      }>(`/admin/time-clock/devices/${id}/purge`, { method: "DELETE" })
+    },
     deviceRequests() {
       return request<TimeClockDeviceRequest[]>("/admin/time-clock/device-requests")
     },
