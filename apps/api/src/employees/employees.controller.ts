@@ -106,13 +106,13 @@ export class EmployeesController {
   @Roles(Role.ENCARGADO)
   @Post()
   create(@Body() dto: EmployeeDto, @Req() request: RequestWithUser) {
-    return this.employees.create(dto, request.user.sub, request.ip)
+    return this.employees.create(dto, request.user, request.ip)
   }
 
   @Roles(Role.ENCARGADO)
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateEmployeeDto, @Req() request: RequestWithUser) {
-    return this.employees.update(id, dto as any, request.user.sub, request.ip)
+    return this.employees.update(id, dto as any, request.user, request.ip)
   }
 
   @Roles(Role.ADMINISTRADOR)

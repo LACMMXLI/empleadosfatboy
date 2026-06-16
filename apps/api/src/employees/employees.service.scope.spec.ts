@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { NotFoundException } from "@nestjs/common"
+import { ForbiddenException, NotFoundException } from "@nestjs/common"
 import { Role } from "@prisma/client"
 import type { AuthUser } from "../auth/auth.types"
 import { EmployeesService } from "./employees.service"
@@ -7,6 +7,8 @@ import { EmployeesService } from "./employees.service"
 type CapturedArgs = {
   employeeFindMany?: { where?: unknown }
   employeeFindFirst?: { where?: unknown }
+  employeeCreate?: { data?: Record<string, unknown> }
+  branchFindFirst?: { where?: unknown }
   movementGroupByCalled: boolean
   movementAggregateCalled: boolean
 }
@@ -26,6 +28,16 @@ function createService(options: { employeeFound?: boolean } = {}) {
       findFirst: async (args: { where?: unknown }) => {
         captured.employeeFindFirst = args
         return employeeFound ? { id: "employee-match" } : null
+      },
+      create: async (args: { data?: Record<string, unknown> }) => {
+        captured.employeeCreate = args
+        return { id: "employee-created", ...args.data }
+      }
+    },
+    branch: {
+      findFirst: async (args: { where?: unknown }) => {
+        captured.branchFindFirst = args
+        return { id: "branch-other" }
       }
     },
     movement: {
@@ -39,9 +51,12 @@ function createService(options: { employeeFound?: boolean } = {}) {
       }
     }
   }
+  const audit = {
+    log: async () => undefined
+  }
 
   return {
-    service: new EmployeesService(prisma as never, {} as never, {} as never),
+    service: new EmployeesService(prisma as never, audit as never, {} as never),
     captured
   }
 }
@@ -135,12 +150,75 @@ async function adminCanUseClientFilters() {
   })
 }
 
+async function managerInChargeCannotCreateEmployeeForAnotherBranch() {
+  const { service, captured } = createService()
+
+  await assert.rejects(
+    () =>
+      service.create(
+        {
+          fullName: "Empleado externo",
+          pin: "123456",
+          position: "Caja",
+          branchId: "branch-other",
+          phone: "5550000000"
+        },
+        authUser({ role: Role.ENCARGADO, branchId: "branch-own" })
+      ),
+    ForbiddenException
+  )
+
+  assert.equal(captured.employeeCreate, undefined)
+  assert.equal(captured.branchFindFirst, undefined)
+}
+
+async function managerCanCreateEmployeeAccordingToRole() {
+  const { service, captured } = createService()
+
+  const employee = await service.create(
+    {
+      fullName: "Empleado nuevo",
+      pin: "123456",
+      position: "Caja",
+      branchId: "branch-other",
+      phone: "5550000001"
+    },
+    authUser({ role: Role.GERENTE })
+  )
+
+  assert.equal(employee.id, "employee-created")
+  assert.deepEqual(captured.branchFindFirst?.where, { id: "branch-other", active: true })
+  assert.equal(captured.employeeCreate?.data?.branchId, "branch-other")
+}
+
+async function adminCanCreateEmployeeAccordingToRole() {
+  const { service, captured } = createService()
+
+  const employee = await service.create(
+    {
+      fullName: "Empleado admin",
+      pin: "123456",
+      position: "Caja",
+      branchId: "branch-other",
+      phone: "5550000002"
+    },
+    authUser({ role: Role.ADMINISTRADOR })
+  )
+
+  assert.equal(employee.id, "employee-created")
+  assert.deepEqual(captured.branchFindFirst?.where, { id: "branch-other", active: true })
+  assert.equal(captured.employeeCreate?.data?.branchId, "branch-other")
+}
+
 async function run() {
   await employeeListCannotOverrideOwnScope()
   await cashierListCannotOverrideBranchScope()
   await managerInChargeGetCannotBypassBranchScope()
   await employeeBalanceCannotReadAnotherEmployee()
   await adminCanUseClientFilters()
+  await managerInChargeCannotCreateEmployeeForAnotherBranch()
+  await managerCanCreateEmployeeAccordingToRole()
+  await adminCanCreateEmployeeAccordingToRole()
   console.log("Employees scope tests passed")
 }
 

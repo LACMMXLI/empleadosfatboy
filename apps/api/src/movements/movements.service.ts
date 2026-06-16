@@ -168,11 +168,15 @@ export class MovementsService {
       throw new BadRequestException("Tipo de movimiento no permitido")
     }
 
-    const employee = await this.prisma.employee.findUnique({
-      where: { id: dto.employeeId },
+    const employee = await this.prisma.employee.findFirst({
+      where: {
+        id: dto.employeeId,
+        active: true,
+        ...this.employeeWriteScopeForUser(user)
+      },
       include: { branch: true }
     })
-    if (!employee?.active) throw new NotFoundException("Empleado no encontrado o inactivo")
+    if (!employee) throw new NotFoundException("Empleado no encontrado o inactivo")
     if (user.role === Role.EMPLEADO && user.employeeId !== employee.id) {
       throw new ForbiddenException("El empleado solo puede operar su propio registro")
     }
@@ -354,7 +358,7 @@ export class MovementsService {
   }
 
   async authorize(id: string, user: AuthUser, ipAddress?: string) {
-    const movement = await this.prisma.movement.findUnique({ where: { id } })
+    const movement = await this.findVisibleMovementForWrite(id, user)
     if (!movement) throw new NotFoundException("Movimiento no encontrado")
     if (movement.status !== MovementStatus.PENDING) {
       throw new BadRequestException("Solo se pueden autorizar movimientos pendientes")
@@ -387,7 +391,7 @@ export class MovementsService {
   }
 
   async deliver(id: string, user: AuthUser, ipAddress?: string) {
-    const movement = await this.prisma.movement.findUnique({ where: { id } })
+    const movement = await this.findVisibleMovementForWrite(id, user)
     if (!movement) throw new NotFoundException("Movimiento no encontrado")
     if (movement.status !== MovementStatus.AUTHORIZED) {
       throw new BadRequestException("Solo se pueden entregar movimientos autorizados")
@@ -445,8 +449,8 @@ export class MovementsService {
   }
 
   async markDiscounted(id: string, user: AuthUser, ipAddress?: string) {
-    const movement = await this.prisma.movement.findUnique({
-      where: { id },
+    const movement = await this.prisma.movement.findFirst({
+      where: this.andWhere(this.scopeForUser(user), { id }),
       select: { id: true, folio: true, employeeId: true, kind: true, amount: true, reason: true, status: true, createdAt: true }
     })
     if (!movement) throw new NotFoundException("Movimiento no encontrado")
@@ -636,7 +640,7 @@ export class MovementsService {
     user: AuthUser,
     ipAddress?: string
   ) {
-    const movement = await this.prisma.movement.findUnique({ where: { id } })
+    const movement = await this.findVisibleMovementForWrite(id, user)
     if (!movement) throw new NotFoundException("Movimiento no encontrado")
     const updated = await this.prisma.movement.update({ where: { id }, data: { status } })
     await this.audit.log({
@@ -848,6 +852,22 @@ export class MovementsService {
       return { branchId: user.branchId ?? "__none__" }
     }
     return {}
+  }
+
+  private employeeWriteScopeForUser(user: AuthUser): Prisma.EmployeeWhereInput {
+    if (user.role === Role.EMPLEADO) {
+      return { id: user.employeeId ?? "__none__" }
+    }
+    if (user.role === Role.CAJERO || user.role === Role.ENCARGADO) {
+      return { branchId: user.branchId ?? "__none__" }
+    }
+    return {}
+  }
+
+  private findVisibleMovementForWrite(id: string, user: AuthUser) {
+    return this.prisma.movement.findFirst({
+      where: this.andWhere(this.scopeForUser(user), { id })
+    })
   }
 
   private toJson(value: unknown): Prisma.InputJsonValue {

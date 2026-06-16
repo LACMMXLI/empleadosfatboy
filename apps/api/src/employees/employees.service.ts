@@ -70,15 +70,16 @@ export class EmployeesService {
 
   async create(
     dto: Required<Pick<EmployeeWrite, "fullName" | "pin" | "position" | "branchId" | "phone">> & EmployeeWrite,
-    userId: string,
+    user: AuthUser,
     ipAddress?: string
   ) {
+    const branchId = await this.ensureBranchWritable(dto.branchId, user)
     const employee = await this.prisma.employee.create({
       data: {
         fullName: dto.fullName,
         pinHash: await bcrypt.hash(dto.pin, 12),
         position: dto.position,
-        branchId: dto.branchId,
+        branchId,
         phone: dto.phone,
         salaryAmount: dto.salaryAmount ?? 0,
         salaryType: dto.salaryType ?? SalaryType.WEEKLY,
@@ -86,7 +87,7 @@ export class EmployeesService {
       }
     })
     await this.audit.log({
-      userId,
+      userId: user.sub,
       action: AuditAction.CREATE,
       entity: "Employee",
       entityId: employee.id,
@@ -96,9 +97,12 @@ export class EmployeesService {
     return employee
   }
 
-  async update(id: string, dto: EmployeeWrite, userId: string, ipAddress?: string) {
-    const before = await this.prisma.employee.findUnique({ where: { id } })
+  async update(id: string, dto: EmployeeWrite, user: AuthUser, ipAddress?: string) {
+    const before = await this.prisma.employee.findFirst({
+      where: this.andEmployeeWhere(this.scopeForUser(user), { id })
+    })
     if (!before) throw new NotFoundException("Empleado no encontrado")
+    const branchId = dto.branchId ? await this.ensureBranchWritable(dto.branchId, user) : undefined
 
     const data: Prisma.EmployeeUpdateInput = {
       fullName: dto.fullName,
@@ -108,13 +112,13 @@ export class EmployeesService {
       salaryAmount: typeof dto.salaryAmount === "number" ? dto.salaryAmount : undefined,
       salaryType: dto.salaryType,
       hireDate: dto.hireDate ? this.parseDate(dto.hireDate) : undefined,
-      branch: dto.branchId ? { connect: { id: dto.branchId } } : undefined
+      branch: branchId ? { connect: { id: branchId } } : undefined
     }
     if (dto.pin) data.pinHash = await bcrypt.hash(dto.pin, 12)
 
     const employee = await this.prisma.employee.update({ where: { id }, data })
     await this.audit.log({
-      userId,
+      userId: user.sub,
       action: AuditAction.UPDATE,
       entity: "Employee",
       entityId: id,
@@ -305,6 +309,25 @@ export class EmployeesService {
       return { branchId: user.branchId ?? "__none__" }
     }
     return {}
+  }
+
+  private async ensureBranchWritable(branchId: string | undefined, user: AuthUser) {
+    const effectiveBranchId = branchId?.trim()
+    if (!effectiveBranchId) throw new NotFoundException("Sucursal no encontrada")
+
+    if (
+      (user.role === Role.CAJERO || user.role === Role.ENCARGADO) &&
+      user.branchId !== effectiveBranchId
+    ) {
+      throw new ForbiddenException("No puedes operar empleados de otra sucursal")
+    }
+
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: effectiveBranchId, active: true },
+      select: { id: true }
+    })
+    if (!branch) throw new NotFoundException("Sucursal no encontrada")
+    return branch.id
   }
 
   private andEmployeeWhere(...clauses: Prisma.EmployeeWhereInput[]): Prisma.EmployeeWhereInput {
