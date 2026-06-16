@@ -1493,10 +1493,128 @@
     font-weight: 950;
   }
 
+  .employee-attendance-history {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+
+  .employee-history-profile,
+  .employee-history-day,
+  .employee-history-entry {
+    display: grid;
+    gap: 0.65rem;
+    align-items: center;
+    border: 1px solid rgb(var(--surface-line) / 0.42);
+    border-radius: 0.7rem;
+    background: rgb(var(--surface-control) / 0.86);
+    padding: 0.65rem;
+  }
+
+  .employee-history-profile {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .employee-history-avatar {
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 0.7rem;
+    background: rgba(103, 232, 249, 0.12);
+    color: #67e8f9;
+  }
+
+  .employee-history-main,
+  .employee-history-day-date,
+  .employee-history-day-times,
+  .employee-history-entry div {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  .employee-history-main span,
+  .employee-history-day-date span,
+  .employee-history-day-times span,
+  .employee-history-entry span {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.76rem;
+    font-weight: 650;
+  }
+
+  .employee-history-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+    gap: 0.55rem;
+  }
+
+  .employee-history-kpi {
+    display: grid;
+    gap: 0.1rem;
+    border: 1px solid rgb(var(--surface-line) / 0.34);
+    border-radius: 0.65rem;
+    background: rgba(255, 255, 255, 0.035);
+    padding: 0.55rem 0.65rem;
+  }
+
+  .employee-history-kpi span {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.68rem;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .employee-history-kpi strong {
+    font-size: 0.95rem;
+  }
+
+  .employee-history-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.95fr) minmax(320px, 1.35fr);
+    gap: 0.75rem;
+  }
+
+  .employee-history-panel {
+    display: grid;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  .employee-history-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: hsl(var(--foreground));
+    font-size: 0.8rem;
+    font-weight: 900;
+  }
+
+  .employee-history-days,
+  .employee-history-entries {
+    display: grid;
+    gap: 0.5rem;
+    max-height: 26rem;
+    overflow: auto;
+    padding-right: 0.15rem;
+  }
+
+  .employee-history-day {
+    grid-template-columns: minmax(110px, 0.9fr) 104px minmax(170px, 1fr);
+  }
+
+  .employee-history-entry {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   @media (max-width: 900px) {
     .timeclock-grid,
     .attendance-row,
-    .attendance-request-card {
+    .attendance-request-card,
+    .employee-history-profile,
+    .employee-history-grid,
+    .employee-history-day,
+    .employee-history-entry {
       grid-template-columns: 1fr;
     }
 

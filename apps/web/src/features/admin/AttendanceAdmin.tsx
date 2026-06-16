@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Camera, CheckCircle2, Clock3, Download, KeyRound, Plus, RefreshCw, RotateCw, Save, Trash2, Wrench, X } from "lucide-react"
+import { CalendarDays, Camera, CheckCircle2, Clock3, Download, History, KeyRound, Plus, RefreshCw, RotateCw, Save, Trash2, UserRound, Wrench, X } from "lucide-react"
 import { api } from "@/lib/api"
-import type { AttendanceRow, Branch, TimeClockDevice, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
+import type { AttendanceRow, Branch, EmployeeTimeClockHistoryDay, TimeClockDevice, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
 
 const statusLabels: Record<AttendanceRow["status"], string> = {
   IN_SHIFT: "En turno",
@@ -13,9 +13,12 @@ const statusLabels: Record<AttendanceRow["status"], string> = {
 export function AttendanceAdmin({ user }: { user?: User }) {
   const queryClient = useQueryClient()
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const defaultHistoryFrom = useMemo(() => addDays(today, -29), [today])
   const [date, setDate] = useState(today)
   const [branchId, setBranchId] = useState("")
   const [employeeId, setEmployeeId] = useState("")
+  const [historyFrom, setHistoryFrom] = useState(defaultHistoryFrom)
+  const [historyTo, setHistoryTo] = useState(today)
   const [deviceName, setDeviceName] = useState("")
   const [deviceBranchId, setDeviceBranchId] = useState("")
   const [requestDrafts, setRequestDrafts] = useState<Record<string, { name: string; branchId: string }>>({})
@@ -51,6 +54,11 @@ export function AttendanceAdmin({ user }: { user?: User }) {
   const scopedEmployees = (employees.data ?? []).filter((employee) => {
     if (branchId) return employee.branch.id === branchId
     return true
+  })
+  const employeeHistory = useQuery({
+    queryKey: ["employee-time-clock-history", employeeId, historyFrom, historyTo],
+    queryFn: () => api.adminTimeClock.employeeHistory(employeeId, { from: historyFrom, to: historyTo }),
+    enabled: Boolean(employeeId)
   })
 
   const createDevice = useMutation({
@@ -111,6 +119,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
       setAdjustment({ employeeId: "", branchId: "", type: "ENTRY", occurredAt: "", reason: "", notes: "" })
       await queryClient.invalidateQueries({ queryKey: ["attendance"] })
       await queryClient.invalidateQueries({ queryKey: ["attendance-adjustments"] })
+      await queryClient.invalidateQueries({ queryKey: ["employee-time-clock-history"] })
     },
     onError: (error: Error) => setMessage(error.message)
   })
@@ -185,6 +194,105 @@ export function AttendanceAdmin({ user }: { user?: User }) {
             {attendance.isLoading && <div className="status-empty">Cargando asistencia...</div>}
             {!attendance.isLoading && !attendance.data?.length && <div className="status-empty">Sin empleados para los filtros seleccionados.</div>}
           </div>
+        </div>
+      </div>
+
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div className="admin-card-title">
+            <History style={{ width: 14, height: 14, color: "#67e8f9" }} />
+            Historial por empleado
+          </div>
+        </div>
+        <div className="admin-card-body">
+          <div className="admin-form-row">
+            <select className="form-select" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
+              <option value="">Selecciona empleado</option>
+              {scopedEmployees.map((employee) => (
+                <option key={employee.id} value={employee.id}>{employee.fullName}</option>
+              ))}
+            </select>
+            <input className="form-input" type="date" value={historyFrom} onChange={(event) => setHistoryFrom(event.target.value)} />
+            <input className="form-input" type="date" value={historyTo} onChange={(event) => setHistoryTo(event.target.value)} />
+          </div>
+
+          {!employeeId && <div className="status-empty">Selecciona un empleado para ver su ficha e historial de entradas, salidas, faltas y correcciones.</div>}
+          {employeeHistory.isLoading && <div className="status-empty">Cargando historial del empleado...</div>}
+          {employeeHistory.error && <div className="status-empty compact-error">{employeeHistory.error.message}</div>}
+          {employeeHistory.data && (
+            <div className="employee-attendance-history">
+              <div className="employee-history-profile">
+                <div className="employee-history-avatar">
+                  <UserRound style={{ width: 22, height: 22 }} />
+                </div>
+                <div className="employee-history-main">
+                  <strong>{employeeHistory.data.employee.fullName}</strong>
+                  <span>{employeeHistory.data.employee.position} · {employeeHistory.data.employee.branch.name}</span>
+                  <span>{employeeHistory.data.employee.phone} · {employeeHistory.data.employee.active ? "Activo" : "Inactivo"}</span>
+                </div>
+                <span className="attendance-status no_show">Retardo no evaluado</span>
+              </div>
+
+              <div className="employee-history-kpis">
+                <HistoryMetric label="Dias con registro" value={employeeHistory.data.summary.presentDays} />
+                <HistoryMetric label="Sin checar" value={employeeHistory.data.summary.noShowDays} />
+                <HistoryMetric label="Entradas" value={employeeHistory.data.summary.entryCount} />
+                <HistoryMetric label="Salidas" value={employeeHistory.data.summary.exitCount} />
+                <HistoryMetric label="Manual" value={employeeHistory.data.summary.manualCount} />
+                <HistoryMetric label="Horas" value={formatHours(employeeHistory.data.summary.totalMinutes)} />
+              </div>
+
+              <div className="employee-history-grid">
+                <div className="employee-history-panel">
+                  <div className="employee-history-panel-head">
+                    <CalendarDays style={{ width: 13, height: 13 }} />
+                    Dias del rango
+                  </div>
+                  <div className="employee-history-days">
+                    {employeeHistory.data.days.map((day) => (
+                      <HistoryDayRow key={day.date} day={day} />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="employee-history-panel">
+                  <div className="employee-history-panel-head">
+                    <Clock3 style={{ width: 13, height: 13 }} />
+                    Registros capturados
+                  </div>
+                  <div className="employee-history-entries">
+                    {employeeHistory.data.entries.map((entry) => (
+                      <div key={entry.id} className="employee-history-entry">
+                        <div>
+                          <strong>{entry.type === "ENTRY" ? "Entrada" : "Salida"} · {entry.localDate} {entry.localTime}</strong>
+                          <span>{entry.status === "MANUAL" ? "Manual" : "Checador"} · {entry.device?.name ?? entry.createdByUser?.fullName ?? "Sin dispositivo"} · {entry.branch?.name ?? "Sucursal"}</span>
+                          {entry.notes && <span>{entry.notes}</span>}
+                        </div>
+                        <EvidenceButton entry={entry} />
+                      </div>
+                    ))}
+                    {!employeeHistory.data.entries.length && <div className="status-empty">Sin entradas ni salidas en este rango.</div>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="employee-history-panel">
+                <div className="employee-history-panel-head">
+                  <Wrench style={{ width: 13, height: 13 }} />
+                  Correcciones registradas
+                </div>
+                <div className="attendance-adjustment-list">
+                  {employeeHistory.data.adjustments.map((item) => (
+                    <div key={item.id}>
+                      <strong>{item.action} · {formatDateTime(item.createdAt)}</strong>
+                      <span>{item.reason} · {item.adjustedBy?.fullName ?? "Usuario"}</span>
+                    </div>
+                  ))}
+                  {!employeeHistory.data.adjustments.length && <div className="status-empty">Sin correcciones para este empleado.</div>}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -379,6 +487,32 @@ export function AttendanceAdmin({ user }: { user?: User }) {
   )
 }
 
+function HistoryMetric({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="employee-history-kpi">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function HistoryDayRow({ day }: { day: EmployeeTimeClockHistoryDay }) {
+  return (
+    <div className="employee-history-day">
+      <div className="employee-history-day-date">
+        <strong>{day.date}</strong>
+        <span>{day.entries.length} registros · {formatHours(day.totalMinutes)}</span>
+      </div>
+      <span className={`attendance-status ${day.status.toLowerCase()}`}>{statusLabels[day.status]}</span>
+      <div className="employee-history-day-times">
+        <span>Entrada {day.firstEntry?.localTime ?? "--"}</span>
+        <span>Salida {day.lastExit?.localTime ?? "--"}</span>
+        <span>Retardo no evaluado</span>
+      </div>
+    </div>
+  )
+}
+
 function EvidenceButton({ entry }: { entry: TimeClockEntry }) {
   const [loading, setLoading] = useState(false)
   if (!entry.evidenceFileId) return null
@@ -406,4 +540,24 @@ function EvidenceButton({ entry }: { entry: TimeClockEntry }) {
 function visibleBranchesForUser(branches: Branch[], user?: User) {
   if (user?.role === "ENCARGADO" && user.branch?.id) return branches.filter((branch) => branch.id === user.branch?.id)
   return branches
+}
+
+function addDays(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00.000Z`)
+  value.setUTCDate(value.getUTCDate() + days)
+  return value.toISOString().slice(0, 10)
+}
+
+function formatHours(minutes: number) {
+  const hours = Math.floor(minutes / 60)
+  const remaining = minutes % 60
+  return `${hours}h ${String(remaining).padStart(2, "0")}m`
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "--"
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(value))
 }

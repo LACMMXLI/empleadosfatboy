@@ -320,6 +320,39 @@ export type AttendanceRow = {
   sessions: WorkSession[]
 }
 
+export type EmployeeTimeClockHistoryDay = {
+  date: string
+  status: AttendanceRow["status"]
+  firstEntry?: TimeClockEntry | null
+  lastExit?: TimeClockEntry | null
+  entries: TimeClockEntry[]
+  sessions: WorkSession[]
+  totalMinutes: number
+  lateStatus: "NOT_CONFIGURED"
+}
+
+export type EmployeeTimeClockHistory = {
+  employee: Employee
+  range: {
+    from: string
+    to: string
+  }
+  summary: {
+    days: number
+    presentDays: number
+    noShowDays: number
+    entryCount: number
+    exitCount: number
+    manualCount: number
+    openSessions: number
+    totalMinutes: number
+  }
+  days: EmployeeTimeClockHistoryDay[]
+  entries: TimeClockEntry[]
+  sessions: WorkSession[]
+  adjustments: AttendanceAdjustment[]
+}
+
 export type AttendanceAdjustment = {
   id: string
   employeeId: string

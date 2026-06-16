@@ -65,6 +65,11 @@ type AttendanceFilters = {
   employeeId?: string
 }
 
+type HistoryFilters = {
+  from?: string
+  to?: string
+}
+
 type ManualAdjustmentInput = {
   employeeId: string
   branchId?: string
@@ -712,18 +717,83 @@ export class TimeClockService {
     })
   }
 
-  async employeeHistory(employeeId: string, filters: { from?: string; to?: string }, user: AuthUser) {
-    await this.ensureEmployeeVisible(employeeId, user)
-    return this.prisma.timeClockEntry.findMany({
-      where: this.entryScope({
-        employeeId,
-        localDate: filters.from || filters.to ? undefined : undefined,
-        localDateRange: this.localDateRange(filters.from, filters.to)
-      }, user),
-      include: this.entryInclude(),
-      orderBy: { occurredAt: "desc" },
-      take: 200
-    })
+  async employeeHistory(employeeId: string, filters: HistoryFilters, user: AuthUser) {
+    const employee = await this.findVisibleEmployee(employeeId, user)
+    const range = this.resolveHistoryRange(filters)
+    const [entries, sessions, adjustments] = await Promise.all([
+      this.prisma.timeClockEntry.findMany({
+        where: this.entryScope({ employeeId, localDateRange: this.localDateRange(range.from, range.to) }, user),
+        include: this.entryInclude(),
+        orderBy: { occurredAt: "desc" },
+        take: 300
+      }),
+      this.prisma.workSession.findMany({
+        where: this.sessionScope({ employeeId, localDateRange: this.localDateRange(range.from, range.to) }, user),
+        include: {
+          startEntry: true,
+          endEntry: true
+        },
+        orderBy: { startedAt: "desc" },
+        take: 300
+      }),
+      this.prisma.attendanceAdjustment.findMany({
+        where: this.adjustmentScope({ employeeId }, user),
+        include: {
+          branch: true,
+          adjustedBy: { select: { id: true, fullName: true, role: true } },
+          entry: true,
+          workSession: true
+        },
+        orderBy: { createdAt: "desc" },
+        take: 100
+      })
+    ])
+
+    const entriesByDate = this.groupBy(entries, (entry) => entry.localDate)
+    const sessionsByDate = this.groupBy(sessions, (session) => session.localDate)
+    const days = this.dateRangeValues(range.from, range.to)
+      .map((date) => {
+        const dayEntries = (entriesByDate.get(date) ?? []).slice().sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime())
+        const daySessions = (sessionsByDate.get(date) ?? []).slice().sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
+        const activeSession = daySessions.find((session) => session.status === WorkSessionStatus.ACTIVE)
+        const lastEntry = dayEntries[dayEntries.length - 1]
+        const status = activeSession
+          ? "IN_SHIFT"
+          : lastEntry?.type === TimeClockEventType.EXIT
+            ? "EXITED"
+            : "NO_SHOW"
+
+        return {
+          date,
+          status,
+          firstEntry: dayEntries.find((entry) => entry.type === TimeClockEventType.ENTRY) ?? null,
+          lastExit: dayEntries.slice().reverse().find((entry) => entry.type === TimeClockEventType.EXIT) ?? null,
+          entries: dayEntries,
+          sessions: daySessions,
+          totalMinutes: daySessions.reduce((total, session) => total + (session.totalMinutes ?? 0), 0),
+          lateStatus: "NOT_CONFIGURED"
+        }
+      })
+      .reverse()
+
+    return {
+      employee,
+      range,
+      summary: {
+        days: days.length,
+        presentDays: days.filter((day) => day.entries.length > 0).length,
+        noShowDays: days.filter((day) => day.status === "NO_SHOW").length,
+        entryCount: entries.filter((entry) => entry.type === TimeClockEventType.ENTRY).length,
+        exitCount: entries.filter((entry) => entry.type === TimeClockEventType.EXIT).length,
+        manualCount: entries.filter((entry) => entry.status === TimeClockEntryStatus.MANUAL).length,
+        openSessions: sessions.filter((session) => session.status === WorkSessionStatus.ACTIVE).length,
+        totalMinutes: sessions.reduce((total, session) => total + (session.totalMinutes ?? 0), 0)
+      },
+      days,
+      entries,
+      sessions,
+      adjustments
+    }
   }
 
   async adjustments(filters: { employeeId?: string; branchId?: string }, user: AuthUser) {
@@ -1031,15 +1101,16 @@ export class TimeClockService {
     return employee
   }
 
-  private async ensureEmployeeVisible(employeeId: string, user: AuthUser) {
+  private async findVisibleEmployee(employeeId: string, user: AuthUser) {
     const employee = await this.prisma.employee.findFirst({
       where: {
         id: employeeId,
         ...(user.role === Role.ENCARGADO ? { branchId: user.branchId ?? "__none__" } : {})
       },
-      select: { id: true }
+      include: { branch: true }
     })
     if (!employee) throw new NotFoundException("Empleado no encontrado o fuera de alcance")
+    return employee
   }
 
   private deviceScope(user: AuthUser): Prisma.TimeClockDeviceWhereInput {
@@ -1059,11 +1130,11 @@ export class TimeClockService {
   }
 
   private sessionScope(
-    filters: { localDate?: string; branchId?: string; employeeId?: string },
+    filters: { localDate?: string; localDateRange?: Prisma.StringFilter; branchId?: string; employeeId?: string },
     user: AuthUser
   ): Prisma.WorkSessionWhereInput {
     return this.definedSessionWhere({
-      localDate: filters.localDate,
+      localDate: filters.localDateRange ?? filters.localDate,
       branchId: this.effectiveBranchFilter(filters.branchId, user),
       employeeId: filters.employeeId
     })
@@ -1115,6 +1186,38 @@ export class TimeClockService {
       ...(from ? { gte: from } : {}),
       ...(to ? { lte: to } : {})
     }
+  }
+
+  private resolveHistoryRange(filters: HistoryFilters) {
+    const today = this.localParts(new Date()).localDate
+    const to = this.validDateOnly(filters.to) ?? today
+    const defaultFrom = this.addDays(to, -29)
+    const from = this.validDateOnly(filters.from) ?? defaultFrom
+    if (from > to) throw new BadRequestException("Rango de fechas invalido")
+    if (this.dateRangeValues(from, to).length > 93) throw new BadRequestException("El historial permite maximo 93 dias por consulta")
+    return { from, to }
+  }
+
+  private validDateOnly(value?: string) {
+    if (!value) return undefined
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException("Fecha invalida")
+    return value
+  }
+
+  private addDays(date: string, days: number) {
+    const value = new Date(`${date}T00:00:00.000Z`)
+    value.setUTCDate(value.getUTCDate() + days)
+    return value.toISOString().slice(0, 10)
+  }
+
+  private dateRangeValues(from: string, to: string) {
+    const dates: string[] = []
+    let cursor = from
+    while (cursor <= to) {
+      dates.push(cursor)
+      cursor = this.addDays(cursor, 1)
+    }
+    return dates
   }
 
   private generateDeviceToken() {

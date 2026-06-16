@@ -1,4 +1,4 @@
-import type { AppConfig, AttendanceAdjustment, AttendanceRow, AuditLog, Branch, DashboardSummary, Employee, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, TimeClockDevice, TimeClockDeviceRequest, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
+import type { AppConfig, AttendanceAdjustment, AttendanceRow, AuditLog, Branch, DashboardSummary, Employee, EmployeeTimeClockHistory, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, TimeClockDevice, TimeClockDeviceRequest, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -425,7 +425,7 @@ export const api = {
       const query = new URLSearchParams(
         Object.fromEntries(Object.entries(params ?? {}).filter(([, value]) => Boolean(value))) as Record<string, string>
       ).toString()
-      return request<TimeClockEntry[]>(`/admin/time-clock/employees/${employeeId}/history${query ? `?${query}` : ""}`)
+      return request<EmployeeTimeClockHistory>(`/admin/time-clock/employees/${employeeId}/history${query ? `?${query}` : ""}`)
     },
     adjustments(params?: Partial<{ employeeId: string; branchId: string }>) {
       const query = new URLSearchParams(
