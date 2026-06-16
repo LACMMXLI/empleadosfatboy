@@ -85,6 +85,7 @@ export type Movement = {
   deliveredBy?: Pick<User, "id" | "fullName" | "role"> | null
   quantity?: number | null
   unitPrice?: number | string | null
+  evidenceFile?: FileAsset | null
 }
 
 export type AuditLog = {

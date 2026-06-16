@@ -1960,6 +1960,7 @@ function MovementTable({
                 {money.format(Number(movement.amount))}
               </strong>
             </div>
+            {movement.evidenceFile && <MovementEvidenceButton movement={movement} />}
             {actions?.(movement) && <div>{actions(movement)}</div>}
           </div>
         ))}
@@ -1976,6 +1977,7 @@ function MovementTable({
               <th>Monto</th>
               <th>Estado</th>
               <th>Fecha</th>
+              <th>Evidencia</th>
               {actions && <th>Acción</th>}
             </tr>
           </thead>
@@ -1997,6 +1999,7 @@ function MovementTable({
                 <td style={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
                   {new Date(movement.createdAt).toLocaleString("es-MX")}
                 </td>
+                <td>{movement.evidenceFile ? <MovementEvidenceButton movement={movement} /> : <span style={{ color: 'hsl(var(--muted-foreground))', fontSize: '0.7rem' }}>--</span>}</td>
                 {actions && <td>{actions(movement)}</td>}
               </tr>
             ))}
@@ -2004,6 +2007,30 @@ function MovementTable({
         </table>
       </div>
     </>
+  )
+}
+
+function MovementEvidenceButton({ movement }: { movement: Movement }) {
+  const [loading, setLoading] = useState(false)
+  if (!movement.evidenceFile) return null
+
+  async function openEvidence() {
+    if (!movement.evidenceFile) return
+    setLoading(true)
+    try {
+      const blob = await api.fileBlob(movement.evidenceFile.id)
+      const url = URL.createObjectURL(blob)
+      window.open(url, "_blank", "noopener,noreferrer")
+      window.setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button className="btn-icon" type="button" title="Ver foto de evidencia" onClick={openEvidence} disabled={loading}>
+      <FileImage style={{ width: 13, height: 13 }} />
+    </button>
   )
 }
 

@@ -579,8 +579,14 @@ export class TimeClockService {
     }
   }
 
-  async registerDrink(token: string | undefined, input: RegisterDrinkInput, metadata: RequestMetadata) {
+  async registerDrink(
+    token: string | undefined,
+    input: RegisterDrinkInput,
+    photo: Express.Multer.File | undefined,
+    metadata: RequestMetadata
+  ) {
     const device = await this.validateDeviceToken(token)
+    if (!photo) throw new BadRequestException("La foto es obligatoria")
     const employeeCode = this.normalizeEmployeeCode(input.employeeCode)
     if (!employeeCode) throw new BadRequestException("Codigo de empleado requerido")
 
@@ -609,54 +615,65 @@ export class TimeClockService {
     })
     const amount = Number(config.beveragePrice)
     const folio = await this.nextMovementFolio()
+    const evidence = await this.files.uploadTimeClockEvidence(photo, employee.branchId, metadata.ipAddress)
 
-    const movement = await this.prisma.movement.create({
-      data: {
-        folio,
-        employeeId: employee.id,
-        branchId: device.branchId,
-        kind: MovementKind.DRINK,
-        origin: MovementOrigin.EMPLOYEE_REQUEST,
+    try {
+      const movement = await this.prisma.movement.create({
+        data: {
+          folio,
+          employeeId: employee.id,
+          branchId: device.branchId,
+          kind: MovementKind.DRINK,
+          origin: MovementOrigin.EMPLOYEE_REQUEST,
+          amount,
+          reason: "Bebida",
+          status: MovementStatus.AUTHORIZED,
+          authorizedAt: new Date(),
+          productName: "Bebida",
+          quantity: 1,
+          unitPrice: amount,
+          receiptText: config.receiptLegalText,
+          requestIp: metadata.ipAddress,
+          requestUserAgent: metadata.userAgent,
+          requestDevice: `time-clock:${device.id}`
+        },
+        include: {
+          employee: { include: { branch: true } }
+        }
+      })
+      const evidenceFile = await this.files.attachTimeClockEvidence(evidence.id, movement.id)
+
+      await this.audit.log({
+        action: AuditAction.CREATE,
+        entity: "Movement",
+        entityId: movement.id,
+        affectedEmployeeId: employee.id,
+        newValue: this.toJson({
+          ...movement,
+          evidenceFileId: evidenceFile.id,
+          source: "time-clock-drink",
+          deviceId: device.id
+        }),
+        ipAddress: metadata.ipAddress
+      })
+
+      return {
+        ok: true,
+        message: "Bebida registrada",
         amount,
-        reason: "Bebida",
-        status: MovementStatus.AUTHORIZED,
-        authorizedAt: new Date(),
-        productName: "Bebida",
-        quantity: 1,
-        unitPrice: amount,
-        receiptText: config.receiptLegalText,
-        requestIp: metadata.ipAddress,
-        requestUserAgent: metadata.userAgent,
-        requestDevice: `time-clock:${device.id}`
-      },
-      include: {
-        employee: { include: { branch: true } }
+        movement: {
+          ...movement,
+          evidenceFile
+        },
+        employee: {
+          id: employee.id,
+          fullName: employee.fullName,
+          position: employee.position
+        }
       }
-    })
-
-    await this.audit.log({
-      action: AuditAction.CREATE,
-      entity: "Movement",
-      entityId: movement.id,
-      affectedEmployeeId: employee.id,
-      newValue: this.toJson({
-        ...movement,
-        source: "time-clock-drink",
-        deviceId: device.id
-      }),
-      ipAddress: metadata.ipAddress
-    })
-
-    return {
-      ok: true,
-      message: "Bebida registrada",
-      amount,
-      movement,
-      employee: {
-        id: employee.id,
-        fullName: employee.fullName,
-        position: employee.position
-      }
+    } catch (error) {
+      await this.files.deleteStoredObject(evidence.key)
+      throw error
     }
   }
 

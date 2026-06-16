@@ -360,11 +360,21 @@ export function TimeClockKiosk() {
       return
     }
 
-    setStatus("registering")
-    setStatusMessage("Registrando bebida...")
-
     try {
-      const result = await api.timeClock.registerDrink(employeeCode)
+      setStatus("capturing_photo")
+      setStatusMessage(`Capturando evidencia para ${verifiedEmployee.fullName}...`)
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      if (cameraError) {
+        throw new Error("Cámara sin permiso o no disponible. No se puede registrar bebida.")
+      }
+
+      const photo = await capturePhotoOnce()
+
+      setStatus("registering")
+      setStatusMessage("Guardando bebida...")
+
+      const result = await api.timeClock.registerDrink({ employeeCode, photo })
       const amount = Number(result.amount)
       const formattedAmount = money.format(Number.isFinite(amount) ? amount : 0)
       const timeStr = new Intl.DateTimeFormat("es-MX", {

@@ -106,7 +106,7 @@ export class MovementsService {
   ) {}
 
   async list(filters: MovementFilters, user: AuthUser) {
-    return this.prisma.movement.findMany({
+    const movements = await this.prisma.movement.findMany({
       where: this.buildWhere(filters, user),
       include: {
         employee: { include: { branch: true } },
@@ -117,6 +117,7 @@ export class MovementsService {
       orderBy: { createdAt: "desc" },
       take: 100
     })
+    return this.withEvidenceFiles(movements)
   }
 
   async get(id: string, user: AuthUser) {
@@ -130,7 +131,7 @@ export class MovementsService {
       }
     })
     if (!movement) throw new NotFoundException("Movimiento no encontrado")
-    return movement
+    return (await this.withEvidenceFiles([movement]))[0]
   }
 
   async receipt(id: string, user: AuthUser) {
@@ -868,6 +869,22 @@ export class MovementsService {
     return this.prisma.movement.findFirst({
       where: this.andWhere(this.scopeForUser(user), { id })
     })
+  }
+
+  private async withEvidenceFiles<T extends { id: string }>(movements: T[]) {
+    if (!movements.length) return movements
+    const files = await this.prisma.fileAsset.findMany({
+      where: {
+        module: "TIMECLOCK",
+        entityId: { in: movements.map((movement) => movement.id) },
+        deletedAt: null
+      }
+    })
+    const filesByEntity = new Map(files.map((file) => [file.entityId, file]))
+    return movements.map((movement) => ({
+      ...movement,
+      evidenceFile: filesByEntity.get(movement.id) ?? null
+    }))
   }
 
   private toJson(value: unknown): Prisma.InputJsonValue {

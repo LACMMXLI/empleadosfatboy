@@ -191,12 +191,26 @@ export class TimeClockPublicController {
   }
 
   @Post("drink")
+  @UseInterceptors(
+    FileInterceptor("photo", {
+      storage: memoryStorage(),
+      limits: { fileSize: maxImageUploadBytes },
+      fileFilter: (_request, file, callback) => {
+        if (!allowedImageMimeTypes.includes(file.mimetype as (typeof allowedImageMimeTypes)[number])) {
+          callback(new BadRequestException("Solo se permiten imagenes JPEG, PNG o WEBP"), false)
+          return
+        }
+        callback(null, true)
+      }
+    })
+  )
   drink(
     @Headers("x-time-clock-device") token: string | undefined,
+    @UploadedFile() photo: Express.Multer.File | undefined,
     @Body() dto: RegisterDrinkDto,
     @Req() request: RequestWithUser
   ) {
-    return this.timeClock.registerDrink(token, dto, {
+    return this.timeClock.registerDrink(token, dto, photo, {
       ipAddress: request.ip,
       userAgent: request.headers["user-agent"] as string | undefined
     })
