@@ -10,6 +10,8 @@ const statusLabels: Record<AttendanceRow["status"], string> = {
   NO_SHOW: "Sin checar"
 }
 
+type AttendancePanel = "day" | "history" | "devices" | "adjustments"
+
 export function AttendanceAdmin({ user }: { user?: User }) {
   const queryClient = useQueryClient()
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
@@ -23,6 +25,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
   const [deviceBranchId, setDeviceBranchId] = useState("")
   const [requestDrafts, setRequestDrafts] = useState<Record<string, { name: string; branchId: string }>>({})
   const [setupToken, setSetupToken] = useState<string | null>(null)
+  const [activePanel, setActivePanel] = useState<AttendancePanel>("day")
   const [adjustment, setAdjustment] = useState({
     employeeId: "",
     branchId: "",
@@ -60,6 +63,10 @@ export function AttendanceAdmin({ user }: { user?: User }) {
     queryFn: () => api.adminTimeClock.employeeHistory(employeeId, { from: historyFrom, to: historyTo }),
     enabled: Boolean(employeeId)
   })
+  const attendanceRows = attendance.data ?? []
+  const inShiftCount = attendanceRows.filter((row) => row.status === "IN_SHIFT").length
+  const exitedCount = attendanceRows.filter((row) => row.status === "EXITED").length
+  const noShowCount = attendanceRows.filter((row) => row.status === "NO_SHOW").length
 
   const createDevice = useMutation({
     mutationFn: () => api.adminTimeClock.createDevice({ name: deviceName, branchId: deviceBranchId }),
@@ -143,6 +150,44 @@ export function AttendanceAdmin({ user }: { user?: User }) {
 
   return (
     <div className="space-y-4">
+      <div className="attendance-dashboard-shell">
+        <div className="attendance-dashboard-head">
+          <div>
+            <div className="admin-card-title">
+              <Clock3 style={{ width: 15, height: 15, color: "#00e5ff" }} />
+              Dashboard de asistencia
+            </div>
+          </div>
+          <div className="attendance-dashboard-tabs" role="tablist" aria-label="Vistas de asistencia">
+            <button className={`attendance-tab ${activePanel === "day" ? "active" : ""}`} type="button" onClick={() => setActivePanel("day")}>
+              <Clock3 style={{ width: 13, height: 13 }} />
+              Dia
+            </button>
+            <button className={`attendance-tab ${activePanel === "history" ? "active" : ""}`} type="button" onClick={() => setActivePanel("history")}>
+              <History style={{ width: 13, height: 13 }} />
+              Historial
+            </button>
+            <button className={`attendance-tab ${activePanel === "devices" ? "active" : ""}`} type="button" onClick={() => setActivePanel("devices")}>
+              <KeyRound style={{ width: 13, height: 13 }} />
+              Dispositivos
+            </button>
+            <button className={`attendance-tab ${activePanel === "adjustments" ? "active" : ""}`} type="button" onClick={() => setActivePanel("adjustments")}>
+              <Wrench style={{ width: 13, height: 13 }} />
+              Correcciones
+            </button>
+          </div>
+        </div>
+        <div className="attendance-dashboard-metrics">
+          <HistoryMetric label="Empleados visibles" value={attendanceRows.length} />
+          <HistoryMetric label="En turno" value={inShiftCount} />
+          <HistoryMetric label="Salieron" value={exitedCount} />
+          <HistoryMetric label="Sin checar" value={noShowCount} />
+          <HistoryMetric label="Tablets activas" value={(devices.data ?? []).filter((device) => device.active).length} />
+          <HistoryMetric label="Solicitudes" value={deviceRequests.data?.length ?? 0} />
+        </div>
+      </div>
+
+      {activePanel === "day" && (
       <div className="admin-card">
         <div className="admin-card-header">
           <div className="admin-card-title">
@@ -196,7 +241,9 @@ export function AttendanceAdmin({ user }: { user?: User }) {
           </div>
         </div>
       </div>
+      )}
 
+      {activePanel === "history" && (
       <div className="admin-card">
         <div className="admin-card-header">
           <div className="admin-card-title">
@@ -295,8 +342,9 @@ export function AttendanceAdmin({ user }: { user?: User }) {
           )}
         </div>
       </div>
+      )}
 
-      <div className="admin-two-column">
+      {activePanel === "devices" && (
         <div className="admin-card">
           <div className="admin-card-header">
             <div className="admin-card-title">
@@ -435,7 +483,9 @@ export function AttendanceAdmin({ user }: { user?: User }) {
             {purgeDevice.error && <div className="status-empty compact-error">{purgeDevice.error.message}</div>}
           </div>
         </div>
+      )}
 
+      {activePanel === "adjustments" && (
         <div className="admin-card">
           <div className="admin-card-header">
             <div className="admin-card-title">
@@ -482,7 +532,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
