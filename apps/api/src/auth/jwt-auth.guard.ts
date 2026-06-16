@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken"
 import { IS_PUBLIC_KEY } from "./public.decorator"
 import { PrismaService } from "../prisma/prisma.service"
 import type { AuthUser } from "./auth.types"
+import { requiredJwtSecret } from "./jwt-secret"
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -26,7 +27,7 @@ export class JwtAuthGuard implements CanActivate {
     if (!header?.startsWith("Bearer ")) throw new UnauthorizedException("Token requerido")
 
     try {
-      const payload = jwt.verify(header.slice(7), this.config.get<string>("JWT_SECRET") ?? "dev-secret") as AuthUser
+      const payload = jwt.verify(header.slice(7), requiredJwtSecret(this.config)) as AuthUser
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
         select: { id: true, email: true, role: true, branchId: true, employeeId: true, active: true }

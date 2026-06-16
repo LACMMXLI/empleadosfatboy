@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken"
 import { PrismaService } from "../prisma/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { LoginThrottleService } from "../security/login-throttle.service"
+import { requiredJwtSecret } from "./jwt-secret"
 
 type LoginMetadata = {
   ipAddress?: string
@@ -59,7 +60,7 @@ export class AuthService {
         branchId: user.branchId,
         employeeId: user.employeeId
       },
-      this.config.get<string>("JWT_SECRET") ?? "dev-secret",
+      requiredJwtSecret(this.config),
       { expiresIn: "12h" }
     )
 

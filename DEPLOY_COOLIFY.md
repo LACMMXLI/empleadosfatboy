@@ -107,6 +107,17 @@ El entrypoint de API ahora hace este orden:
 4. Ejecuta `prisma migrate deploy`.
 5. Inicia NestJS.
 
+### Rotacion de `JWT_SECRET`
+
+`JWT_SECRET` firma las sesiones de administradores y del portal de empleados. En produccion debe existir y tener al menos 32 caracteres; si falta o es corto, la API no arranca.
+
+Para rotarlo:
+
+1. Genera un secreto nuevo, largo y unico.
+2. Cambia `JWT_SECRET` en el entorno de Coolify.
+3. Reinicia/redeploya la API.
+4. Considera todas las sesiones anteriores expiradas: los tokens firmados con el secreto viejo dejaran de validar y los usuarios deberan iniciar sesion otra vez.
+
 Esto evita fallos intermitentes cuando Coolify levanta el contenedor de API antes de que la base externa este lista.
 
 Variable opcional:

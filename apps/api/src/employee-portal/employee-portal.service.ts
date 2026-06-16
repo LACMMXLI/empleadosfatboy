@@ -7,6 +7,7 @@ import { AuditService } from "../audit/audit.service"
 import { PrismaService } from "../prisma/prisma.service"
 import { LoginThrottleService } from "../security/login-throttle.service"
 import { MovementsService, RequestMetadata, type CreateEmployeeRequestInput } from "../movements/movements.service"
+import { requiredJwtSecret } from "../auth/jwt-secret"
 
 type PortalToken = {
   sub: string
@@ -64,7 +65,7 @@ export class EmployeePortalService {
 
     const token = jwt.sign(
       { sub: employee.id, portal: "employee" } satisfies PortalToken,
-      this.config.get<string>("JWT_SECRET") ?? "dev-secret",
+      requiredJwtSecret(this.config),
       { expiresIn: "12h" }
     )
 
@@ -223,10 +224,7 @@ export class EmployeePortalService {
   private verifyToken(authorization?: string) {
     if (!authorization?.startsWith("Bearer ")) throw new UnauthorizedException("Token de empleado requerido")
     try {
-      const payload = jwt.verify(
-        authorization.slice(7),
-        this.config.get<string>("JWT_SECRET") ?? "dev-secret"
-      ) as PortalToken
+      const payload = jwt.verify(authorization.slice(7), requiredJwtSecret(this.config)) as PortalToken
       if (payload.portal !== "employee") throw new UnauthorizedException("Token de empleado invalido")
       return payload
     } catch {

@@ -7,10 +7,12 @@ import { ValidationPipe } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { NestExpressApplication } from "@nestjs/platform-express"
 import { AppModule } from "./app.module"
+import { requiredJwtSecret } from "./auth/jwt-secret"
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule)
   const config = app.get(ConfigService)
+  requiredJwtSecret(config)
   const configuredTrustProxyHops = Number(config.get("TRUST_PROXY_HOPS") ?? 1)
   const trustProxyHops =
     Number.isInteger(configuredTrustProxyHops) && configuredTrustProxyHops > 0 ? configuredTrustProxyHops : 1
