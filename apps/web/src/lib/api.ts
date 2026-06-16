@@ -246,6 +246,8 @@ export const api = {
       employeeDeleted: boolean
       linkedUsersAnonymized: number
       movementsDeleted: number
+      timeClockEntriesDeleted: number
+      workSessionsDeleted: number
       payrollItemsDeleted: number
       payrollsRecalculated: number
       sensitiveDataStored: boolean

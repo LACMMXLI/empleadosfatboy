@@ -162,6 +162,10 @@ export class EmployeesService {
       const linkedUserEmails = linkedUsers.map((user) => user.email)
       const movementRows = await tx.movement.findMany({ where: { employeeId: id }, select: { id: true } })
       const movementIds = movementRows.map((movement) => movement.id)
+      const timeClockEntryRows = await tx.timeClockEntry.findMany({ where: { employeeId: id }, select: { id: true } })
+      const timeClockEntryIds = timeClockEntryRows.map((entry) => entry.id)
+      const workSessionRows = await tx.workSession.findMany({ where: { employeeId: id }, select: { id: true } })
+      const workSessionIds = workSessionRows.map((session) => session.id)
       const payrollItemRows = await tx.payrollItem.findMany({
         where: { employeeId: id },
         select: { id: true, payrollId: true }
@@ -198,6 +202,18 @@ export class EmployeesService {
         })
       }
 
+      await tx.attendanceAdjustment.deleteMany({
+        where: {
+          OR: [
+            { employeeId: id },
+            ...(timeClockEntryIds.length ? [{ entryId: { in: timeClockEntryIds } }] : []),
+            ...(workSessionIds.length ? [{ workSessionId: { in: workSessionIds } }] : [])
+          ]
+        }
+      })
+      await tx.workSession.deleteMany({ where: { employeeId: id } })
+      await tx.timeClockEntry.deleteMany({ where: { employeeId: id } })
+      await tx.incident.updateMany({ where: { employeeId: id }, data: { employeeId: null } })
       await tx.payrollItem.deleteMany({ where: { employeeId: id } })
       await tx.movement.deleteMany({ where: { employeeId: id } })
 
@@ -246,6 +262,8 @@ export class EmployeesService {
         employeeDeleted: true,
         linkedUsersAnonymized: linkedUsers.length,
         movementsDeleted: movementIds.length,
+        timeClockEntriesDeleted: timeClockEntryIds.length,
+        workSessionsDeleted: workSessionIds.length,
         payrollItemsDeleted: payrollItemIds.length,
         payrollsRecalculated: payrollIds.length,
         sensitiveDataStored: false
