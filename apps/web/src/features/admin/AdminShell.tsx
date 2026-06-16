@@ -87,6 +87,7 @@ export function Shell({
   const me = useQuery({ queryKey: ["me"], queryFn: api.me })
   const { scrollDir, isNearTop } = useScrollDirection()
   const showNav = isNearTop || scrollDir === "up"
+  const touchOptimizedLayout = useTouchOptimizedLayout()
   const handleLogout = () => {
     if (!window.confirm("¿Cerrar sesión del administrador?")) return
     session.token = null
@@ -116,7 +117,7 @@ export function Shell({
     <main className="admin-shell min-h-screen">
       <div className="flex min-h-screen">
         {/* === Desktop Sidebar === */}
-        <aside className="admin-sidebar hidden w-60 flex-col lg:flex" style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+        <aside className={touchOptimizedLayout ? "admin-sidebar hidden" : "admin-sidebar hidden w-60 flex-col lg:flex"} style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
           <div className="admin-sidebar-brand">
             <img src={fatboyLogo} alt="Fatboy" className="admin-sidebar-logo" />
             <div>
@@ -156,11 +157,11 @@ export function Shell({
             style={{ transform: showNav ? "translateY(0)" : "translateY(-100%)" }}
           >
             <div className="flex items-center gap-3">
-              <div className="lg:hidden">
+              <div className={touchOptimizedLayout ? "" : "lg:hidden"}>
                 <img src={fatboyLogo} alt="" className="h-6 w-auto opacity-80" />
               </div>
               <div className="admin-header-user">
-                <div className="admin-header-view lg:hidden">{viewTitles[activeView]}</div>
+                <div className={touchOptimizedLayout ? "admin-header-view" : "admin-header-view lg:hidden"}>{viewTitles[activeView]}</div>
                 <div className="admin-header-name">
                   {me.data?.fullName ?? "Usuario"}{" "}
                   {me.data?.branch?.name ? `(${me.data.branch.name})` : ""}{" "}
@@ -170,7 +171,7 @@ export function Shell({
               </div>
             </div>
             <button
-              className="btn-icon lg:hidden"
+              className={touchOptimizedLayout ? "btn-icon" : "btn-icon lg:hidden"}
               onClick={handleLogout}
               type="button"
               aria-label="Cerrar sesión"
@@ -178,7 +179,7 @@ export function Shell({
               <LogOut style={{ width: 16, height: 16 }} />
             </button>
           </header>
-          <div className="mobile-page flex-1 p-3 lg:p-5">
+          <div className={touchOptimizedLayout ? "mobile-page flex-1 p-3" : "mobile-page flex-1 p-3 lg:p-5"}>
             {activeView === "dashboard" && <Dashboard />}
             {activeView === "empleados" && <Employees user={me.data} />}
             {activeView === "pendientes" && <PendingAuthorizations currentRole={me.data?.role} />}
@@ -198,21 +199,45 @@ export function Shell({
         activeView={activeView} 
         views={views} 
         onViewChange={onViewChange} 
+        touchOptimizedLayout={touchOptimizedLayout}
         style={{ transform: showNav ? "translateY(0)" : "translateY(100%)" }}
       />
     </main>
   )
 }
 
+function useTouchOptimizedLayout() {
+  const [enabled, setEnabled] = useState(false)
+
+  useEffect(() => {
+    const touchQuery = window.matchMedia("(pointer: coarse), (hover: none)")
+    const tabletWidthQuery = window.matchMedia("(max-width: 1366px)")
+    const update = () => setEnabled(touchQuery.matches && tabletWidthQuery.matches)
+
+    update()
+    touchQuery.addEventListener("change", update)
+    tabletWidthQuery.addEventListener("change", update)
+
+    return () => {
+      touchQuery.removeEventListener("change", update)
+      tabletWidthQuery.removeEventListener("change", update)
+    }
+  }, [])
+
+  return enabled
+}
+
 function MobileBottomNav({
   activeView,
   views,
   onViewChange,
+  touchOptimizedLayout,
   style
 }: {
   activeView: View
   views: Array<{ id: View; label: string; icon: typeof LayoutDashboard }>
   onViewChange: (view: View) => void
+  touchOptimizedLayout: boolean
   style?: React.CSSProperties
 }) {
   const navLabels: Record<View, string> = {
@@ -228,7 +253,7 @@ function MobileBottomNav({
     entregas: "Entregas"
   }
   return (
-    <nav className="bottom-nav lg:hidden" style={style}>
+    <nav className={touchOptimizedLayout ? "bottom-nav" : "bottom-nav lg:hidden"} style={style}>
       <div className="bottom-nav-inner" style={{ gridTemplateColumns: `repeat(${views.length}, minmax(0, 1fr))` }}>
         {views.map((item) => {
           const active = activeView === item.id
