@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { CheckCircle2, X } from "lucide-react"
 import { api, employeeSession, session } from "@/lib/api"
-import { clearPwa, PWA_UPDATE_EVENT, syncAdminPwa, syncEmployeePwa, type PwaUpdateDetail } from "@/pwa/employeePwa"
+import { clearPwa, PWA_UPDATE_EVENT, syncAdminPwa, syncEmployeePwa, syncTimeClockPwa, type PwaUpdateDetail } from "@/pwa/employeePwa"
 import { AdminLogin, EmployeeLogin, PortalSelector } from "@/features/auth/PortalAuth"
 import { Shell } from "@/features/admin/AdminShell"
 import { EmployeePortal } from "@/features/employee/EmployeePortal"
@@ -85,6 +85,8 @@ function App() {
       syncEmployeePwa(true)
     } else if (route === "admin") {
       syncAdminPwa(true)
+    } else if (route === "timeClock") {
+      syncTimeClockPwa(true)
     } else {
       clearPwa()
     }

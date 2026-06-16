@@ -1,5 +1,6 @@
 let employeeServiceWorkerRegistered = false
 let adminServiceWorkerRegistered = false
+let timeClockServiceWorkerRegistered = false
 let versionWatchStarted = false
 let updateAlreadyNotified = false
 let reloadAfterControllerChange = false
@@ -175,6 +176,23 @@ export function syncAdminPwa(enabled: boolean) {
   if (!adminServiceWorkerRegistered) {
     registerServiceWorker("/admin-sw.js", "/admin")
     adminServiceWorkerRegistered = true
+  }
+}
+
+export function syncTimeClockPwa(enabled: boolean) {
+  if (!enabled) return
+
+  removeManagedTags()
+  appendLink("manifest", "/pwa/timeclock-manifest.webmanifest")
+  appendLink("apple-touch-icon", "/pwa/employee-apple-touch-180.png", { sizes: "180x180" })
+  appendMeta("theme-color", "#050710")
+  appendMeta("apple-mobile-web-app-capable", "yes")
+  appendMeta("apple-mobile-web-app-title", "Checador")
+  appendMeta("apple-mobile-web-app-status-bar-style", "black-translucent")
+
+  if (!timeClockServiceWorkerRegistered) {
+    registerServiceWorker("/timeclock-sw.js", "/checador")
+    timeClockServiceWorkerRegistered = true
   }
 }
 
