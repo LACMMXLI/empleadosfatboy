@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common"
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common"
 import { Type } from "class-transformer"
 import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Length, Min } from "class-validator"
 import { Role, SalaryType } from "@prisma/client"
@@ -101,6 +101,12 @@ export class EmployeesController {
   @Get(":id/balance")
   balance(@Param("id") id: string, @Req() request: RequestWithUser) {
     return this.employees.balance(id, request.user)
+  }
+
+  @Roles(Role.ADMINISTRADOR)
+  @Get(":id/purge")
+  purgeRequiresDelete() {
+    throw new BadRequestException("La purga de empleado debe ejecutarse con metodo DELETE desde el panel administrador.")
   }
 
   @Roles(Role.ENCARGADO)

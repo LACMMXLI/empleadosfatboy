@@ -2094,7 +2094,7 @@ function Employees({ user }: { user?: User }) {
 
   const confirmDeveloperPurge = (employee: Employee) => {
     const confirmation = window.prompt(`Borrado definitivo de ${employee.fullName}. Escribe BORRAR para confirmar.`)
-    if (confirmation === "BORRAR") {
+            if (confirmation === "BORRAR") {
       purgeDeveloperEmployee.mutate(employee)
     }
   }
@@ -2240,7 +2240,11 @@ function Employees({ user }: { user?: User }) {
                 className="btn-reject modal-submit"
                 type="button"
                 disabled={purgeDeveloperEmployee.isPending}
-                onClick={() => confirmDeveloperPurge(selectedEmployee)}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  confirmDeveloperPurge(selectedEmployee)
+                }}
               >
                 <Trash2 style={{ width: 14, height: 14 }} />
                 Purga dev
