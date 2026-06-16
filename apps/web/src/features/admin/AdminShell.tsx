@@ -117,7 +117,7 @@ export function Shell({
     <main className="admin-shell min-h-screen">
       <div className="flex min-h-screen">
         {/* === Desktop Sidebar === */}
-        <aside className={touchOptimizedLayout ? "admin-sidebar hidden" : "admin-sidebar hidden w-60 flex-col lg:flex"} style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+        <aside className={touchOptimizedLayout ? "admin-sidebar hidden" : "admin-sidebar hidden w-52 flex-col lg:flex"} style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
           <div className="admin-sidebar-brand">
             <img src={fatboyLogo} alt="Fatboy" className="admin-sidebar-logo" />
             <div>
@@ -179,7 +179,7 @@ export function Shell({
               <LogOut style={{ width: 16, height: 16 }} />
             </button>
           </header>
-          <div className={touchOptimizedLayout ? "mobile-page flex-1 p-3" : "mobile-page flex-1 p-3 lg:p-5"}>
+          <div className={touchOptimizedLayout ? "mobile-page flex-1 p-3" : "mobile-page flex-1 p-3 lg:p-4"}>
             {activeView === "dashboard" && <Dashboard />}
             {activeView === "empleados" && <Employees user={me.data} />}
             {activeView === "pendientes" && <PendingAuthorizations currentRole={me.data?.role} />}
