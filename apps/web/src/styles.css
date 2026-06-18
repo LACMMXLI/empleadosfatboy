@@ -4479,6 +4479,10 @@
     text-align: center;
   }
 
+  .timeclock-kiosk-pin-panel.verified {
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  }
+
   .timeclock-kiosk-employee-icon {
     width: clamp(2.7rem, 7.2vh, 4rem);
     height: clamp(2.7rem, 7.2vh, 4rem);
@@ -4604,6 +4608,160 @@
 
   .timeclock-kiosk-status-card.error .timeclock-kiosk-status-text {
     color: #fca5a5;
+  }
+
+  .timeclock-kiosk-employee-summary {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: 0.55rem;
+    overflow: hidden;
+  }
+
+  .timeclock-kiosk-attendance-pill {
+    min-height: 2.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    justify-self: center;
+    max-width: 100%;
+    border-radius: 0.6rem;
+    padding: 0 0.75rem;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(15, 23, 42, 0.72);
+    color: #e2e8f0;
+    font-size: clamp(0.72rem, 1.8vh, 0.9rem);
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .timeclock-kiosk-attendance-pill svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .timeclock-kiosk-attendance-pill.in_shift {
+    border-color: rgba(74, 222, 128, 0.44);
+    background: rgba(22, 101, 52, 0.48);
+    color: #bbf7d0;
+  }
+
+  .timeclock-kiosk-attendance-pill.exited {
+    border-color: rgba(96, 165, 250, 0.38);
+    background: rgba(30, 64, 175, 0.36);
+    color: #bfdbfe;
+  }
+
+  .timeclock-kiosk-attendance-pill.no_record {
+    border-color: rgba(251, 191, 36, 0.4);
+    background: rgba(146, 64, 14, 0.32);
+    color: #fde68a;
+  }
+
+  .timeclock-kiosk-employee-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .timeclock-kiosk-employee-grid > div {
+    min-width: 0;
+    border-radius: 0.55rem;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    background: rgba(2, 6, 23, 0.36);
+    padding: 0.55rem;
+    text-align: left;
+  }
+
+  .timeclock-kiosk-employee-grid span,
+  .timeclock-kiosk-movement-header span,
+  .timeclock-kiosk-movement-row span,
+  .timeclock-kiosk-empty-movements {
+    color: #94a3b8;
+    font-size: clamp(0.62rem, 1.55vh, 0.75rem);
+    font-weight: 700;
+  }
+
+  .timeclock-kiosk-employee-grid strong,
+  .timeclock-kiosk-movement-row strong {
+    display: block;
+    margin-top: 0.18rem;
+    overflow: hidden;
+    color: #f8fafc;
+    font-size: clamp(0.76rem, 1.9vh, 0.95rem);
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .timeclock-kiosk-movement-list {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.45rem;
+    overflow: hidden;
+    text-align: left;
+  }
+
+  .timeclock-kiosk-movement-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: #cbd5e1;
+    font-size: clamp(0.68rem, 1.8vh, 0.85rem);
+    font-weight: 950;
+    text-transform: uppercase;
+  }
+
+  .timeclock-kiosk-movement-header span {
+    display: grid;
+    min-width: 1.45rem;
+    height: 1.45rem;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(159, 232, 112, 0.14);
+    color: #9fe870;
+  }
+
+  .timeclock-kiosk-movement-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.7rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.12);
+    padding: 0.43rem 0;
+  }
+
+  .timeclock-kiosk-movement-row div {
+    min-width: 0;
+  }
+
+  .timeclock-kiosk-movement-row b {
+    color: #9fe870;
+    font-size: clamp(0.76rem, 1.9vh, 0.95rem);
+    font-weight: 950;
+  }
+
+  .timeclock-kiosk-empty-movements {
+    display: grid;
+    min-height: 3.4rem;
+    place-items: center;
+    border-radius: 0.55rem;
+    background: rgba(2, 6, 23, 0.28);
+    text-align: center;
+  }
+
+  .timeclock-kiosk-clear-session {
+    min-height: 2.25rem;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 0.55rem;
+    background: rgba(15, 23, 42, 0.84);
+    color: #e2e8f0;
+    font-size: clamp(0.72rem, 1.8vh, 0.85rem);
+    font-weight: 900;
+    cursor: pointer;
   }
 
   .timeclock-kiosk-photo-note {

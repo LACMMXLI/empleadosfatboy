@@ -296,6 +296,38 @@ export type TimeClockEntry = {
   createdAt: string
 }
 
+export type TimeClockEmployeeVerification = {
+  employee: Pick<Employee, "id" | "fullName" | "position"> & {
+    branch: Pick<Branch, "id" | "name" | "code">
+  }
+  attendance: {
+    state: "IN_SHIFT" | "EXITED" | "NO_RECORD"
+    statusLabel: string
+    nextAction: TimeClockEventType
+    activeSession?: {
+      startedAt: string
+      localDate: string
+      localTime: string
+    } | null
+    lastEntry?: {
+      type: TimeClockEventType
+      occurredAt: string
+      localDate: string
+      localTime: string
+    } | null
+  }
+  recentMovements: Array<{
+    id: string
+    folio: string
+    kind: MovementKind
+    amount: number
+    reason: string
+    status: MovementStatus
+    productName?: string | null
+    createdAt: string
+  }>
+}
+
 export type WorkSession = {
   id: string
   employeeId: string

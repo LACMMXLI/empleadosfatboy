@@ -2,17 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { CheckCircle2, CircleHelp, Clock3, Coffee, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, Settings, ShieldAlert, ShieldCheck, Tag, UserRound } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
-import type { TimeClockEventType } from "@/types/domain"
+import { movementLabels, statusLabels } from "@/lib/ledger-ui"
+import type { TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
 const KIOSK_PIN_LENGTH = 6
+const KIOSK_SESSION_TIMEOUT_MS = 20_000
 
 type KioskStatus = "idle" | "validating_pin" | "capturing_photo" | "registering" | "success" | "error"
-type VerifiedEmployee = {
-  id: string
-  fullName: string
-  position: string
+type VerifiedEmployee = TimeClockEmployeeVerification["employee"] & {
+  attendance: TimeClockEmployeeVerification["attendance"]
+  recentMovements: TimeClockEmployeeVerification["recentMovements"]
 }
 type LastKioskSuccess = {
   employeeName: string
@@ -110,9 +111,24 @@ export function TimeClockKiosk() {
   const [statusMessage, setStatusMessage] = useState<string>("Ingresa tu PIN para comenzar")
   const [lastSuccess, setLastSuccess] = useState<LastKioskSuccess | null>(null)
   const [verifiedEmployee, setVerifiedEmployee] = useState<VerifiedEmployee | null>(null)
+  const [sessionActivityAt, setSessionActivityAt] = useState<number>(0)
   const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
   const canUseActions = Boolean(verifiedEmployee) && !isProcessing
+  const canRegisterEntry = Boolean(canUseActions && verifiedEmployee?.attendance.nextAction === "ENTRY")
+  const canRegisterExit = Boolean(canUseActions && verifiedEmployee?.attendance.nextAction === "EXIT")
+  const canRegisterDrink = Boolean(canUseActions && verifiedEmployee?.attendance.state === "IN_SHIFT")
   const { playClick, playError, playSuccess } = useKioskSounds()
+
+  const markSessionActivity = useCallback(() => {
+    setSessionActivityAt(Date.now())
+  }, [])
+
+  const clearEmployeeSession = useCallback((nextMessage = "Ingresa tu PIN para comenzar") => {
+    setEmployeeCode("")
+    setVerifiedEmployee(null)
+    setStatus("idle")
+    setStatusMessage(nextMessage)
+  }, [])
 
   // Fullscreen event listener
   useEffect(() => {
@@ -243,7 +259,12 @@ export function TimeClockKiosk() {
     api.timeClock.verifyEmployeeCode(employeeCode)
       .then((result) => {
         if (cancelled) return
-        setVerifiedEmployee(result.employee)
+        setVerifiedEmployee({
+          ...result.employee,
+          attendance: result.attendance,
+          recentMovements: result.recentMovements
+        })
+        setSessionActivityAt(Date.now())
         setStatus("idle")
         setStatusMessage(`PIN confirmado: ${result.employee.fullName}`)
         playSuccess()
@@ -266,6 +287,14 @@ export function TimeClockKiosk() {
       cancelled = true
     }
   }, [employeeCode, needsAuthorization, playError, playSuccess])
+
+  useEffect(() => {
+    if (!verifiedEmployee || isProcessing) return
+    const timeout = window.setTimeout(() => {
+      clearEmployeeSession("Sesión cerrada por inactividad. Ingresa tu PIN.")
+    }, KIOSK_SESSION_TIMEOUT_MS)
+    return () => window.clearTimeout(timeout)
+  }, [clearEmployeeSession, isProcessing, sessionActivityAt, verifiedEmployee])
 
   // Initialize and run the camera stream in background (hidden video element)
   useEffect(() => {
@@ -313,6 +342,7 @@ export function TimeClockKiosk() {
   const handleKeyPress = (key: string) => {
     if (isProcessing) return
     playClick()
+    markSessionActivity()
 
     if (status === 'success' || status === 'error') {
       setStatus('idle')
@@ -334,6 +364,7 @@ export function TimeClockKiosk() {
 
   const handleRegister = async (type: TimeClockEventType) => {
     playClick()
+    markSessionActivity()
     if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
       setStatus('error')
       setStatusMessage("Ingresa un PIN válido para habilitar el registro.")
@@ -420,6 +451,7 @@ export function TimeClockKiosk() {
 
   const handleRegisterDrink = async () => {
     playClick()
+    markSessionActivity()
     if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
       setStatus("error")
       setStatusMessage("Ingresa un PIN válido para habilitar bebida.")
@@ -538,7 +570,12 @@ export function TimeClockKiosk() {
   }
 
   return (
-    <main className="timeclock-shell-kiosk">
+    <main
+      className="timeclock-shell-kiosk"
+      onPointerDownCapture={() => {
+        if (verifiedEmployee && !isProcessing) markSessionActivity()
+      }}
+    >
       <section className="timeclock-panel-kiosk">
         <header className="timeclock-kiosk-header">
           <div className="timeclock-kiosk-brand-block">
@@ -584,7 +621,7 @@ export function TimeClockKiosk() {
               type="button"
               className="timeclock-kiosk-action-card entry"
               onClick={() => handleRegister("ENTRY")}
-              disabled={!canUseActions}
+              disabled={!canRegisterEntry}
             >
               <span className="timeclock-kiosk-action-icon">
                 <LogIn />
@@ -597,7 +634,7 @@ export function TimeClockKiosk() {
               type="button"
               className="timeclock-kiosk-action-card exit"
               onClick={() => handleRegister("EXIT")}
-              disabled={!canUseActions}
+              disabled={!canRegisterExit}
             >
               <span className="timeclock-kiosk-action-icon">
                 <LogOut />
@@ -607,60 +644,72 @@ export function TimeClockKiosk() {
             </button>
           </div>
 
-          <div className="timeclock-kiosk-pin-panel">
+          <div className={`timeclock-kiosk-pin-panel ${verifiedEmployee ? "verified" : ""}`}>
             <div className={`timeclock-kiosk-employee-icon ${verifiedEmployee ? "active" : ""}`}>
               <UserRound />
             </div>
             <div className="timeclock-kiosk-pin-title">
               <h2>{verifiedEmployee ? verifiedEmployee.fullName : "Ingresa tu PIN"}</h2>
-              <p>{verifiedEmployee ? "Opciones habilitadas" : "para continuar"}</p>
+              <p>{verifiedEmployee ? `${verifiedEmployee.position} · ${verifiedEmployee.branch.name}` : "para continuar"}</p>
             </div>
 
-            <div className={`timeclock-kiosk-pin-dots ${verifiedEmployee ? "verified" : ""}`}>
-              {Array.from({ length: KIOSK_PIN_LENGTH }).map((_, i) => (
-                <span key={i} className={i < employeeCode.length ? "filled" : ""} />
-              ))}
-            </div>
+            {verifiedEmployee ? (
+              <EmployeeVerificationSummary
+                employee={verifiedEmployee}
+                onClear={() => {
+                  playClick()
+                  clearEmployeeSession()
+                }}
+              />
+            ) : (
+              <>
+                <div className="timeclock-kiosk-pin-dots">
+                  {Array.from({ length: KIOSK_PIN_LENGTH }).map((_, i) => (
+                    <span key={i} className={i < employeeCode.length ? "filled" : ""} />
+                  ))}
+                </div>
 
-            <div className="timeclock-kiosk-keypad">
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  className="timeclock-kiosk-key"
-                  onClick={() => handleKeyPress(key)}
-                  disabled={isProcessing || employeeCode.length >= KIOSK_PIN_LENGTH}
-                >
-                  {key}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="timeclock-kiosk-key action-key"
-                onClick={() => handleKeyPress("Limpiar")}
-                disabled={isProcessing}
-                aria-label="Limpiar PIN"
-              >
-                ×
-              </button>
-              <button
-                type="button"
-                className="timeclock-kiosk-key"
-                onClick={() => handleKeyPress("0")}
-                disabled={isProcessing || employeeCode.length >= KIOSK_PIN_LENGTH}
-              >
-                0
-              </button>
-              <button
-                type="button"
-                className="timeclock-kiosk-key action-key"
-                onClick={() => handleKeyPress("Borrar")}
-                disabled={isProcessing}
-                aria-label="Borrar último dígito"
-              >
-                ⌫
-              </button>
-            </div>
+                <div className="timeclock-kiosk-keypad">
+                  {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className="timeclock-kiosk-key"
+                      onClick={() => handleKeyPress(key)}
+                      disabled={isProcessing || employeeCode.length >= KIOSK_PIN_LENGTH}
+                    >
+                      {key}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className="timeclock-kiosk-key action-key"
+                    onClick={() => handleKeyPress("Limpiar")}
+                    disabled={isProcessing}
+                    aria-label="Limpiar PIN"
+                  >
+                    ×
+                  </button>
+                  <button
+                    type="button"
+                    className="timeclock-kiosk-key"
+                    onClick={() => handleKeyPress("0")}
+                    disabled={isProcessing || employeeCode.length >= KIOSK_PIN_LENGTH}
+                  >
+                    0
+                  </button>
+                  <button
+                    type="button"
+                    className="timeclock-kiosk-key action-key"
+                    onClick={() => handleKeyPress("Borrar")}
+                    disabled={isProcessing}
+                    aria-label="Borrar último dígito"
+                  >
+                    ⌫
+                  </button>
+                </div>
+              </>
+            )}
 
             <div className={`timeclock-kiosk-status-card ${status}`}>
               <span className="timeclock-kiosk-status-text">{statusMessage}</span>
@@ -677,7 +726,7 @@ export function TimeClockKiosk() {
               type="button"
               className="timeclock-kiosk-drink-card"
               onClick={handleRegisterDrink}
-              disabled={!canUseActions}
+              disabled={!canRegisterDrink}
             >
               <span className="timeclock-kiosk-drink-icon">
                 <Coffee />
@@ -750,6 +799,78 @@ export function TimeClockKiosk() {
       </section>
     </main>
   )
+}
+
+function EmployeeVerificationSummary({ employee, onClear }: { employee: VerifiedEmployee; onClear: () => void }) {
+  const { attendance, recentMovements } = employee
+  const lastEntry = attendance.lastEntry
+  const activeSession = attendance.activeSession
+
+  return (
+    <div className="timeclock-kiosk-employee-summary">
+      <div className={`timeclock-kiosk-attendance-pill ${attendance.state.toLowerCase()}`}>
+        <ShieldCheck />
+        <span>{attendance.statusLabel}</span>
+      </div>
+
+      <div className="timeclock-kiosk-employee-grid">
+        <div>
+          <span>Sucursal</span>
+          <strong>{employee.branch.name}</strong>
+        </div>
+        <div>
+          <span>Siguiente acción</span>
+          <strong>{attendance.nextAction === "ENTRY" ? "Registrar entrada" : "Registrar salida"}</strong>
+        </div>
+        <div>
+          <span>Entrada activa</span>
+          <strong>{activeSession ? activeSession.localTime : "Sin jornada activa"}</strong>
+        </div>
+        <div>
+          <span>Última checada</span>
+          <strong>{lastEntry ? `${entryTypeLabel(lastEntry.type)} · ${lastEntry.localTime}` : "Sin registros"}</strong>
+        </div>
+      </div>
+
+      <div className="timeclock-kiosk-movement-list">
+        <div className="timeclock-kiosk-movement-header">
+          <strong>Últimos movimientos</strong>
+          <span>{recentMovements.length}</span>
+        </div>
+        {recentMovements.length ? (
+          recentMovements.map((movement) => (
+            <div className="timeclock-kiosk-movement-row" key={movement.id}>
+              <div>
+                <strong>{movement.productName || movementLabels[movement.kind]}</strong>
+                <span>{formatKioskDateTime(movement.createdAt)} · {statusLabels[movement.status]}</span>
+              </div>
+              <b>{money.format(movement.amount)}</b>
+            </div>
+          ))
+        ) : (
+          <div className="timeclock-kiosk-empty-movements">Sin adelantos o consumos recientes</div>
+        )}
+      </div>
+
+      <button className="timeclock-kiosk-clear-session" type="button" onClick={onClear}>
+        Limpiar empleado
+      </button>
+    </div>
+  )
+}
+
+function entryTypeLabel(type: TimeClockEventType) {
+  return type === "ENTRY" ? "Entrada" : "Salida"
+}
+
+function formatKioskDateTime(value: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Tijuana",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value))
 }
 
 function createLocalDeviceRequestToken() {

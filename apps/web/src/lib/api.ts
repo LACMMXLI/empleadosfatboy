@@ -1,4 +1,4 @@
-import type { AppConfig, AttendanceAdjustment, AttendanceRow, AuditLog, Branch, DashboardSummary, Employee, EmployeeTimeClockHistory, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, TimeClockDevice, TimeClockDeviceRequest, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
+import type { AppConfig, AttendanceAdjustment, AttendanceRow, AuditLog, Branch, DashboardSummary, Employee, EmployeeTimeClockHistory, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, TimeClockDevice, TimeClockDeviceRequest, TimeClockEmployeeVerification, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -355,7 +355,7 @@ export const api = {
       return timeClockRequest<{ id: string; name: string; branch: Branch }>("/time-clock/public/device")
     },
     verifyEmployeeCode(employeeCode: string) {
-      return timeClockRequest<{ employee: Pick<Employee, "id" | "fullName" | "position"> }>("/time-clock/public/employee-code", {
+      return timeClockRequest<TimeClockEmployeeVerification>("/time-clock/public/employee-code", {
         method: "POST",
         body: JSON.stringify({ employeeCode })
       })

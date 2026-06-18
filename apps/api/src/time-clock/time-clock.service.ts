@@ -458,12 +458,106 @@ export class TimeClockService {
     }
 
     await this.loginThrottle.recordSuccess("time-clock", throttleId)
+    const [activeSession, lastEntry, recentMovements] = await Promise.all([
+      this.prisma.workSession.findFirst({
+        where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
+        include: {
+          startEntry: {
+            select: {
+              occurredAt: true,
+              localDate: true,
+              localTime: true,
+              type: true
+            }
+          }
+        },
+        orderBy: { startedAt: "desc" }
+      }),
+      this.prisma.timeClockEntry.findFirst({
+        where: {
+          employeeId: employee.id,
+          status: { in: [TimeClockEntryStatus.VALID, TimeClockEntryStatus.MANUAL] }
+        },
+        orderBy: { occurredAt: "desc" },
+        select: {
+          occurredAt: true,
+          localDate: true,
+          localTime: true,
+          type: true
+        }
+      }),
+      this.prisma.movement.findMany({
+        where: {
+          employeeId: employee.id,
+          kind: {
+            in: [
+              MovementKind.SALARY_ADVANCE,
+              MovementKind.ADMIN_SALARY_ADVANCE,
+              MovementKind.LOAN,
+              MovementKind.ADMIN_LOAN,
+              MovementKind.INTERNAL_CONSUMPTION,
+              MovementKind.DRINK,
+              MovementKind.FOOD
+            ]
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          folio: true,
+          kind: true,
+          amount: true,
+          reason: true,
+          status: true,
+          productName: true,
+          createdAt: true
+        }
+      })
+    ])
+    const attendanceState = activeSession ? "IN_SHIFT" : lastEntry?.type === TimeClockEventType.EXIT ? "EXITED" : "NO_RECORD"
+
     return {
       employee: {
         id: employee.id,
         fullName: employee.fullName,
-        position: employee.position
-      }
+        position: employee.position,
+        branch: {
+          id: employee.branch.id,
+          name: employee.branch.name,
+          code: employee.branch.code
+        }
+      },
+      attendance: {
+        state: attendanceState,
+        statusLabel: activeSession ? "Jornada activa" : lastEntry?.type === TimeClockEventType.EXIT ? "Salida registrada" : "Sin entrada activa",
+        nextAction: activeSession ? TimeClockEventType.EXIT : TimeClockEventType.ENTRY,
+        activeSession: activeSession
+          ? {
+              startedAt: activeSession.startedAt,
+              localDate: activeSession.localDate,
+              localTime: activeSession.startEntry.localTime
+            }
+          : null,
+        lastEntry: lastEntry
+          ? {
+              type: lastEntry.type,
+              occurredAt: lastEntry.occurredAt,
+              localDate: lastEntry.localDate,
+              localTime: lastEntry.localTime
+            }
+          : null
+      },
+      recentMovements: recentMovements.map((movement) => ({
+        id: movement.id,
+        folio: movement.folio,
+        kind: movement.kind,
+        amount: Number(movement.amount),
+        reason: movement.reason,
+        status: movement.status,
+        productName: movement.productName,
+        createdAt: movement.createdAt
+      }))
     }
   }
 
