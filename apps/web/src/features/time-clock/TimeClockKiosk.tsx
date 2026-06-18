@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { CheckCircle2, CircleHelp, Clock3, Coffee, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, Settings, ShieldAlert, ShieldCheck, Tag, UserRound } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
@@ -19,6 +19,67 @@ type LastKioskSuccess = {
   type: TimeClockEventType | "DRINK"
   time: string
   amount?: number
+}
+
+type BrowserAudioContext = typeof AudioContext
+
+function useKioskSounds() {
+  const contextRef = useRef<AudioContext | null>(null)
+
+  const getContext = useCallback(() => {
+    const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: BrowserAudioContext }).webkitAudioContext
+    if (!AudioContextCtor) return null
+    if (!contextRef.current) {
+      contextRef.current = new AudioContextCtor()
+    }
+    if (contextRef.current.state === "suspended") {
+      void contextRef.current.resume()
+    }
+    return contextRef.current
+  }, [])
+
+  const playTone = useCallback((frequency: number, duration: number, volume = 0.12, delay = 0) => {
+    const context = getContext()
+    if (!context) return
+
+    const startAt = context.currentTime + delay
+    const oscillator = context.createOscillator()
+    const gain = context.createGain()
+
+    oscillator.type = "sine"
+    oscillator.frequency.setValueAtTime(frequency, startAt)
+    gain.gain.setValueAtTime(0.0001, startAt)
+    gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.015)
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration)
+
+    oscillator.connect(gain)
+    gain.connect(context.destination)
+    oscillator.start(startAt)
+    oscillator.stop(startAt + duration + 0.03)
+  }, [getContext])
+
+  const playClick = useCallback(() => {
+    playTone(820, 0.045, 0.055)
+  }, [playTone])
+
+  const playSuccess = useCallback(() => {
+    playTone(660, 0.09, 0.12)
+    playTone(920, 0.12, 0.11, 0.095)
+  }, [playTone])
+
+  const playError = useCallback(() => {
+    playTone(220, 0.12, 0.13)
+    playTone(165, 0.16, 0.11, 0.12)
+  }, [playTone])
+
+  useEffect(() => {
+    return () => {
+      void contextRef.current?.close()
+      contextRef.current = null
+    }
+  }, [])
+
+  return { playClick, playError, playSuccess }
 }
 
 export function TimeClockKiosk() {
@@ -51,6 +112,7 @@ export function TimeClockKiosk() {
   const [verifiedEmployee, setVerifiedEmployee] = useState<VerifiedEmployee | null>(null)
   const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
   const canUseActions = Boolean(verifiedEmployee) && !isProcessing
+  const { playClick, playError, playSuccess } = useKioskSounds()
 
   // Fullscreen event listener
   useEffect(() => {
@@ -184,12 +246,14 @@ export function TimeClockKiosk() {
         setVerifiedEmployee(result.employee)
         setStatus("idle")
         setStatusMessage(`PIN confirmado: ${result.employee.fullName}`)
+        playSuccess()
       })
       .catch((error: Error) => {
         if (cancelled) return
         setVerifiedEmployee(null)
         setStatus("error")
         setStatusMessage(error.message || "PIN inválido")
+        playError()
         window.setTimeout(() => {
           if (cancelled) return
           setEmployeeCode("")
@@ -201,7 +265,7 @@ export function TimeClockKiosk() {
     return () => {
       cancelled = true
     }
-  }, [employeeCode, needsAuthorization])
+  }, [employeeCode, needsAuthorization, playError, playSuccess])
 
   // Initialize and run the camera stream in background (hidden video element)
   useEffect(() => {
@@ -248,6 +312,7 @@ export function TimeClockKiosk() {
 
   const handleKeyPress = (key: string) => {
     if (isProcessing) return
+    playClick()
 
     if (status === 'success' || status === 'error') {
       setStatus('idle')
@@ -268,9 +333,11 @@ export function TimeClockKiosk() {
   }
 
   const handleRegister = async (type: TimeClockEventType) => {
+    playClick()
     if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
       setStatus('error')
       setStatusMessage("Ingresa un PIN válido para habilitar el registro.")
+      playError()
       window.setTimeout(() => {
         setStatus('idle')
         setStatusMessage("Ingresa tu PIN para comenzar")
@@ -321,6 +388,7 @@ export function TimeClockKiosk() {
         type,
         time: timeStr
       })
+      playSuccess()
 
       // Clean input automatically
       setEmployeeCode("")
@@ -340,6 +408,7 @@ export function TimeClockKiosk() {
     } catch (error: any) {
       setStatus('error')
       setStatusMessage(error.message || "Error al registrar asistencia")
+      playError()
       setEmployeeCode("")
       setVerifiedEmployee(null)
       window.setTimeout(() => {
@@ -350,9 +419,11 @@ export function TimeClockKiosk() {
   }
 
   const handleRegisterDrink = async () => {
+    playClick()
     if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
       setStatus("error")
       setStatusMessage("Ingresa un PIN válido para habilitar bebida.")
+      playError()
       window.setTimeout(() => {
         setStatus("idle")
         setStatusMessage("Ingresa tu PIN para comenzar")
@@ -392,6 +463,7 @@ export function TimeClockKiosk() {
         amount,
         time: timeStr
       })
+      playSuccess()
       setEmployeeCode("")
       setVerifiedEmployee(null)
 
@@ -406,6 +478,7 @@ export function TimeClockKiosk() {
     } catch (error: any) {
       setStatus("error")
       setStatusMessage(error.message || "Error al registrar bebida")
+      playError()
       setEmployeeCode("")
       setVerifiedEmployee(null)
       window.setTimeout(() => {
@@ -416,6 +489,7 @@ export function TimeClockKiosk() {
   }
 
   function regenerateRequestCode() {
+    playClick()
     const created = createLocalDeviceRequestToken()
     timeClockDeviceRequestSession.token = created
     setRequestToken(created)
@@ -424,6 +498,7 @@ export function TimeClockKiosk() {
   async function copyCode() {
     const code = deviceRequest.data?.code
     if (!code) return
+    playClick()
     await navigator.clipboard?.writeText(code).catch(() => undefined)
     setMessage("Código copiado")
     window.setTimeout(() => setMessage(null), 1800)
@@ -489,7 +564,10 @@ export function TimeClockKiosk() {
             <button
               type="button"
               className="timeclock-kiosk-fullscreen-btn"
-              onClick={toggleFullscreen}
+              onClick={() => {
+                playClick()
+                toggleFullscreen()
+              }}
               title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
             >
               {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
