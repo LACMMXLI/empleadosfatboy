@@ -1,5 +1,9 @@
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
+ENV CI=true \
+  DEBIAN_FRONTEND=noninteractive \
+  NPM_CONFIG_FUND=false \
+  NPM_CONFIG_AUDIT=false
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
@@ -15,7 +19,7 @@ RUN npm config set fetch-retries 10 \
 FROM deps AS build
 COPY apps/api apps/api
 RUN npm run prisma:generate --workspace apps/api
-RUN npm run build --workspace apps/api
+RUN npx tsc -p apps/api/tsconfig.build.json --declaration false --sourceMap false --incremental false --pretty false
 
 FROM build AS production-deps
 RUN npm prune --omit=dev \
