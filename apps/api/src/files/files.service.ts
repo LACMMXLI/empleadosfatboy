@@ -9,6 +9,7 @@ import {
 import { ConfigService } from "@nestjs/config"
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { AuditAction, FileAsset, FileAssetModule, Prisma, Role } from "@prisma/client"
+import sharp from "sharp"
 import { randomUUID } from "crypto"
 import type { Readable } from "stream"
 import { AuditService } from "../audit/audit.service"
@@ -62,19 +63,20 @@ export class FilesService {
     if (!file) throw new BadRequestException("Archivo requerido")
     this.validateImage(file)
 
-    const target = await this.resolveUploadTarget(input, file, user)
+    const optimized = await this.optimizeImage(file)
+    const target = await this.resolveUploadTarget(input, optimized.ext, user)
     const s3Config = this.getS3Config()
 
-    await this.putObject(target.key, file)
+    await this.putObject(target.key, optimized)
 
     try {
       const asset = await this.prisma.fileAsset.create({
         data: {
           bucket: s3Config.bucket,
           key: target.key,
-          originalName: this.cleanOriginalName(file.originalname),
-          mimeType: file.mimetype,
-          size: file.size,
+          originalName: this.cleanOriginalName(file.originalname).replace(/\.[^/.]+$/, "") + ".webp",
+          mimeType: optimized.mimetype,
+          size: optimized.size,
           module: target.module,
           entityId: target.entityId,
           branchId: target.branchId,
@@ -150,19 +152,20 @@ export class FilesService {
     })
     if (!branch) throw new NotFoundException("Sucursal no encontrada")
 
-    const target = this.buildTimeClockTarget(file, branch.id)
+    const optimized = await this.optimizeImage(file)
+    const target = this.buildTimeClockTarget(optimized.ext, branch.id)
     const s3Config = this.getS3Config()
 
-    await this.putObject(target.key, file)
+    await this.putObject(target.key, optimized)
 
     try {
       const asset = await this.prisma.fileAsset.create({
         data: {
           bucket: s3Config.bucket,
           key: target.key,
-          originalName: this.cleanOriginalName(file.originalname || "checador.jpg"),
-          mimeType: file.mimetype,
-          size: file.size,
+          originalName: this.cleanOriginalName(file.originalname || "checador").replace(/\.[^/.]+$/, "") + ".webp",
+          mimeType: optimized.mimetype,
+          size: optimized.size,
           module: FileAssetModule.TIMECLOCK,
           branchId: branch.id
         }
@@ -199,8 +202,21 @@ export class FilesService {
     }
   }
 
-  private async resolveUploadTarget(input: UploadFileInput, file: Express.Multer.File, user: AuthUser) {
-    const ext = mimeExtension[file.mimetype as (typeof allowedImageMimeTypes)[number]]
+  private async optimizeImage(file: Express.Multer.File) {
+    const optimizedBuffer = await sharp(file.buffer)
+      .resize(1280, 1280, { fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toBuffer()
+
+    return {
+      buffer: optimizedBuffer,
+      mimetype: "image/webp",
+      size: optimizedBuffer.length,
+      ext: "webp"
+    }
+  }
+
+  private async resolveUploadTarget(input: UploadFileInput, ext: string, user: AuthUser) {
     const id = randomUUID()
     const now = new Date()
     const year = String(now.getFullYear())
@@ -242,8 +258,7 @@ export class FilesService {
     throw new BadRequestException("Modulo de archivo no permitido")
   }
 
-  private buildTimeClockTarget(file: Express.Multer.File, branchId: string) {
-    const ext = mimeExtension[file.mimetype as (typeof allowedImageMimeTypes)[number]]
+  private buildTimeClockTarget(ext: string, branchId: string) {
     const id = randomUUID()
     const now = new Date()
     const year = String(now.getFullYear())
@@ -320,7 +335,7 @@ export class FilesService {
     return user.role === Role.ENCARGADO && asset.branchId === user.branchId
   }
 
-  private async putObject(key: string, file: Express.Multer.File) {
+  private async putObject(key: string, file: { buffer: Buffer; mimetype: string; size: number }) {
     const s3Config = this.getS3Config()
     try {
       await this.getS3().send(
