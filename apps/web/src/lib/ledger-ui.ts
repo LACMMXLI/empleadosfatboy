@@ -180,7 +180,12 @@ export const adminUserSchema = z.object({
   email: z.string().email("Correo invalido"),
   password: z.string().min(8, "Mínimo 8 caracteres"),
   role: z.enum(["ADMINISTRADOR", "GERENTE", "ENCARGADO", "CAJERO"]),
-  branchId: z.string().optional()
+  branchId: z.string().optional(),
+  approvalPin: z.string().optional()
+}).superRefine((data, ctx) => {
+  if (data.role === "ENCARGADO" && !/^\d{6}$/.test(data.approvalPin ?? "")) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Código de aprobación a 6 dígitos", path: ["approvalPin"] })
+  }
 })
 export type AdminUserFormInput = z.input<typeof adminUserSchema>
 export type AdminUserFormOutput = z.output<typeof adminUserSchema>
@@ -189,6 +194,7 @@ export const adminUserEditSchema = z.object({
   fullName: z.string().min(3, "Nombre requerido"),
   email: z.string().email("Correo invalido"),
   password: z.string().optional().refine((value) => !value || value.length >= 8, "Mínimo 8 caracteres"),
+  approvalPin: z.string().optional().refine((value) => !value || /^\d{6}$/.test(value), "Código a 6 dígitos"),
   role: z.enum(["ADMINISTRADOR", "GERENTE", "ENCARGADO", "CAJERO"]),
   branchId: z.string().optional()
 })

@@ -39,6 +39,13 @@ export type CreateEmployeeRequestInput = {
   unitPrice?: number
 }
 
+export type CreateTimeClockSalaryAdvanceInput = {
+  employeeCode: string
+  approverCode: string
+  amount: number
+  reason?: string
+}
+
 export type RequestMetadata = {
   ipAddress?: string
   userAgent?: string
@@ -355,6 +362,74 @@ export class MovementsService {
       ipAddress: metadata.ipAddress
     })
 
+    return movement
+  }
+
+  async createTimeClockSalaryAdvance(
+    token: string | undefined,
+    dto: CreateTimeClockSalaryAdvanceInput,
+    metadata: RequestMetadata
+  ) {
+    if (!Number.isFinite(dto.amount) || dto.amount <= 0 || dto.amount > 50_000) {
+      throw new BadRequestException("El adelanto debe ser mayor a $0 y no exceder $50,000")
+    }
+
+    const { device, employee, approver } = await this.timeClock.authorizeSalaryAdvanceRequest(token, dto, metadata)
+    await this.timeClock.ensureEmployeeHasActiveShiftToday(employee.id, MovementKind.SALARY_ADVANCE, {
+      ...metadata,
+      userId: approver.id,
+      device: `time-clock:${device.id}`,
+      context: "time-clock-salary-advance"
+    })
+
+    const amount = Number(dto.amount.toFixed(2))
+    const duplicateSince = new Date(Date.now() - 2 * 60_000)
+    const duplicate = await this.prisma.movement.findFirst({
+      where: {
+        employeeId: employee.id,
+        kind: MovementKind.SALARY_ADVANCE,
+        amount,
+        requestDevice: `time-clock:${device.id}`,
+        createdAt: { gte: duplicateSince },
+        status: { notIn: [MovementStatus.REJECTED, MovementStatus.CANCELED] }
+      },
+      select: { id: true }
+    })
+    if (duplicate) throw new BadRequestException("Este adelanto ya fue registrado recientemente")
+
+    const config = await this.getConfig()
+    const movement = await this.prisma.movement.create({
+      data: {
+        folio: await this.nextFolio(),
+        employeeId: employee.id,
+        branchId: employee.branchId,
+        kind: MovementKind.SALARY_ADVANCE,
+        origin: MovementOrigin.EMPLOYEE_REQUEST,
+        amount,
+        reason: dto.reason?.trim() || "Adelanto solicitado desde reloj checador",
+        status: MovementStatus.AUTHORIZED,
+        authorizedById: approver.id,
+        authorizedAt: new Date(),
+        receiptText: config.receiptLegalText,
+        requestIp: metadata.ipAddress,
+        requestUserAgent: metadata.userAgent,
+        requestDevice: `time-clock:${device.id}`
+      },
+      include: {
+        employee: { select: { id: true, fullName: true, position: true } },
+        authorizedBy: { select: { id: true, fullName: true, role: true } }
+      }
+    })
+
+    await this.audit.log({
+      userId: approver.id,
+      action: AuditAction.CREATE,
+      entity: "Movement",
+      entityId: movement.id,
+      affectedEmployeeId: employee.id,
+      newValue: this.toJson({ ...movement, source: "time-clock-salary-advance", deviceId: device.id }),
+      ipAddress: metadata.ipAddress
+    })
     return movement
   }
 

@@ -8,6 +8,7 @@ type CreateAdminUserInput = {
   fullName: string
   email: string
   password: string
+  approvalPin?: string
   role: Role
   branchId?: string
 }
@@ -16,6 +17,7 @@ type UpdateAdminUserInput = {
   fullName?: string
   email?: string
   password?: string
+  approvalPin?: string
   role?: Role
   active?: boolean
   branchId?: string
@@ -40,6 +42,12 @@ export class AdminUsersService {
 
   async create(dto: CreateAdminUserInput, adminId: string, fallbackBranchId?: string, ipAddress?: string) {
     this.ensureAllowedRole(dto.role)
+    if (dto.role === Role.ENCARGADO && !dto.approvalPin) {
+      throw new BadRequestException("El encargado requiere un codigo de aprobacion de 6 digitos")
+    }
+    if (dto.role === Role.ENCARGADO && !(dto.branchId || fallbackBranchId)) {
+      throw new BadRequestException("El encargado requiere una sucursal")
+    }
     const email = dto.email.trim().toLowerCase()
     const existing = await this.prisma.user.findUnique({ where: { email }, select: { id: true } })
     if (existing) throw new ConflictException("Ya existe un usuario con ese correo")
@@ -49,6 +57,7 @@ export class AdminUsersService {
         fullName: dto.fullName.trim(),
         email,
         passwordHash: await bcrypt.hash(dto.password, 12),
+        approvalPinHash: dto.approvalPin ? await bcrypt.hash(dto.approvalPin, 12) : undefined,
         role: dto.role,
         branchId: dto.branchId || fallbackBranchId
       },
@@ -87,7 +96,8 @@ export class AdminUsersService {
         role: dto.role,
         active: dto.active,
         branchId: dto.branchId !== undefined ? (dto.branchId || null) : undefined,
-        passwordHash: dto.password ? await bcrypt.hash(dto.password, 12) : undefined
+        passwordHash: dto.password ? await bcrypt.hash(dto.password, 12) : undefined,
+        approvalPinHash: dto.approvalPin ? await bcrypt.hash(dto.approvalPin, 12) : undefined
       },
       select: this.safeSelect()
     })

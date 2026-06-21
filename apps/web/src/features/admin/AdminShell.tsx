@@ -2287,7 +2287,7 @@ function Configuration() {
   
   const userForm = useForm<AdminUserFormInput, unknown, AdminUserFormOutput>({
     resolver: zodResolver(adminUserSchema),
-    defaultValues: { role: "ENCARGADO", branchId: "" }
+    defaultValues: { role: "ENCARGADO", branchId: "", approvalPin: "" }
   })
   
   const userEditForm = useForm<AdminUserEditFormInput, unknown, AdminUserEditFormOutput>({
@@ -2344,6 +2344,7 @@ function Configuration() {
       fullName: selectedUser.fullName,
       email: selectedUser.email,
       password: "",
+      approvalPin: "",
       role: selectedUser.role as AdminUserEditFormInput["role"],
       branchId: selectedUser.branch?.id ?? ""
     })
@@ -2406,14 +2407,14 @@ function Configuration() {
   const createUser = useMutation({
     mutationFn: (values: AdminUserFormOutput) => api.createAdminUser(values),
     onSuccess: async () => {
-      userForm.reset({ role: "ENCARGADO", fullName: "", email: "", password: "" })
+      userForm.reset({ role: "ENCARGADO", fullName: "", email: "", password: "", approvalPin: "" })
       await queryClient.invalidateQueries({ queryKey: ["admin-users"] })
     }
   })
 
   const updateUser = useMutation({
     mutationFn: ({ id, values }: { id: string; values: AdminUserEditFormOutput }) =>
-      api.updateAdminUser(id, { ...values, password: values.password || undefined }),
+      api.updateAdminUser(id, { ...values, password: values.password || undefined, approvalPin: values.approvalPin || undefined }),
     onSuccess: async (user) => {
       setSelectedUserId(user.id)
       await queryClient.invalidateQueries({ queryKey: ["admin-users"] })
@@ -2590,6 +2591,7 @@ function Configuration() {
                   <input className="form-input" placeholder="Nombre completo" {...userForm.register("fullName")} />
                   <input className="form-input" placeholder="Correo electrónico" type="email" {...userForm.register("email")} />
                   <input className="form-input" placeholder="Contraseña temporal" type="password" {...userForm.register("password")} />
+                  <input className="form-input" placeholder="Código de aprobación (6 dígitos)" type="password" inputMode="numeric" maxLength={6} {...userForm.register("approvalPin")} />
                   <select className="form-select" {...userForm.register("role")}>
                     {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
                       <option key={role} value={role}>{role}</option>
@@ -2725,6 +2727,7 @@ function Configuration() {
             <input className="form-input" placeholder="Nombre completo" {...userEditForm.register("fullName")} />
             <input className="form-input" placeholder="Correo" type="email" {...userEditForm.register("email")} />
             <input className="form-input" placeholder="Nueva contraseña (opcional)" type="password" {...userEditForm.register("password")} />
+            <input className="form-input" placeholder="Nuevo código de aprobación (opcional)" type="password" inputMode="numeric" maxLength={6} {...userEditForm.register("approvalPin")} />
             <select className="form-select" {...userEditForm.register("role")}>
               {["ENCARGADO", "GERENTE", "CAJERO", "ADMINISTRADOR"].map((role) => (
                 <option key={role} value={role}>{role}</option>

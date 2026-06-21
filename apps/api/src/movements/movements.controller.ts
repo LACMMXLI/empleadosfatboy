@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req } from "@nestjs/common"
-import { IsEnum, IsNumber, IsOptional, IsString, Length, Min, ValidateIf } from "class-validator"
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req } from "@nestjs/common"
+import { IsEnum, IsNumber, IsOptional, IsString, Length, Max, Min, ValidateIf } from "class-validator"
 import { MovementKind, MovementStatus, Role } from "@prisma/client"
 import { Roles } from "../auth/roles.decorator"
+import { Public } from "../auth/public.decorator"
 import type { RequestWithUser } from "../auth/auth.types"
 import { MovementsService } from "./movements.service"
 
@@ -130,6 +131,43 @@ class SettleMovementsDto {
   @IsOptional()
   @IsString()
   to?: string
+}
+
+class TimeClockSalaryAdvanceDto {
+  @IsString()
+  @Length(6, 6)
+  employeeCode!: string
+
+  @IsString()
+  @Length(6, 6)
+  approverCode!: string
+
+  @IsNumber()
+  @Min(0.01)
+  @Max(50_000)
+  amount!: number
+
+  @IsOptional()
+  @IsString()
+  reason?: string
+}
+
+@Public()
+@Controller("time-clock/public")
+export class TimeClockMovementsController {
+  constructor(private readonly movements: MovementsService) {}
+
+  @Post("salary-advances")
+  salaryAdvance(
+    @Headers("x-time-clock-device") token: string | undefined,
+    @Body() dto: TimeClockSalaryAdvanceDto,
+    @Req() request: RequestWithUser
+  ) {
+    return this.movements.createTimeClockSalaryAdvance(token, dto, {
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] as string | undefined
+    })
+  }
 }
 
 @Controller("movements")

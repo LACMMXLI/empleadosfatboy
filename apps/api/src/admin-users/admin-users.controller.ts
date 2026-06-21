@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Req } from "@nestjs/common"
-import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator"
+import { IsBoolean, IsEmail, IsEnum, IsNumberString, IsOptional, IsString, Length, MinLength } from "class-validator"
 import { Role } from "@prisma/client"
 import { Roles } from "../auth/roles.decorator"
 import type { RequestWithUser } from "../auth/auth.types"
@@ -17,6 +17,11 @@ class CreateAdminUserDto {
   @IsString()
   @MinLength(8)
   password!: string
+
+  @IsOptional()
+  @IsNumberString()
+  @Length(6, 6)
+  approvalPin?: string
 
   @IsEnum(adminUserRoles)
   role!: Role
@@ -39,6 +44,11 @@ class UpdateAdminUserDto {
   @IsString()
   @MinLength(8)
   password?: string
+
+  @IsOptional()
+  @IsNumberString()
+  @Length(6, 6)
+  approvalPin?: string
 
   @IsOptional()
   @IsEnum(adminUserRoles)

@@ -575,6 +575,59 @@ export class TimeClockService {
     }
   }
 
+  async authorizeSalaryAdvanceRequest(
+    token: string | undefined,
+    input: { employeeCode: string; approverCode: string },
+    metadata: RequestMetadata
+  ) {
+    const device = await this.validateDeviceToken(token)
+    const employeeCode = this.normalizeEmployeeCode(input.employeeCode)
+    const approverCode = this.normalizeEmployeeCode(input.approverCode)
+    if (employeeCode.length !== 6) throw new BadRequestException("Codigo de empleado invalido")
+    if (approverCode.length !== 6) throw new BadRequestException("Codigo del encargado invalido")
+
+    const employeeThrottleId = this.timeClockThrottleIdentifier(device.id, employeeCode, metadata.ipAddress)
+    await this.loginThrottle.assertCanAttempt("time-clock", employeeThrottleId)
+    const employee = await this.findEmployeeByCode(device.branchId, employeeCode)
+    if (!employee) {
+      await this.loginThrottle.recordFailure("time-clock", employeeThrottleId, metadata)
+      throw new BadRequestException("Codigo de empleado invalido")
+    }
+    await this.loginThrottle.recordSuccess("time-clock", employeeThrottleId)
+
+    const approverThrottleId = `${device.id}:${metadata.ipAddress?.trim() || "unknown-ip"}`
+    await this.loginThrottle.assertCanAttempt("time-clock-advance-approver", approverThrottleId)
+    const approvers = await this.prisma.user.findMany({
+      where: {
+        branchId: device.branchId,
+        role: Role.ENCARGADO,
+        active: true,
+        approvalPinHash: { not: null }
+      },
+      select: { id: true, fullName: true, role: true, branchId: true, approvalPinHash: true }
+    })
+    if (!approvers.length) {
+      throw new BadRequestException("La sucursal no tiene un encargado con codigo de aprobacion configurado")
+    }
+
+    let approver: (typeof approvers)[number] | undefined
+    for (const candidate of approvers) {
+      if (candidate.approvalPinHash && await bcrypt.compare(approverCode, candidate.approvalPinHash)) {
+        approver = candidate
+        break
+      }
+    }
+    if (!approver) {
+      await this.loginThrottle.recordFailure("time-clock-advance-approver", approverThrottleId, metadata)
+      throw new BadRequestException("Codigo del encargado invalido")
+    }
+    await this.loginThrottle.recordSuccess("time-clock-advance-approver", approverThrottleId)
+
+    const { approvalPinHash, ...safeApprover } = approver
+    void approvalPinHash
+    return { device, employee, approver: safeApprover }
+  }
+
   async registerEntry(
     token: string | undefined,
     input: RegisterEntryInput,

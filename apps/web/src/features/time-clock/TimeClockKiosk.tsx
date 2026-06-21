@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { CheckCircle2, CircleHelp, Clock3, Coffee, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, Settings, ShieldAlert, ShieldCheck, Tag, UserRound } from "lucide-react"
+import { Banknote, CheckCircle2, CircleHelp, Clock3, Coffee, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, Settings, ShieldAlert, ShieldCheck, Tag, UserRound, X } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
 import { movementLabels, statusLabels } from "@/lib/ledger-ui"
 import type { TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
@@ -17,7 +17,7 @@ type VerifiedEmployee = TimeClockEmployeeVerification["employee"] & {
 }
 type LastKioskSuccess = {
   employeeName: string
-  type: TimeClockEventType | "DRINK"
+  type: TimeClockEventType | "DRINK" | "ADVANCE"
   time: string
   amount?: number
 }
@@ -112,11 +112,15 @@ export function TimeClockKiosk() {
   const [lastSuccess, setLastSuccess] = useState<LastKioskSuccess | null>(null)
   const [verifiedEmployee, setVerifiedEmployee] = useState<VerifiedEmployee | null>(null)
   const [sessionActivityAt, setSessionActivityAt] = useState<number>(0)
+  const [advanceOpen, setAdvanceOpen] = useState(false)
+  const [advanceAmount, setAdvanceAmount] = useState("")
+  const [approverCode, setApproverCode] = useState("")
   const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
   const canUseActions = Boolean(verifiedEmployee) && !isProcessing
   const canRegisterEntry = Boolean(canUseActions && verifiedEmployee?.attendance.nextAction === "ENTRY")
   const canRegisterExit = Boolean(canUseActions && verifiedEmployee?.attendance.nextAction === "EXIT")
   const canRegisterDrink = Boolean(canUseActions && verifiedEmployee?.attendance.state === "IN_SHIFT")
+  const canRequestAdvance = canRegisterDrink
   const { playClick, playError, playSuccess } = useKioskSounds()
 
   const markSessionActivity = useCallback(() => {
@@ -128,6 +132,9 @@ export function TimeClockKiosk() {
     setVerifiedEmployee(null)
     setStatus("idle")
     setStatusMessage(nextMessage)
+    setAdvanceOpen(false)
+    setAdvanceAmount("")
+    setApproverCode("")
   }, [])
 
   // Fullscreen event listener
@@ -520,6 +527,64 @@ export function TimeClockKiosk() {
     }
   }
 
+  const handleSalaryAdvance = async () => {
+    playClick()
+    markSessionActivity()
+    const amount = Number(advanceAmount)
+    if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
+      setStatus("error")
+      setStatusMessage("La sesión del empleado ya no es válida.")
+      playError()
+      return
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setStatus("error")
+      setStatusMessage("Ingresa una cantidad válida para el adelanto.")
+      playError()
+      return
+    }
+    if (approverCode.length !== KIOSK_PIN_LENGTH) {
+      setStatus("error")
+      setStatusMessage("El encargado debe ingresar su código de 6 dígitos.")
+      playError()
+      return
+    }
+
+    try {
+      setStatus("registering")
+      setStatusMessage("Validando encargado y registrando adelanto...")
+      const movement = await api.timeClock.registerSalaryAdvance({ employeeCode, approverCode, amount })
+      const registeredAmount = Number(movement.amount)
+      const timeStr = new Intl.DateTimeFormat("es-MX", {
+        timeZone: "America/Tijuana",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true
+      }).format(new Date())
+
+      setStatus("success")
+      setStatusMessage(`Adelanto autorizado y registrado - ${money.format(registeredAmount)}`)
+      setLastSuccess({ employeeName: verifiedEmployee.fullName, type: "ADVANCE", amount: registeredAmount, time: timeStr })
+      setAdvanceOpen(false)
+      setAdvanceAmount("")
+      setApproverCode("")
+      playSuccess()
+      setEmployeeCode("")
+      setVerifiedEmployee(null)
+      window.setTimeout(() => {
+        setStatus("idle")
+        setStatusMessage("Ingresa tu PIN para comenzar")
+      }, 6000)
+      window.setTimeout(() => setLastSuccess(null), 10000)
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "No se pudo registrar el adelanto"
+      setStatus("error")
+      setStatusMessage(errorMessage)
+      setApproverCode("")
+      playError()
+    }
+  }
+
   function regenerateRequestCode() {
     playClick()
     const created = createLocalDeviceRequestToken()
@@ -743,26 +808,102 @@ export function TimeClockKiosk() {
               </span>
             </button>
 
+            <button
+              type="button"
+              className="timeclock-kiosk-advance-card"
+              onClick={() => {
+                playClick()
+                markSessionActivity()
+                setAdvanceAmount("")
+                setApproverCode("")
+                setAdvanceOpen(true)
+              }}
+              disabled={!canRequestAdvance}
+            >
+              <Banknote />
+              <span>
+                <strong>Solicitar adelanto</strong>
+                <small>Cantidad variable · requiere encargado</small>
+              </span>
+            </button>
+
             <div className="timeclock-kiosk-last-consumption">
-              <h3>Último consumo</h3>
-              {lastSuccess?.type === "DRINK" ? (
+              <h3>Última operación</h3>
+              {lastSuccess?.type === "DRINK" || lastSuccess?.type === "ADVANCE" ? (
                 <div className="timeclock-kiosk-consumption-row">
                   <span className="timeclock-kiosk-consumption-icon">
-                    <Coffee />
+                    {lastSuccess.type === "DRINK" ? <Coffee /> : <Banknote />}
                   </span>
                   <div>
                     <strong>{lastSuccess.time}</strong>
-                    <span>Bebida registrada</span>
+                    <span>{lastSuccess.type === "DRINK" ? "Bebida registrada" : "Adelanto autorizado"}</span>
                     <small>{lastSuccess.employeeName}</small>
                   </div>
                   <b>{money.format(lastSuccess.amount ?? 0)}</b>
                 </div>
               ) : (
-                <div className="timeclock-kiosk-empty-consumption">Sin consumo reciente en esta sesión</div>
+                <div className="timeclock-kiosk-empty-consumption">Sin operaciones recientes en esta sesión</div>
               )}
             </div>
           </div>
         </div>
+
+        {advanceOpen && verifiedEmployee && (
+          <div className="timeclock-advance-overlay" role="dialog" aria-modal="true" aria-labelledby="advance-title">
+            <div className="timeclock-advance-modal">
+              <button className="timeclock-advance-close" type="button" onClick={() => setAdvanceOpen(false)} disabled={isProcessing} aria-label="Cerrar">
+                <X />
+              </button>
+              <div className="timeclock-advance-icon"><Banknote /></div>
+              <div>
+                <h2 id="advance-title">Adelanto de sueldo</h2>
+                <p>{verifiedEmployee.fullName} · {verifiedEmployee.branch.name}</p>
+              </div>
+              <label>
+                <span>Cantidad solicitada</span>
+                <div className="timeclock-advance-amount">
+                  <b>$</b>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0.01"
+                    max="50000"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={advanceAmount}
+                    onChange={(event) => {
+                      setAdvanceAmount(event.target.value)
+                      markSessionActivity()
+                    }}
+                    autoFocus
+                  />
+                </div>
+              </label>
+              <label>
+                <span>Código del encargado de sucursal</span>
+                <input
+                  className="timeclock-advance-code"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="••••••"
+                  value={approverCode}
+                  onChange={(event) => {
+                    setApproverCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                    markSessionActivity()
+                  }}
+                />
+              </label>
+              <div className="timeclock-advance-note">
+                <ShieldCheck />
+                <span>El adelanto se registrará autorizado, con folio y responsable.</span>
+              </div>
+              <button className="timeclock-advance-submit" type="button" disabled={isProcessing || !advanceAmount || approverCode.length !== 6} onClick={handleSalaryAdvance}>
+                {isProcessing ? "Registrando..." : "Autorizar y registrar adelanto"}
+              </button>
+            </div>
+          </div>
+        )}
 
         <footer className="timeclock-kiosk-footer">
           <div>

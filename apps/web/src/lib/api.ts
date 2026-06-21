@@ -373,6 +373,12 @@ export const api = {
       formData.append("photo", payload.photo, "bebida-checador.jpg")
       return timeClockFormRequest<{ ok: boolean; message: string; amount: number; movement: Movement; employee: Pick<Employee, "id" | "fullName" | "position"> }>("/time-clock/public/drink", formData)
     },
+    registerSalaryAdvance(payload: { employeeCode: string; approverCode: string; amount: number; reason?: string }) {
+      return timeClockRequest<Movement>("/time-clock/public/salary-advances", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      })
+    },
     requestDeviceAuthorization(requestToken: string) {
       return request<TimeClockDeviceRequest & { device?: { id: string; name: string; branch: Branch } }>("/time-clock/public/device-requests", {
         method: "POST",
