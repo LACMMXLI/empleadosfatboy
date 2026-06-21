@@ -5808,6 +5808,519 @@
     color: #ffd54f !important;
   }
 
+  /* === Executive interaction refinement === */
+  .admin-sidebar {
+    flex: 0 0 14.5rem;
+    transition: width 420ms cubic-bezier(.16, 1, .3, 1), flex-basis 420ms cubic-bezier(.16, 1, .3, 1), box-shadow 260ms ease;
+  }
+
+  .admin-sidebar.collapsed {
+    width: 5.35rem !important;
+    flex-basis: 5.35rem;
+    box-shadow: 10px 0 34px rgba(0, 0, 0, 0.42), inset -1px 0 rgba(255, 213, 79, 0.08);
+  }
+
+  .admin-sidebar-brand {
+    position: relative;
+    gap: 0.7rem;
+    min-height: 5.1rem;
+    padding-right: 2.65rem;
+    transition: min-height 320ms ease, padding 320ms ease;
+  }
+
+  .admin-sidebar-brand-copy,
+  .nav-item-label {
+    min-width: 0;
+    opacity: 1;
+    transform: translateX(0);
+    white-space: nowrap;
+    transition: opacity 180ms ease 100ms, transform 260ms cubic-bezier(.2,.8,.2,1), max-width 340ms ease;
+  }
+
+  .sidebar-collapse-control {
+    position: absolute;
+    top: 50%;
+    right: 0.7rem;
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    place-items: center;
+    border: 1px solid rgba(255, 145, 72, 0.25);
+    border-radius: 0.65rem;
+    color: #ff9a43;
+    background: linear-gradient(145deg, rgba(255, 90, 31, 0.13), rgba(255, 193, 7, 0.035));
+    box-shadow: inset 0 1px rgba(255, 244, 224, 0.09), 0 8px 18px rgba(0, 0, 0, 0.28);
+    cursor: pointer;
+    transform: translateY(-50%);
+    transition: transform 200ms ease, color 180ms ease, box-shadow 200ms ease, border-color 180ms ease;
+  }
+
+  .sidebar-collapse-control svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    filter: drop-shadow(0 0 7px rgba(255, 90, 31, 0.4));
+  }
+
+  .sidebar-collapse-control:hover {
+    color: #ffd54f;
+    border-color: rgba(255, 193, 7, 0.5);
+    box-shadow: 0 0 22px rgba(255, 90, 31, 0.15), inset 0 1px rgba(255, 244, 224, 0.14);
+    transform: translateY(-50%) scale(1.08);
+  }
+
+  .admin-sidebar.collapsed .admin-sidebar-brand {
+    min-height: 7rem;
+    padding: 0.8rem 0.45rem;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .admin-sidebar.collapsed .admin-sidebar-logo {
+    width: 3.3rem;
+    max-height: 2.35rem;
+  }
+
+  .admin-sidebar.collapsed .admin-sidebar-brand-copy,
+  .admin-sidebar.collapsed .nav-item-label {
+    width: 0;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition-delay: 0ms;
+  }
+
+  .admin-sidebar.collapsed .sidebar-collapse-control {
+    position: static;
+    flex: 0 0 auto;
+    transform: none;
+  }
+
+  .admin-sidebar.collapsed .sidebar-collapse-control:hover {
+    transform: scale(1.08);
+  }
+
+  .admin-sidebar.collapsed .nav-item {
+    justify-content: center;
+    gap: 0;
+    min-height: 3.25rem;
+    padding-inline: 0.35rem;
+  }
+
+  .admin-sidebar.collapsed .nav-item:hover {
+    transform: translateY(-2px);
+  }
+
+  .nav-icon-stage {
+    position: relative;
+    display: grid;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: 0 0 2.25rem;
+    place-items: center;
+    border: 1px solid rgba(255, 166, 91, 0.08);
+    border-radius: 0.7rem;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0.08));
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.04), 0 5px 12px rgba(0, 0, 0, 0.2);
+    transition: transform 220ms cubic-bezier(.2,.8,.2,1), border-color 180ms ease, background 180ms ease, box-shadow 220ms ease;
+  }
+
+  .nav-icon-stage::after {
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    content: "";
+    background: radial-gradient(circle, rgba(255, 90, 31, 0.12), transparent 68%);
+    opacity: 0;
+    transition: opacity 180ms ease;
+  }
+
+  .nav-icon {
+    z-index: 1;
+    width: 1.28rem;
+    height: 1.28rem;
+    stroke-width: 1.85;
+  }
+
+  .nav-item:hover .nav-icon-stage,
+  .nav-item.active .nav-icon-stage {
+    border-color: rgba(255, 162, 83, 0.32);
+    background: linear-gradient(145deg, rgba(255, 90, 31, 0.18), rgba(255, 193, 7, 0.045));
+    box-shadow: inset 0 1px rgba(255, 239, 213, 0.13), 0 0 18px rgba(255, 90, 31, 0.14), 0 7px 14px rgba(0, 0, 0, 0.3);
+    transform: translateY(-1px) rotateX(5deg);
+  }
+
+  .nav-item:hover .nav-icon-stage::after,
+  .nav-item.active .nav-icon-stage::after {
+    opacity: 1;
+  }
+
+  .section-title svg,
+  .admin-card-title svg {
+    width: 1.2rem !important;
+    height: 1.2rem !important;
+    stroke-width: 2;
+  }
+
+  .section-title {
+    font-size: 1rem;
+  }
+
+  .btn-icon {
+    min-width: 2.35rem;
+    min-height: 2.35rem;
+  }
+
+  .btn-icon svg {
+    width: 1.05rem !important;
+    height: 1.05rem !important;
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.5));
+  }
+
+  .form-select,
+  .filter-bar select {
+    appearance: none;
+    padding-right: 2.65rem !important;
+    background-image:
+      linear-gradient(45deg, transparent 50%, #ff9b42 50%),
+      linear-gradient(135deg, #ff9b42 50%, transparent 50%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent) !important;
+    background-position:
+      calc(100% - 17px) 50%,
+      calc(100% - 11px) 50%,
+      0 0 !important;
+    background-size: 6px 6px, 6px 6px, 100% 100% !important;
+    background-repeat: no-repeat !important;
+  }
+
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    padding: 0.35rem;
+    border-radius: 0.45rem;
+    background-color: #ff8a2b;
+    cursor: pointer;
+    filter: sepia(1) saturate(2.2) brightness(1.05);
+  }
+
+  .executive-date-picker {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .executive-date-picker.open {
+    z-index: 120;
+  }
+
+  .executive-date-trigger {
+    display: flex;
+    width: 100%;
+    min-height: 2.65rem;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid rgba(255, 168, 98, 0.18);
+    border-radius: 0.7rem;
+    color: #f4eee6;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent),
+      rgba(8, 8, 8, 0.62);
+    box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.36), 0 1px rgba(255, 255, 255, 0.025);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 180ms ease, box-shadow 200ms ease, transform 180ms ease;
+  }
+
+  .executive-date-trigger:hover,
+  .executive-date-picker.open .executive-date-trigger {
+    border-color: rgba(255, 115, 43, 0.66);
+    box-shadow: 0 0 0 3px rgba(255, 90, 31, 0.09), 0 0 24px rgba(255, 90, 31, 0.09), inset 0 1px rgba(255, 255, 255, 0.05);
+    transform: translateY(-1px);
+  }
+
+  .executive-date-trigger > svg {
+    width: 1.12rem;
+    height: 1.12rem;
+    flex: 0 0 auto;
+    color: #ff8a2b;
+    filter: drop-shadow(0 0 7px rgba(255, 90, 31, 0.38));
+  }
+
+  .executive-date-trigger > span:not(.executive-date-indicator) {
+    flex: 1;
+    overflow: hidden;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .executive-date-trigger .placeholder {
+    color: #857d75;
+    font-weight: 500;
+  }
+
+  .executive-date-indicator {
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 50%;
+    background: #ffc107;
+    box-shadow: 0 0 10px rgba(255, 90, 31, 0.72);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .executive-date-picker.open .executive-date-indicator {
+    box-shadow: 0 0 17px rgba(255, 193, 7, 0.9);
+    transform: scale(1.35);
+  }
+
+  .executive-calendar {
+    position: absolute;
+    top: calc(100% + 0.55rem);
+    left: 0;
+    z-index: 180;
+    width: min(20rem, calc(100vw - 2rem));
+    padding: 0.85rem;
+    overflow: hidden;
+    border: 1px solid rgba(255, 151, 75, 0.32);
+    border-radius: 1rem;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.075), transparent 25%),
+      rgba(17, 15, 13, 0.96);
+    box-shadow: 0 30px 75px rgba(0, 0, 0, 0.62), 0 0 34px rgba(255, 90, 31, 0.09), inset 0 1px rgba(255, 238, 210, 0.13);
+    backdrop-filter: blur(30px) saturate(140%);
+    animation: calendar-deploy 260ms cubic-bezier(.16, 1, .3, 1) both;
+    transform-origin: top left;
+  }
+
+  .executive-calendar-glow {
+    position: absolute;
+    top: -4rem;
+    right: -3rem;
+    width: 10rem;
+    height: 10rem;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 90, 31, 0.19), transparent 68%);
+    pointer-events: none;
+  }
+
+  .executive-calendar-header {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.25rem 1fr 2.25rem;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .executive-calendar-header strong {
+    color: #fff4e7;
+    font-size: 0.86rem;
+    text-align: center;
+    text-transform: capitalize;
+  }
+
+  .executive-calendar-header button {
+    display: grid;
+    width: 2.25rem;
+    height: 2.25rem;
+    place-items: center;
+    border: 1px solid rgba(255, 157, 80, 0.18);
+    border-radius: 0.65rem;
+    color: #ff9b42;
+    background: rgba(255, 255, 255, 0.035);
+    cursor: pointer;
+    transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+  }
+
+  .executive-calendar-header button:hover {
+    color: #ffd54f;
+    background: rgba(255, 90, 31, 0.14);
+    transform: scale(1.08);
+  }
+
+  .executive-calendar-header svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .executive-calendar-weekdays,
+  .executive-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.23rem;
+  }
+
+  .executive-calendar-weekdays {
+    margin-bottom: 0.3rem;
+  }
+
+  .executive-calendar-weekdays span {
+    color: #8c837b;
+    font-size: 0.61rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-align: center;
+  }
+
+  .executive-calendar-grid button {
+    aspect-ratio: 1;
+    border: 1px solid transparent;
+    border-radius: 0.58rem;
+    color: #d8d0c7;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.74rem;
+    font-weight: 650;
+    transition: transform 150ms ease, border-color 150ms ease, color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+  }
+
+  .executive-calendar-grid button:hover {
+    border-color: rgba(255, 144, 65, 0.35);
+    color: #fff7ed;
+    background: rgba(255, 90, 31, 0.13);
+    transform: translateY(-2px) scale(1.06);
+  }
+
+  .executive-calendar-grid button.outside {
+    color: #5d5751;
+  }
+
+  .executive-calendar-grid button.today {
+    border-color: rgba(255, 193, 7, 0.38);
+    color: #ffd54f;
+  }
+
+  .executive-calendar-grid button.selected {
+    border-color: rgba(255, 213, 79, 0.62);
+    color: #160a04;
+    background: linear-gradient(145deg, #ffd54f, #ff6a24);
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.5), 0 6px 16px rgba(255, 90, 31, 0.26);
+    transform: scale(1.04);
+  }
+
+  .executive-calendar-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.7rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid rgba(255, 166, 93, 0.11);
+  }
+
+  .executive-calendar-footer button {
+    border: 0;
+    color: #b9afa5;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: 750;
+  }
+
+  .executive-calendar-footer button:last-child {
+    color: #ffad42;
+  }
+
+  .admin-card:has(.executive-date-picker.open),
+  .admin-modal:has(.executive-date-picker.open),
+  .filter-bar:has(.executive-date-picker.open) {
+    z-index: 100;
+    overflow: visible;
+  }
+
+  .executive-confirm-backdrop {
+    background:
+      radial-gradient(circle at 50% 45%, rgba(255, 90, 31, 0.11), transparent 28rem),
+      rgba(0, 0, 0, 0.78);
+  }
+
+  .executive-confirm {
+    position: relative;
+    width: min(28rem, calc(100vw - 2rem));
+    padding: 1.4rem;
+    overflow: hidden;
+    border: 1px solid rgba(255, 151, 75, 0.3);
+    border-radius: 1.15rem;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.08), transparent 28%),
+      linear-gradient(160deg, rgba(31, 27, 23, 0.96), rgba(10, 10, 10, 0.97));
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.68), 0 0 45px rgba(255, 90, 31, 0.1), inset 0 1px rgba(255, 239, 213, 0.14);
+    backdrop-filter: blur(30px) saturate(145%);
+    animation: confirm-arrival 340ms cubic-bezier(.16, 1, .3, 1) both;
+  }
+
+  .executive-confirm::before {
+    position: absolute;
+    inset: 0 8% auto;
+    height: 1px;
+    content: "";
+    background: linear-gradient(90deg, transparent, #ffd54f, #ff5a1f, transparent);
+    box-shadow: 0 0 18px rgba(255, 90, 31, 0.75);
+  }
+
+  .executive-confirm-icon {
+    display: grid;
+    width: 4rem;
+    height: 4rem;
+    margin-bottom: 1rem;
+    place-items: center;
+    border: 1px solid rgba(255, 110, 48, 0.34);
+    border-radius: 1.15rem;
+    color: #ff7840;
+    background: linear-gradient(145deg, rgba(255, 90, 31, 0.2), rgba(255, 193, 7, 0.045));
+    box-shadow: inset 0 1px rgba(255, 240, 215, 0.14), 0 12px 26px rgba(0, 0, 0, 0.34), 0 0 25px rgba(255, 90, 31, 0.11);
+  }
+
+  .executive-confirm-icon svg {
+    width: 1.75rem;
+    height: 1.75rem;
+    filter: drop-shadow(0 0 9px rgba(255, 90, 31, 0.42));
+  }
+
+  .executive-confirm-kicker {
+    margin-bottom: 0.35rem;
+    color: #ff9b42;
+    font-size: 0.64rem;
+    font-weight: 850;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .executive-confirm h2 {
+    margin: 0;
+    color: #fff8ef;
+    font-size: 1.35rem;
+    letter-spacing: -0.025em;
+  }
+
+  .executive-confirm p {
+    margin: 0.55rem 0 0;
+    color: #aaa198;
+    font-size: 0.82rem;
+    line-height: 1.55;
+  }
+
+  .executive-confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+    margin-top: 1.35rem;
+  }
+
+  .executive-confirm-actions button {
+    min-height: 2.8rem;
+  }
+
+  @keyframes calendar-deploy {
+    from { opacity: 0; transform: translateY(-7px) scale(0.96) rotateX(-5deg); }
+    to { opacity: 1; transform: translateY(0) scale(1) rotateX(0); }
+  }
+
+  @keyframes confirm-arrival {
+    from { opacity: 0; transform: translateY(18px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .admin-card,
     .stat-card,

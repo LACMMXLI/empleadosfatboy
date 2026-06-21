@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { CalendarDays, Camera, CheckCircle2, Clock3, Download, History, KeyRound, Plus, RefreshCw, RotateCw, Save, Trash2, UserRound, Wrench, X } from "lucide-react"
 import { api } from "@/lib/api"
+import { ExecutiveDatePicker } from "@/components/common/AdminPrimitives"
 import type { AttendanceRow, Branch, EmployeeTimeClockHistoryDay, TimeClockDevice, TimeClockEntry, TimeClockEventType, User, WorkScheduleDay } from "@/types/domain"
 
 const statusLabels: Record<AttendanceRow["status"], string> = {
@@ -259,7 +260,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
         </div>
         <div className="admin-card-body">
           <div className="admin-form-row">
-            <input className="form-input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+            <ExecutiveDatePicker value={date} onChange={setDate} title="Fecha de asistencia" />
             <select className="form-select" value={branchId} onChange={(event) => setBranchId(event.target.value)}>
               <option value="">Todas las sucursales</option>
               {activeBranches.map((branch) => (
@@ -331,8 +332,8 @@ export function AttendanceAdmin({ user }: { user?: User }) {
                 <option key={employee.id} value={employee.id}>{employee.fullName}</option>
               ))}
             </select>
-            <input className="form-input" type="date" value={historyFrom} onChange={(event) => setHistoryFrom(event.target.value)} />
-            <input className="form-input" type="date" value={historyTo} onChange={(event) => setHistoryTo(event.target.value)} />
+            <ExecutiveDatePicker value={historyFrom} onChange={setHistoryFrom} title="Desde" />
+            <ExecutiveDatePicker value={historyTo} onChange={setHistoryTo} title="Hasta" />
           </div>
 
           {!employeeId && <div className="status-empty">Selecciona un empleado para ver su ficha e historial de entradas, salidas, faltas y correcciones.</div>}

@@ -17,6 +17,8 @@ import {
   LogOut,
   MessageSquareText,
   Maximize2,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   ShieldCheck,
   Send,
@@ -32,7 +34,7 @@ import { api, session } from "@/lib/api"
 import type { Employee, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementStatus, Payroll, PayrollItem, Role, User } from "@/types/domain"
 import { useScrollDirection } from "@/hooks/useScrollDirection"
 import { StatusEmpty, StatusText } from "@/components/common/Status"
-import { AdminModal, DetailLine, GuidedBlock } from "@/components/common/AdminPrimitives"
+import { AdminModal, DetailLine, ExecutiveConfirmDialog, ExecutiveDatePicker, GuidedBlock } from "@/components/common/AdminPrimitives"
 import { AttendanceAdmin } from "@/features/admin/AttendanceAdmin"
 import {
   adminMovementSchema,
@@ -88,10 +90,19 @@ export function Shell({
   const { scrollDir, isNearTop } = useScrollDirection()
   const showNav = isNearTop || scrollDir === "up"
   const touchOptimizedLayout = useTouchOptimizedLayout()
-  const handleLogout = () => {
-    if (!window.confirm("¿Cerrar sesión del administrador?")) return
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("fatboy-admin-sidebar-collapsed") === "true")
+  const [logoutOpen, setLogoutOpen] = useState(false)
+  const handleLogout = () => setLogoutOpen(true)
+  const confirmLogout = () => {
     session.token = null
     onLogout()
+  }
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current
+      localStorage.setItem("fatboy-admin-sidebar-collapsed", String(next))
+      return next
+    })
   }
 
   const views = useMemo(() => {
@@ -117,13 +128,16 @@ export function Shell({
     <main className="admin-shell min-h-screen">
       <div className="flex min-h-screen">
         {/* === Desktop Sidebar === */}
-        <aside className={touchOptimizedLayout ? "admin-sidebar hidden" : "admin-sidebar hidden w-52 flex-col lg:flex"} style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+        <aside className={touchOptimizedLayout ? "admin-sidebar hidden" : `admin-sidebar hidden flex-col lg:flex ${sidebarCollapsed ? "collapsed" : ""}`} style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
           <div className="admin-sidebar-brand">
             <img src={fatboyLogo} alt="Fatboy" className="admin-sidebar-logo" />
-            <div>
+            <div className="admin-sidebar-brand-copy">
               <div className="admin-sidebar-title">Fatboy RH</div>
               <div className="admin-sidebar-subtitle">Adelantos internos</div>
             </div>
+            <button className="sidebar-collapse-control" type="button" title={sidebarCollapsed ? "Expandir menú" : "Ocultar menú"} aria-label={sidebarCollapsed ? "Expandir menú" : "Ocultar menú"} onClick={toggleSidebar}>
+              {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+            </button>
           </div>
           <nav className="flex flex-col gap-0.5 p-2 flex-1">
             {views.map((item) => (
@@ -132,9 +146,10 @@ export function Shell({
                 className={`nav-item ${activeView === item.id ? "active" : ""}`}
                 onClick={() => onViewChange(item.id)}
                 type="button"
+                title={sidebarCollapsed ? item.label : undefined}
               >
-                <item.icon className="nav-icon" />
-                {item.id === "pendientes" ? "Aprobaciones" : (item.id === "entregas" ? "Entregas" : viewTitles[item.id])}
+                <span className="nav-icon-stage"><item.icon className="nav-icon" /></span>
+                <span className="nav-item-label">{item.id === "pendientes" ? "Aprobaciones" : (item.id === "entregas" ? "Entregas" : viewTitles[item.id])}</span>
               </button>
             ))}
           </nav>
@@ -143,9 +158,10 @@ export function Shell({
               className="nav-item w-full"
               onClick={handleLogout}
               type="button"
+              title={sidebarCollapsed ? "Cerrar sesión" : undefined}
             >
-              <LogOut className="nav-icon" />
-              Cerrar sesión
+              <span className="nav-icon-stage"><LogOut className="nav-icon" /></span>
+              <span className="nav-item-label">Cerrar sesión</span>
             </button>
           </div>
         </aside>
@@ -201,6 +217,14 @@ export function Shell({
         onViewChange={onViewChange} 
         touchOptimizedLayout={touchOptimizedLayout}
         style={{ transform: showNav ? "translateY(0)" : "translateY(100%)" }}
+      />
+      <ExecutiveConfirmDialog
+        open={logoutOpen}
+        title="¿Finalizar sesión?"
+        description="Se cerrará el acceso administrativo en este dispositivo. Los cambios guardados permanecerán protegidos."
+        confirmLabel="Cerrar sesión"
+        onCancel={() => setLogoutOpen(false)}
+        onConfirm={confirmLogout}
       />
     </main>
   )
@@ -609,21 +633,11 @@ function AdministrativeMovements({ user }: { user?: User }) {
             <div className="admin-form-row">
               <div className="form-field">
                 <label className="form-label">Desde</label>
-                <input
-                  className="form-input"
-                  type="date"
-                  value={settlementFrom}
-                  onChange={(event) => { setSettlementFrom(event.target.value); setSettlementMessage(null) }}
-                />
+                <ExecutiveDatePicker value={settlementFrom} title="Desde" onChange={(value) => { setSettlementFrom(value); setSettlementMessage(null) }} />
               </div>
               <div className="form-field">
                 <label className="form-label">Hasta</label>
-                <input
-                  className="form-input"
-                  type="date"
-                  value={settlementTo}
-                  onChange={(event) => { setSettlementTo(event.target.value); setSettlementMessage(null) }}
-                />
+                <ExecutiveDatePicker value={settlementTo} title="Hasta" onChange={(value) => { setSettlementTo(value); setSettlementMessage(null) }} />
               </div>
             </div>
           </div>
@@ -1179,8 +1193,8 @@ function IncidentsAdmin({ user }: { user?: User }) {
             <option key={employee.id} value={employee.id}>{employee.fullName}</option>
           ))}
         </select>
-        <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} title="Desde" />
-        <input type="date" value={to} onChange={(event) => setTo(event.target.value)} title="Hasta" />
+        <ExecutiveDatePicker value={from} onChange={setFrom} title="Desde" placeholder="Desde" />
+        <ExecutiveDatePicker value={to} onChange={setTo} title="Hasta" placeholder="Hasta" />
       </div>
 
       <div className="incident-workspace">
@@ -1583,8 +1597,8 @@ function History() {
             ))}
           </select>
         )}
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} title="Desde" />
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} title="Hasta" />
+        <ExecutiveDatePicker value={from} onChange={setFrom} title="Desde" placeholder="Desde" />
+        <ExecutiveDatePicker value={to} onChange={setTo} title="Hasta" placeholder="Hasta" />
         <select value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="">Todos los tipos</option>
           {Object.entries(movementLabels).map(([v, l]) => (
@@ -1670,21 +1684,11 @@ function PayrollAdmin() {
           <div className="payroll-period-row">
             <label className="payroll-date-field">
               <span>Desde</span>
-              <input
-                type="date"
-                className="form-input"
-                value={periodStart}
-                onChange={(e) => setPeriodStart(e.target.value)}
-              />
+              <ExecutiveDatePicker value={periodStart} onChange={setPeriodStart} title="Desde" />
             </label>
             <label className="payroll-date-field">
               <span>Hasta</span>
-              <input
-                type="date"
-                className="form-input"
-                value={periodEnd}
-                onChange={(e) => setPeriodEnd(e.target.value)}
-              />
+              <ExecutiveDatePicker value={periodEnd} onChange={setPeriodEnd} title="Hasta" />
             </label>
             <button className="btn-secondary payroll-action-btn" type="button" onClick={() => preview.mutate()} disabled={preview.isPending}>
               Previsualizar
@@ -2179,7 +2183,7 @@ function Employees({ user }: { user?: User }) {
               </select>
             </div>
             <div className="admin-form-row">
-              <input className="form-input" type="date" {...form.register("hireDate")} />
+              <ExecutiveDatePicker value={form.watch("hireDate") ?? ""} onChange={(value) => form.setValue("hireDate", value, { shouldDirty: true, shouldValidate: true })} title="Fecha de ingreso" />
               <select className="form-select" {...form.register("branchId")}>
                 <option value="">Selecciona Sucursal</option>
                 {branches.data?.map((b) => (
@@ -2216,7 +2220,7 @@ function Employees({ user }: { user?: User }) {
               </select>
             </div>
             <div className="admin-form-row">
-              <input className="form-input" type="date" {...editForm.register("hireDate")} />
+              <ExecutiveDatePicker value={editForm.watch("hireDate") ?? ""} onChange={(value) => editForm.setValue("hireDate", value, { shouldDirty: true, shouldValidate: true })} title="Fecha de ingreso" />
               <select className="form-select" {...editForm.register("branchId")}>
                 <option value="">Selecciona Sucursal</option>
                 {branches.data?.map((b) => (
