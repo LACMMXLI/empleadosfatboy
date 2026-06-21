@@ -342,15 +342,54 @@ export type WorkSession = {
   endEntry?: TimeClockEntry | null
 }
 
+export type WorkScheduleDay = {
+  dayOfWeek: number
+  enabled: boolean
+  start: string
+  end: string
+}
+
+export type EmployeeWorkSchedule = {
+  employee: Employee
+  configured: boolean
+  days: WorkScheduleDay[]
+  lateGraceMinutes: number
+  overtimeThresholdMinutes: number
+}
+
+export type AttendanceCalculation = {
+  scheduled: boolean
+  scheduledStart?: string | null
+  scheduledEnd?: string | null
+  scheduledMinutes: number
+  workedMinutes: number
+  lateStatus: "NOT_SCHEDULED" | "NO_ENTRY" | "ON_TIME" | "LATE"
+  lateMinutes: number
+  earlyDepartureMinutes: number
+  overtimeMinutes: number
+}
+
+export type OvertimeAuthorization = {
+  id?: string
+  status: "NONE" | "PENDING" | "AUTHORIZED" | "REJECTED"
+  calculatedMinutes: number
+  authorizedMinutes?: number | null
+  notes?: string | null
+  authorizedAt?: string | null
+  authorizedBy?: Pick<User, "id" | "fullName" | "role"> | null
+}
+
 export type AttendanceRow = {
   employee: Employee
   branch: Branch
   date: string
-  status: "IN_SHIFT" | "EXITED" | "NO_SHOW"
+  status: "IN_SHIFT" | "EXITED" | "NO_SHOW" | "OFF"
   activeSession?: WorkSession | null
   lastEntry?: TimeClockEntry | null
   entries: TimeClockEntry[]
   sessions: WorkSession[]
+  calculation: AttendanceCalculation
+  overtimeAuthorization: OvertimeAuthorization
 }
 
 export type EmployeeTimeClockHistoryDay = {
@@ -361,7 +400,8 @@ export type EmployeeTimeClockHistoryDay = {
   entries: TimeClockEntry[]
   sessions: WorkSession[]
   totalMinutes: number
-  lateStatus: "NOT_CONFIGURED"
+  calculation: AttendanceCalculation
+  overtimeAuthorization: OvertimeAuthorization
 }
 
 export type EmployeeTimeClockHistory = {
@@ -379,7 +419,12 @@ export type EmployeeTimeClockHistory = {
     manualCount: number
     openSessions: number
     totalMinutes: number
+    lateDays: number
+    lateMinutes: number
+    overtimeMinutes: number
+    authorizedOvertimeMinutes: number
   }
+  schedule: Omit<EmployeeWorkSchedule, "employee">
   days: EmployeeTimeClockHistoryDay[]
   entries: TimeClockEntry[]
   sessions: WorkSession[]

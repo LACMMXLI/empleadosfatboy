@@ -1,16 +1,26 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { CalendarDays, Camera, CheckCircle2, Clock3, Download, History, KeyRound, Plus, RefreshCw, RotateCw, Save, Trash2, UserRound, Wrench, X } from "lucide-react"
 import { api } from "@/lib/api"
-import type { AttendanceRow, Branch, EmployeeTimeClockHistoryDay, TimeClockDevice, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
+import type { AttendanceRow, Branch, EmployeeTimeClockHistoryDay, TimeClockDevice, TimeClockEntry, TimeClockEventType, User, WorkScheduleDay } from "@/types/domain"
 
 const statusLabels: Record<AttendanceRow["status"], string> = {
   IN_SHIFT: "En turno",
   EXITED: "Salio",
-  NO_SHOW: "Sin checar"
+  NO_SHOW: "Sin checar",
+  OFF: "Descanso"
 }
 
-type AttendancePanel = "day" | "history" | "devices" | "adjustments"
+type AttendancePanel = "day" | "history" | "schedules" | "devices" | "adjustments"
+type ScheduleDraft = { days: WorkScheduleDay[]; lateGraceMinutes: number; overtimeThresholdMinutes: number }
+
+const dayLabels: Record<number, string> = { 0: "Domingo", 1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes", 6: "Sábado" }
+const defaultScheduleDays: WorkScheduleDay[] = [1, 2, 3, 4, 5, 6, 0].map((dayOfWeek) => ({
+  dayOfWeek,
+  enabled: dayOfWeek >= 1 && dayOfWeek <= 5,
+  start: "09:00",
+  end: "17:00"
+}))
 
 export function AttendanceAdmin({ user }: { user?: User }) {
   const queryClient = useQueryClient()
@@ -19,6 +29,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
   const [date, setDate] = useState(today)
   const [branchId, setBranchId] = useState("")
   const [employeeId, setEmployeeId] = useState("")
+  const [scheduleEmployeeId, setScheduleEmployeeId] = useState("")
   const [historyFrom, setHistoryFrom] = useState(defaultHistoryFrom)
   const [historyTo, setHistoryTo] = useState(today)
   const [deviceName, setDeviceName] = useState("")
@@ -35,6 +46,11 @@ export function AttendanceAdmin({ user }: { user?: User }) {
     notes: ""
   })
   const [message, setMessage] = useState<string | null>(null)
+  const [scheduleDraft, setScheduleDraft] = useState({
+    days: defaultScheduleDays,
+    lateGraceMinutes: 5,
+    overtimeThresholdMinutes: 15
+  })
 
   const branches = useQuery({ queryKey: ["branches"], queryFn: () => api.branches() })
   const employees = useQuery({ queryKey: ["employees", "attendance"], queryFn: () => api.employees() })
@@ -63,6 +79,20 @@ export function AttendanceAdmin({ user }: { user?: User }) {
     queryFn: () => api.adminTimeClock.employeeHistory(employeeId, { from: historyFrom, to: historyTo }),
     enabled: Boolean(employeeId)
   })
+  const employeeSchedule = useQuery({
+    queryKey: ["employee-work-schedule", scheduleEmployeeId],
+    queryFn: () => api.adminTimeClock.employeeSchedule(scheduleEmployeeId),
+    enabled: Boolean(scheduleEmployeeId)
+  })
+
+  useEffect(() => {
+    if (!employeeSchedule.data) return
+    setScheduleDraft({
+      days: employeeSchedule.data.days,
+      lateGraceMinutes: employeeSchedule.data.lateGraceMinutes,
+      overtimeThresholdMinutes: employeeSchedule.data.overtimeThresholdMinutes
+    })
+  }, [employeeSchedule.data])
   const attendanceRows = attendance.data ?? []
   const inShiftCount = attendanceRows.filter((row) => row.status === "IN_SHIFT").length
   const exitedCount = attendanceRows.filter((row) => row.status === "EXITED").length
@@ -131,6 +161,28 @@ export function AttendanceAdmin({ user }: { user?: User }) {
     onError: (error: Error) => setMessage(error.message)
   })
 
+  const saveSchedule = useMutation({
+    mutationFn: () => api.adminTimeClock.updateEmployeeSchedule(scheduleEmployeeId, scheduleDraft),
+    onSuccess: async () => {
+      setMessage("Turno del empleado guardado")
+      await queryClient.invalidateQueries({ queryKey: ["employee-work-schedule", scheduleEmployeeId] })
+      await queryClient.invalidateQueries({ queryKey: ["attendance"] })
+      await queryClient.invalidateQueries({ queryKey: ["employee-time-clock-history"] })
+    },
+    onError: (error: Error) => setMessage(error.message)
+  })
+
+  const decideOvertime = useMutation({
+    mutationFn: ({ targetEmployeeId, targetDate, status }: { targetEmployeeId: string; targetDate: string; status: "AUTHORIZED" | "REJECTED" }) =>
+      api.adminTimeClock.decideOvertime(targetEmployeeId, targetDate, { status }),
+    onSuccess: async () => {
+      setMessage("Decisión de tiempo extra registrada")
+      await queryClient.invalidateQueries({ queryKey: ["attendance"] })
+      await queryClient.invalidateQueries({ queryKey: ["employee-time-clock-history"] })
+    },
+    onError: (error: Error) => setMessage(error.message)
+  })
+
   async function exportRows() {
     const blob = await api.adminTimeClock.exportAttendance({ date, branchId, employeeId })
     const url = URL.createObjectURL(blob)
@@ -167,6 +219,10 @@ export function AttendanceAdmin({ user }: { user?: User }) {
               <History style={{ width: 13, height: 13 }} />
               Historial
             </button>
+            <button className={`attendance-tab ${activePanel === "schedules" ? "active" : ""}`} type="button" onClick={() => setActivePanel("schedules")}>
+              <CalendarDays style={{ width: 13, height: 13 }} />
+              Turnos
+            </button>
             <button className={`attendance-tab ${activePanel === "devices" ? "active" : ""}`} type="button" onClick={() => setActivePanel("devices")}>
               <KeyRound style={{ width: 13, height: 13 }} />
               Dispositivos
@@ -182,6 +238,8 @@ export function AttendanceAdmin({ user }: { user?: User }) {
           <HistoryMetric label="En turno" value={inShiftCount} />
           <HistoryMetric label="Salieron" value={exitedCount} />
           <HistoryMetric label="Sin checar" value={noShowCount} />
+          <HistoryMetric label="Retardos" value={attendanceRows.filter((row) => row.calculation.lateStatus === "LATE").length} />
+          <HistoryMetric label="Extra pendiente" value={attendanceRows.filter((row) => row.overtimeAuthorization.status === "PENDING").length} />
           <HistoryMetric label="Tablets activas" value={(devices.data ?? []).filter((device) => device.active).length} />
           <HistoryMetric label="Solicitudes" value={deviceRequests.data?.length ?? 0} />
         </div>
@@ -225,14 +283,28 @@ export function AttendanceAdmin({ user }: { user?: User }) {
                 </div>
                 <span className={`attendance-status ${row.status.toLowerCase()}`}>{statusLabels[row.status]}</span>
                 <div className="attendance-times">
+                  <span>Turno: {row.calculation.scheduled ? `${row.calculation.scheduledStart}-${row.calculation.scheduledEnd}` : "Descanso"}</span>
                   <span>Entrada: {row.sessions[0]?.startEntry?.localTime ?? "--"}</span>
                   <span>Salida: {row.sessions[row.sessions.length - 1]?.endEntry?.localTime ?? "--"}</span>
-                  <span>{row.sessions[row.sessions.length - 1]?.totalMinutes ?? 0} min</span>
+                  <span>Trabajado: {formatHours(row.calculation.workedMinutes)}</span>
+                  {row.calculation.lateMinutes > 0 && <span className="attendance-alert-text">Retardo: {row.calculation.lateMinutes} min</span>}
+                  {row.calculation.earlyDepartureMinutes > 0 && <span>Salida anticipada: {row.calculation.earlyDepartureMinutes} min</span>}
+                  {row.calculation.overtimeMinutes > 0 && <span className="attendance-extra-text">Extra: {row.calculation.overtimeMinutes} min · {overtimeStatusLabel(row.overtimeAuthorization.status)}</span>}
                 </div>
                 <div className="attendance-evidence">
                   {row.entries.map((entry) => (
                     <EvidenceButton key={entry.id} entry={entry} />
                   ))}
+                  {row.overtimeAuthorization.status === "PENDING" && (
+                    <>
+                      <button className="btn-icon" type="button" title="Autorizar tiempo extra" onClick={() => decideOvertime.mutate({ targetEmployeeId: row.employee.id, targetDate: row.date, status: "AUTHORIZED" })}>
+                        <CheckCircle2 style={{ width: 13, height: 13 }} />
+                      </button>
+                      <button className="btn-icon danger" type="button" title="Rechazar tiempo extra" onClick={() => decideOvertime.mutate({ targetEmployeeId: row.employee.id, targetDate: row.date, status: "REJECTED" })}>
+                        <X style={{ width: 13, height: 13 }} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -277,7 +349,9 @@ export function AttendanceAdmin({ user }: { user?: User }) {
                   <span>{employeeHistory.data.employee.position} · {employeeHistory.data.employee.branch.name}</span>
                   <span>{employeeHistory.data.employee.phone} · {employeeHistory.data.employee.active ? "Activo" : "Inactivo"}</span>
                 </div>
-                <span className="attendance-status no_show">Retardo no evaluado</span>
+                <span className={`attendance-status ${employeeHistory.data.schedule.configured ? "in_shift" : "no_show"}`}>
+                  {employeeHistory.data.schedule.configured ? "Turno configurado" : "Sin turno configurado"}
+                </span>
               </div>
 
               <div className="employee-history-kpis">
@@ -287,6 +361,9 @@ export function AttendanceAdmin({ user }: { user?: User }) {
                 <HistoryMetric label="Salidas" value={employeeHistory.data.summary.exitCount} />
                 <HistoryMetric label="Manual" value={employeeHistory.data.summary.manualCount} />
                 <HistoryMetric label="Horas" value={formatHours(employeeHistory.data.summary.totalMinutes)} />
+                <HistoryMetric label="Retardos" value={`${employeeHistory.data.summary.lateDays} / ${employeeHistory.data.summary.lateMinutes} min`} />
+                <HistoryMetric label="Tiempo extra" value={formatHours(employeeHistory.data.summary.overtimeMinutes)} />
+                <HistoryMetric label="Extra autorizado" value={formatHours(employeeHistory.data.summary.authorizedOvertimeMinutes)} />
               </div>
 
               <div className="employee-history-grid">
@@ -297,7 +374,11 @@ export function AttendanceAdmin({ user }: { user?: User }) {
                   </div>
                   <div className="employee-history-days">
                     {employeeHistory.data.days.map((day) => (
-                      <HistoryDayRow key={day.date} day={day} />
+                      <HistoryDayRow
+                        key={day.date}
+                        day={day}
+                        onDecide={(status) => decideOvertime.mutate({ targetEmployeeId: employeeHistory.data.employee.id, targetDate: day.date, status })}
+                      />
                     ))}
                   </div>
                 </div>
@@ -342,6 +423,66 @@ export function AttendanceAdmin({ user }: { user?: User }) {
           )}
         </div>
       </div>
+      )}
+
+      {activePanel === "schedules" && (
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <CalendarDays style={{ width: 14, height: 14, color: "#67e8f9" }} />
+              Turnos por empleado
+            </div>
+          </div>
+          <div className="admin-card-body space-y-3">
+            <select className="form-select" value={scheduleEmployeeId} onChange={(event) => setScheduleEmployeeId(event.target.value)}>
+              <option value="">Selecciona empleado</option>
+              {(employees.data ?? []).map((employee) => (
+                <option key={employee.id} value={employee.id}>{employee.fullName} · {employee.branch.name}</option>
+              ))}
+            </select>
+
+            {!scheduleEmployeeId && <div className="status-empty">Selecciona un empleado para configurar sus días y horas de trabajo.</div>}
+            {employeeSchedule.isLoading && <div className="status-empty">Cargando turno...</div>}
+            {scheduleEmployeeId && employeeSchedule.data && (
+              <div className="schedule-editor">
+                <div className="schedule-policy-grid">
+                  <label>
+                    <span>Tolerancia de entrada (min)</span>
+                    <input className="form-input" type="number" min="0" max="180" value={scheduleDraft.lateGraceMinutes} onChange={(event) => setScheduleDraft((current) => ({ ...current, lateGraceMinutes: Number(event.target.value) }))} />
+                  </label>
+                  <label>
+                    <span>Umbral para tiempo extra (min)</span>
+                    <input className="form-input" type="number" min="0" max="240" value={scheduleDraft.overtimeThresholdMinutes} onChange={(event) => setScheduleDraft((current) => ({ ...current, overtimeThresholdMinutes: Number(event.target.value) }))} />
+                  </label>
+                </div>
+                <div className="schedule-days-grid">
+                  {scheduleDraft.days.map((day) => (
+                    <div key={day.dayOfWeek} className={`schedule-day-row ${day.enabled ? "enabled" : ""}`}>
+                      <label className="schedule-day-toggle">
+                        <input type="checkbox" checked={day.enabled} onChange={(event) => updateScheduleDay(setScheduleDraft, day.dayOfWeek, { enabled: event.target.checked })} />
+                        <strong>{dayLabels[day.dayOfWeek]}</strong>
+                      </label>
+                      <input className="form-input" type="time" value={day.start} disabled={!day.enabled} onChange={(event) => updateScheduleDay(setScheduleDraft, day.dayOfWeek, { start: event.target.value })} />
+                      <span>a</span>
+                      <input className="form-input" type="time" value={day.end} disabled={!day.enabled} onChange={(event) => updateScheduleDay(setScheduleDraft, day.dayOfWeek, { end: event.target.value })} />
+                      <small>{day.enabled && day.end <= day.start ? "Termina al día siguiente" : day.enabled ? formatScheduleDuration(day) : "Descanso"}</small>
+                    </div>
+                  ))}
+                </div>
+                <div className="settings-row-actions">
+                  <button className="btn-primary" type="button" disabled={saveSchedule.isPending} onClick={() => saveSchedule.mutate()}>
+                    <Save style={{ width: 14, height: 14 }} />
+                    {saveSchedule.isPending ? "Guardando..." : "Guardar turno"}
+                  </button>
+                  <span className={`attendance-status ${employeeSchedule.data.configured ? "in_shift" : "no_show"}`}>
+                    {employeeSchedule.data.configured ? "Configurado" : "Nuevo"}
+                  </span>
+                </div>
+                {message && <div className="status-empty">{message}</div>}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {activePanel === "devices" && (
@@ -546,7 +687,7 @@ function HistoryMetric({ label, value }: { label: string; value: string | number
   )
 }
 
-function HistoryDayRow({ day }: { day: EmployeeTimeClockHistoryDay }) {
+function HistoryDayRow({ day, onDecide }: { day: EmployeeTimeClockHistoryDay; onDecide: (status: "AUTHORIZED" | "REJECTED") => void }) {
   return (
     <div className="employee-history-day">
       <div className="employee-history-day-date">
@@ -555,10 +696,19 @@ function HistoryDayRow({ day }: { day: EmployeeTimeClockHistoryDay }) {
       </div>
       <span className={`attendance-status ${day.status.toLowerCase()}`}>{statusLabels[day.status]}</span>
       <div className="employee-history-day-times">
+        <span>Turno {day.calculation.scheduled ? `${day.calculation.scheduledStart}-${day.calculation.scheduledEnd}` : "Descanso"}</span>
         <span>Entrada {day.firstEntry?.localTime ?? "--"}</span>
         <span>Salida {day.lastExit?.localTime ?? "--"}</span>
-        <span>Retardo no evaluado</span>
+        <span>{day.calculation.lateMinutes ? `Retardo ${day.calculation.lateMinutes} min` : day.calculation.lateStatus === "ON_TIME" ? "A tiempo" : "Sin retardo evaluable"}</span>
+        {day.calculation.earlyDepartureMinutes > 0 && <span>Salida anticipada {day.calculation.earlyDepartureMinutes} min</span>}
+        {day.calculation.overtimeMinutes > 0 && <span>Extra {day.calculation.overtimeMinutes} min · {overtimeStatusLabel(day.overtimeAuthorization.status)}</span>}
       </div>
+      {day.overtimeAuthorization.status === "PENDING" && (
+        <div className="settings-row-actions">
+          <button className="btn-icon" type="button" title="Autorizar" onClick={() => onDecide("AUTHORIZED")}><CheckCircle2 style={{ width: 13, height: 13 }} /></button>
+          <button className="btn-icon danger" type="button" title="Rechazar" onClick={() => onDecide("REJECTED")}><X style={{ width: 13, height: 13 }} /></button>
+        </div>
+      )}
     </div>
   )
 }
@@ -610,4 +760,31 @@ function formatDateTime(value?: string | null) {
     dateStyle: "short",
     timeStyle: "short"
   }).format(new Date(value))
+}
+
+function updateScheduleDay(
+  setDraft: (updater: (current: ScheduleDraft) => ScheduleDraft) => void,
+  dayOfWeek: number,
+  patch: Partial<WorkScheduleDay>
+) {
+  setDraft((current) => ({
+    ...current,
+    days: current.days.map((day) => day.dayOfWeek === dayOfWeek ? { ...day, ...patch } : day)
+  }))
+}
+
+function formatScheduleDuration(day: WorkScheduleDay) {
+  const [startHour, startMinute] = day.start.split(":").map(Number)
+  const [endHour, endMinute] = day.end.split(":").map(Number)
+  const start = startHour * 60 + startMinute
+  let end = endHour * 60 + endMinute
+  if (end <= start) end += 24 * 60
+  return formatHours(end - start)
+}
+
+function overtimeStatusLabel(status: "NONE" | "PENDING" | "AUTHORIZED" | "REJECTED") {
+  if (status === "AUTHORIZED") return "Autorizado"
+  if (status === "REJECTED") return "Rechazado"
+  if (status === "PENDING") return "Por autorizar"
+  return "Sin tiempo extra"
 }

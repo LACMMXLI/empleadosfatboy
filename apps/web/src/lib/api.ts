@@ -1,4 +1,4 @@
-import type { AppConfig, AttendanceAdjustment, AttendanceRow, AuditLog, Branch, DashboardSummary, Employee, EmployeeTimeClockHistory, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, Payroll, PayrollPreview, Role, TimeClockDevice, TimeClockDeviceRequest, TimeClockEmployeeVerification, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
+import type { AppConfig, AttendanceAdjustment, AttendanceRow, AuditLog, Branch, DashboardSummary, Employee, EmployeeTimeClockHistory, EmployeeWorkSchedule, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementSettlementSummary, MovementSettlementTicket, OvertimeAuthorization, Payroll, PayrollPreview, Role, TimeClockDevice, TimeClockDeviceRequest, TimeClockEmployeeVerification, TimeClockEntry, TimeClockEventType, User } from "@/types/domain"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
 
@@ -428,6 +428,21 @@ export const api = {
         Object.fromEntries(Object.entries(params ?? {}).filter(([, value]) => Boolean(value))) as Record<string, string>
       ).toString()
       return request<EmployeeTimeClockHistory>(`/admin/time-clock/employees/${employeeId}/history${query ? `?${query}` : ""}`)
+    },
+    employeeSchedule(employeeId: string) {
+      return request<EmployeeWorkSchedule>(`/admin/time-clock/employees/${employeeId}/schedule`)
+    },
+    updateEmployeeSchedule(employeeId: string, payload: Omit<EmployeeWorkSchedule, "employee" | "configured">) {
+      return request<EmployeeWorkSchedule>(`/admin/time-clock/employees/${employeeId}/schedule`, {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      })
+    },
+    decideOvertime(employeeId: string, date: string, payload: { status: "AUTHORIZED" | "REJECTED"; authorizedMinutes?: number; notes?: string }) {
+      return request<OvertimeAuthorization>(`/admin/time-clock/employees/${employeeId}/overtime/${date}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload)
+      })
     },
     adjustments(params?: Partial<{ employeeId: string; branchId: string }>) {
       const query = new URLSearchParams(

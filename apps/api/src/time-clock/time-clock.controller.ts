@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -16,10 +17,11 @@ import {
   UseInterceptors
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
-import { IsBoolean, IsEnum, IsOptional, IsString, MinLength } from "class-validator"
+import { Type } from "class-transformer"
+import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min, MinLength, ValidateNested } from "class-validator"
 import { memoryStorage } from "multer"
 import type { Response } from "express"
-import { Role, TimeClockEventType } from "@prisma/client"
+import { OvertimeAuthorizationStatus, Role, TimeClockEventType } from "@prisma/client"
 import { Public } from "../auth/public.decorator"
 import { Roles } from "../auth/roles.decorator"
 import type { RequestWithUser } from "../auth/auth.types"
@@ -128,6 +130,55 @@ class CreateAdjustmentDto {
   @IsString()
   @MinLength(5)
   reason!: string
+
+  @IsOptional()
+  @IsString()
+  notes?: string
+}
+
+class WorkScheduleDayDto {
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  dayOfWeek!: number
+
+  @IsBoolean()
+  enabled!: boolean
+
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  start!: string
+
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  end!: string
+}
+
+class UpdateWorkScheduleDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WorkScheduleDayDto)
+  days!: WorkScheduleDayDto[]
+
+  @IsInt()
+  @Min(0)
+  @Max(180)
+  lateGraceMinutes!: number
+
+  @IsInt()
+  @Min(0)
+  @Max(240)
+  overtimeThresholdMinutes!: number
+}
+
+class DecideOvertimeDto {
+  @IsEnum(OvertimeAuthorizationStatus)
+  status!: OvertimeAuthorizationStatus
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  authorizedMinutes?: number
 
   @IsOptional()
   @IsString()
@@ -261,6 +312,30 @@ export class TimeClockAdminController {
   @Get("attendance")
   attendance(@Query() query: AttendanceQuery, @Req() request: RequestWithUser) {
     return this.timeClock.attendance(query, request.user)
+  }
+
+  @Get("employees/:employeeId/schedule")
+  employeeSchedule(@Param("employeeId") employeeId: string, @Req() request: RequestWithUser) {
+    return this.timeClock.employeeSchedule(employeeId, request.user)
+  }
+
+  @Put("employees/:employeeId/schedule")
+  updateEmployeeSchedule(
+    @Param("employeeId") employeeId: string,
+    @Body() dto: UpdateWorkScheduleDto,
+    @Req() request: RequestWithUser
+  ) {
+    return this.timeClock.updateEmployeeSchedule(employeeId, dto, request.user, request.ip)
+  }
+
+  @Patch("employees/:employeeId/overtime/:date")
+  decideOvertime(
+    @Param("employeeId") employeeId: string,
+    @Param("date") date: string,
+    @Body() dto: DecideOvertimeDto,
+    @Req() request: RequestWithUser
+  ) {
+    return this.timeClock.decideOvertime(employeeId, date, dto, request.user, request.ip)
   }
 
   @Get("export")

@@ -101,6 +101,12 @@ enum WorkSessionStatus {
   ADJUSTED
 }
 
+enum OvertimeAuthorizationStatus {
+  PENDING
+  AUTHORIZED
+  REJECTED
+}
+
 enum TimeClockDeviceRequestStatus {
   PENDING
   AUTHORIZED
@@ -150,6 +156,7 @@ model User {
   authorizedTimeClockDeviceRequests TimeClockDeviceRequest[] @relation("TimeClockDeviceRequestAuthorizer")
   createdTimeClockEntries TimeClockEntry[] @relation("TimeClockEntryCreator")
   attendanceAdjustments AttendanceAdjustment[] @relation("AttendanceAdjustmentUser")
+  overtimeAuthorizations OvertimeAuthorization[] @relation("OvertimeAuthorizationUser")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 }
@@ -174,6 +181,8 @@ model Employee {
   timeClockEntries TimeClockEntry[]
   workSessions WorkSession[]
   attendanceAdjustments AttendanceAdjustment[]
+  workSchedule EmployeeWorkSchedule?
+  overtimeAuthorizations OvertimeAuthorization[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 }
@@ -518,4 +527,54 @@ model AttendanceAdjustment {
   @@index([employeeId, createdAt])
   @@index([branchId, createdAt])
   @@index([adjustedById, createdAt])
+}
+
+model EmployeeWorkSchedule {
+  id                       String   @id @default(cuid())
+  employeeId               String   @unique
+  mondayEnabled            Boolean  @default(true)
+  mondayStart              String   @default("09:00")
+  mondayEnd                String   @default("17:00")
+  tuesdayEnabled           Boolean  @default(true)
+  tuesdayStart             String   @default("09:00")
+  tuesdayEnd               String   @default("17:00")
+  wednesdayEnabled         Boolean  @default(true)
+  wednesdayStart           String   @default("09:00")
+  wednesdayEnd             String   @default("17:00")
+  thursdayEnabled          Boolean  @default(true)
+  thursdayStart            String   @default("09:00")
+  thursdayEnd              String   @default("17:00")
+  fridayEnabled            Boolean  @default(true)
+  fridayStart              String   @default("09:00")
+  fridayEnd                String   @default("17:00")
+  saturdayEnabled          Boolean  @default(false)
+  saturdayStart            String   @default("09:00")
+  saturdayEnd              String   @default("17:00")
+  sundayEnabled            Boolean  @default(false)
+  sundayStart              String   @default("09:00")
+  sundayEnd                String   @default("17:00")
+  lateGraceMinutes         Int      @default(5)
+  overtimeThresholdMinutes Int      @default(15)
+  employee                 Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+model OvertimeAuthorization {
+  id                    String                      @id @default(cuid())
+  employeeId            String
+  localDate             String
+  status                OvertimeAuthorizationStatus @default(PENDING)
+  calculatedMinutes     Int
+  authorizedMinutes     Int?
+  notes                 String?
+  authorizedById        String?
+  authorizedAt          DateTime?
+  employee              Employee                    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  authorizedBy          User?                       @relation("OvertimeAuthorizationUser", fields: [authorizedById], references: [id], onDelete: SetNull)
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  @@unique([employeeId, localDate])
+  @@index([status, localDate])
 }

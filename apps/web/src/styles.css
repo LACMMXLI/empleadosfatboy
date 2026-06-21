@@ -1394,7 +1394,7 @@
 
   .attendance-dashboard-tabs {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0.45rem;
   }
 
@@ -1472,6 +1472,19 @@
   .attendance-status.no_show {
     background: rgba(148, 163, 184, 0.14);
     color: #cbd5e1;
+  }
+
+  .attendance-status.off {
+    background: rgba(100, 116, 139, 0.12);
+    color: #94a3b8;
+  }
+
+  .attendance-alert-text {
+    color: #fb7185 !important;
+  }
+
+  .attendance-extra-text {
+    color: #fbbf24 !important;
   }
 
   .attendance-evidence {
@@ -1647,11 +1660,61 @@
   }
 
   .employee-history-day {
-    grid-template-columns: minmax(110px, 0.9fr) 104px minmax(170px, 1fr);
+    grid-template-columns: minmax(110px, 0.9fr) 104px minmax(170px, 1fr) auto;
   }
 
   .employee-history-entry {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .schedule-editor,
+  .schedule-days-grid {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .schedule-policy-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+
+  .schedule-policy-grid label {
+    display: grid;
+    gap: 0.3rem;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+
+  .schedule-day-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 0.8fr) 130px auto 130px minmax(120px, 0.8fr);
+    gap: 0.55rem;
+    align-items: center;
+    border: 1px solid rgb(var(--surface-line) / 0.35);
+    border-radius: 0.65rem;
+    background: rgb(var(--surface-control) / 0.62);
+    padding: 0.55rem;
+    opacity: 0.72;
+  }
+
+  .schedule-day-row.enabled {
+    border-color: rgba(103, 232, 249, 0.22);
+    opacity: 1;
+  }
+
+  .schedule-day-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .schedule-day-row small {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.7rem;
+    font-weight: 700;
   }
 
   @media (max-width: 900px) {
@@ -1666,6 +1729,11 @@
     .employee-history-grid,
     .employee-history-day,
     .employee-history-entry {
+      grid-template-columns: 1fr;
+    }
+
+    .schedule-policy-grid,
+    .schedule-day-row {
       grid-template-columns: 1fr;
     }
 

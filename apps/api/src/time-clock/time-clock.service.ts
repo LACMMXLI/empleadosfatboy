@@ -5,6 +5,7 @@ import {
   MovementKind,
   MovementOrigin,
   MovementStatus,
+  OvertimeAuthorizationStatus,
   Prisma,
   Role,
   TimeClockDeviceRequestStatus,
@@ -19,6 +20,7 @@ import type { AuthUser } from "../auth/auth.types"
 import { FilesService } from "../files/files.service"
 import { PrismaService } from "../prisma/prisma.service"
 import { LoginThrottleService } from "../security/login-throttle.service"
+import { calculateAttendance, scheduleDayNames, type ScheduleRecord } from "./attendance-calculation"
 
 type RequestMetadata = {
   ipAddress?: string
@@ -76,6 +78,18 @@ type ManualAdjustmentInput = {
   type: TimeClockEventType
   occurredAt?: string
   reason: string
+  notes?: string
+}
+
+type WorkScheduleInput = {
+  days: Array<{ dayOfWeek: number; enabled: boolean; start: string; end: string }>
+  lateGraceMinutes: number
+  overtimeThresholdMinutes: number
+}
+
+type DecideOvertimeInput = {
+  status: OvertimeAuthorizationStatus
+  authorizedMinutes?: number
   notes?: string
 }
 
@@ -771,6 +785,124 @@ export class TimeClockService {
     }
   }
 
+  async employeeSchedule(employeeId: string, user: AuthUser) {
+    const employee = await this.findVisibleEmployee(employeeId, user)
+    const schedule = await this.prisma.employeeWorkSchedule.findUnique({ where: { employeeId } })
+    return {
+      employee,
+      configured: Boolean(schedule),
+      ...this.scheduleResponse(schedule)
+    }
+  }
+
+  async updateEmployeeSchedule(employeeId: string, input: WorkScheduleInput, user: AuthUser, ipAddress?: string) {
+    const employee = await this.findVisibleEmployee(employeeId, user)
+    if (input.days.length !== 7 || new Set(input.days.map((day) => day.dayOfWeek)).size !== 7) {
+      throw new BadRequestException("El horario debe incluir los siete dias de la semana")
+    }
+
+    const before = await this.prisma.employeeWorkSchedule.findUnique({ where: { employeeId } })
+    const dayData = Object.fromEntries(input.days.flatMap((day) => {
+      const name = scheduleDayNames[day.dayOfWeek]
+      return [
+        [`${name}Enabled`, day.enabled],
+        [`${name}Start`, day.start],
+        [`${name}End`, day.end]
+      ]
+    }))
+    const data = {
+      ...dayData,
+      lateGraceMinutes: input.lateGraceMinutes,
+      overtimeThresholdMinutes: input.overtimeThresholdMinutes
+    } as Prisma.EmployeeWorkScheduleUncheckedCreateInput
+
+    const schedule = await this.prisma.employeeWorkSchedule.upsert({
+      where: { employeeId },
+      create: { ...data, employeeId },
+      update: data
+    })
+
+    await this.audit.log({
+      userId: user.sub,
+      action: before ? AuditAction.UPDATE : AuditAction.CREATE,
+      entity: "EmployeeWorkSchedule",
+      entityId: schedule.id,
+      affectedEmployeeId: employee.id,
+      oldValue: before ? this.toJson(this.scheduleResponse(before)) : undefined,
+      newValue: this.toJson(this.scheduleResponse(schedule)),
+      ipAddress
+    })
+
+    return { employee, configured: true, ...this.scheduleResponse(schedule) }
+  }
+
+  async decideOvertime(employeeId: string, date: string, input: DecideOvertimeInput, user: AuthUser, ipAddress?: string) {
+    this.validDateOnly(date)
+    if (input.status === OvertimeAuthorizationStatus.PENDING) {
+      throw new BadRequestException("Selecciona autorizar o rechazar el tiempo extra")
+    }
+    const employee = await this.findVisibleEmployee(employeeId, user)
+    const [schedule, entries, sessions, before] = await Promise.all([
+      this.prisma.employeeWorkSchedule.findUnique({ where: { employeeId } }),
+      this.prisma.timeClockEntry.findMany({
+        where: this.entryScope({ employeeId, localDate: date }, user),
+        orderBy: { occurredAt: "asc" }
+      }),
+      this.prisma.workSession.findMany({
+        where: this.sessionScope({ employeeId, localDate: date }, user),
+        include: { startEntry: true, endEntry: true },
+        orderBy: { startedAt: "asc" }
+      }),
+      this.prisma.overtimeAuthorization.findUnique({ where: { employeeId_localDate: { employeeId, localDate: date } } })
+    ])
+
+    const calculation = this.calculateDay(date, schedule, entries, sessions)
+    if (!calculation.scheduled) throw new BadRequestException("El empleado no tiene turno programado ese dia")
+    if (!calculation.overtimeMinutes) throw new BadRequestException("No hay tiempo extra calculado para autorizar")
+
+    const authorizedMinutes = input.status === OvertimeAuthorizationStatus.AUTHORIZED
+      ? input.authorizedMinutes ?? calculation.overtimeMinutes
+      : 0
+    if (authorizedMinutes > calculation.overtimeMinutes) {
+      throw new BadRequestException("Los minutos autorizados no pueden exceder el tiempo extra calculado")
+    }
+
+    const authorization = await this.prisma.overtimeAuthorization.upsert({
+      where: { employeeId_localDate: { employeeId, localDate: date } },
+      create: {
+        employeeId,
+        localDate: date,
+        status: input.status,
+        calculatedMinutes: calculation.overtimeMinutes,
+        authorizedMinutes,
+        notes: input.notes?.trim() || undefined,
+        authorizedById: user.sub,
+        authorizedAt: new Date()
+      },
+      update: {
+        status: input.status,
+        calculatedMinutes: calculation.overtimeMinutes,
+        authorizedMinutes,
+        notes: input.notes?.trim() || null,
+        authorizedById: user.sub,
+        authorizedAt: new Date()
+      },
+      include: { authorizedBy: { select: { id: true, fullName: true, role: true } } }
+    })
+
+    await this.audit.log({
+      userId: user.sub,
+      action: before ? AuditAction.UPDATE : AuditAction.CREATE,
+      entity: "OvertimeAuthorization",
+      entityId: authorization.id,
+      affectedEmployeeId: employee.id,
+      oldValue: before ? this.toJson(before) : undefined,
+      newValue: this.toJson(authorization),
+      ipAddress
+    })
+    return authorization
+  }
+
   async attendance(filters: AttendanceFilters, user: AuthUser) {
     const date = filters.date || this.localParts(new Date()).localDate
     const branchId = this.effectiveBranchFilter(filters.branchId, user)
@@ -780,10 +912,10 @@ export class TimeClockService {
       active: true
     })
 
-    const [employees, entries, sessions] = await Promise.all([
+    const [employees, entries, sessions, overtimeAuthorizations] = await Promise.all([
       this.prisma.employee.findMany({
         where: employeeWhere,
-        include: { branch: true },
+        include: { branch: true, workSchedule: true },
         orderBy: { fullName: "asc" }
       }),
       this.prisma.timeClockEntry.findMany({
@@ -798,22 +930,33 @@ export class TimeClockService {
           endEntry: true
         },
         orderBy: { startedAt: "asc" }
+      }),
+      this.prisma.overtimeAuthorization.findMany({
+        where: {
+          localDate: date,
+          employee: employeeWhere
+        },
+        include: { authorizedBy: { select: { id: true, fullName: true, role: true } } }
       })
     ])
 
     const entriesByEmployee = this.groupBy(entries, (entry) => entry.employeeId)
     const sessionsByEmployee = this.groupBy(sessions, (session) => session.employeeId)
+    const authorizationByEmployee = new Map(overtimeAuthorizations.map((item) => [item.employeeId, item]))
 
     return employees.map((employee) => {
       const employeeEntries = entriesByEmployee.get(employee.id) ?? []
       const employeeSessions = sessionsByEmployee.get(employee.id) ?? []
       const activeSession = employeeSessions.find((session) => session.status === WorkSessionStatus.ACTIVE)
       const lastEntry = employeeEntries[employeeEntries.length - 1]
+      const calculation = this.calculateDay(date, employee.workSchedule, employeeEntries, employeeSessions)
       const status = activeSession
         ? "IN_SHIFT"
         : lastEntry?.type === TimeClockEventType.EXIT
           ? "EXITED"
-          : "NO_SHOW"
+          : calculation.scheduled
+            ? "NO_SHOW"
+            : "OFF"
 
       return {
         employee,
@@ -823,7 +966,9 @@ export class TimeClockService {
         activeSession,
         lastEntry,
         entries: employeeEntries,
-        sessions: employeeSessions
+        sessions: employeeSessions,
+        calculation,
+        overtimeAuthorization: this.overtimeDecision(calculation.overtimeMinutes, authorizationByEmployee.get(employee.id))
       }
     })
   }
@@ -831,7 +976,8 @@ export class TimeClockService {
   async employeeHistory(employeeId: string, filters: HistoryFilters, user: AuthUser) {
     const employee = await this.findVisibleEmployee(employeeId, user)
     const range = this.resolveHistoryRange(filters)
-    const [entries, sessions, adjustments] = await Promise.all([
+    const [schedule, entries, sessions, adjustments, overtimeAuthorizations] = await Promise.all([
+      this.prisma.employeeWorkSchedule.findUnique({ where: { employeeId } }),
       this.prisma.timeClockEntry.findMany({
         where: this.entryScope({ employeeId, localDateRange: this.localDateRange(range.from, range.to) }, user),
         include: this.entryInclude(),
@@ -857,22 +1003,30 @@ export class TimeClockService {
         },
         orderBy: { createdAt: "desc" },
         take: 100
+      }),
+      this.prisma.overtimeAuthorization.findMany({
+        where: { employeeId, localDate: this.localDateRange(range.from, range.to) },
+        include: { authorizedBy: { select: { id: true, fullName: true, role: true } } }
       })
     ])
 
     const entriesByDate = this.groupBy(entries, (entry) => entry.localDate)
     const sessionsByDate = this.groupBy(sessions, (session) => session.localDate)
+    const authorizationByDate = new Map(overtimeAuthorizations.map((item) => [item.localDate, item]))
     const days = this.dateRangeValues(range.from, range.to)
       .map((date) => {
         const dayEntries = (entriesByDate.get(date) ?? []).slice().sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime())
         const daySessions = (sessionsByDate.get(date) ?? []).slice().sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
         const activeSession = daySessions.find((session) => session.status === WorkSessionStatus.ACTIVE)
         const lastEntry = dayEntries[dayEntries.length - 1]
+        const calculation = this.calculateDay(date, schedule, dayEntries, daySessions)
         const status = activeSession
           ? "IN_SHIFT"
           : lastEntry?.type === TimeClockEventType.EXIT
             ? "EXITED"
-            : "NO_SHOW"
+            : calculation.scheduled
+              ? "NO_SHOW"
+              : "OFF"
 
         return {
           date,
@@ -882,7 +1036,8 @@ export class TimeClockService {
           entries: dayEntries,
           sessions: daySessions,
           totalMinutes: daySessions.reduce((total, session) => total + (session.totalMinutes ?? 0), 0),
-          lateStatus: "NOT_CONFIGURED"
+          calculation,
+          overtimeAuthorization: this.overtimeDecision(calculation.overtimeMinutes, authorizationByDate.get(date))
         }
       })
       .reverse()
@@ -898,8 +1053,13 @@ export class TimeClockService {
         exitCount: entries.filter((entry) => entry.type === TimeClockEventType.EXIT).length,
         manualCount: entries.filter((entry) => entry.status === TimeClockEntryStatus.MANUAL).length,
         openSessions: sessions.filter((session) => session.status === WorkSessionStatus.ACTIVE).length,
-        totalMinutes: sessions.reduce((total, session) => total + (session.totalMinutes ?? 0), 0)
+        totalMinutes: sessions.reduce((total, session) => total + (session.totalMinutes ?? 0), 0),
+        lateDays: days.filter((day) => day.calculation.lateStatus === "LATE").length,
+        lateMinutes: days.reduce((total, day) => total + day.calculation.lateMinutes, 0),
+        overtimeMinutes: days.reduce((total, day) => total + day.calculation.overtimeMinutes, 0),
+        authorizedOvertimeMinutes: days.reduce((total, day) => total + (day.overtimeAuthorization.authorizedMinutes ?? 0), 0)
       },
+      schedule: { configured: Boolean(schedule), ...this.scheduleResponse(schedule) },
       days,
       entries,
       sessions,
@@ -1032,7 +1192,7 @@ export class TimeClockService {
 
   async exportAttendance(filters: AttendanceFilters, user: AuthUser) {
     const rows = await this.attendance(filters, user)
-    const header = ["Fecha", "Sucursal", "Empleado", "Puesto", "Estado", "Ultima checada", "Entrada", "Salida", "Minutos"].join(",")
+    const header = ["Fecha", "Sucursal", "Empleado", "Puesto", "Estado", "Turno", "Entrada", "Salida", "Minutos trabajados", "Retardo", "Salida anticipada", "Tiempo extra", "Estado tiempo extra"].join(",")
     const lines = rows.map((row) => {
       const session = row.sessions[row.sessions.length - 1]
       return [
@@ -1041,10 +1201,14 @@ export class TimeClockService {
         row.employee.fullName,
         row.employee.position,
         this.statusLabel(row.status),
-        row.lastEntry ? `${row.lastEntry.localTime} ${row.lastEntry.type}` : "",
+        row.calculation.scheduled ? `${row.calculation.scheduledStart}-${row.calculation.scheduledEnd}` : "Descanso",
         session?.startEntry?.localTime ?? "",
         session?.endEntry?.localTime ?? "",
-        session?.totalMinutes ?? ""
+        row.calculation.workedMinutes,
+        row.calculation.lateMinutes,
+        row.calculation.earlyDepartureMinutes,
+        row.calculation.overtimeMinutes,
+        row.overtimeAuthorization.status
       ].map((value) => this.csvValue(value)).join(",")
     })
     return `\uFEFF${header}\n${lines.join("\n")}`
@@ -1273,6 +1437,76 @@ export class TimeClockService {
     } satisfies Prisma.TimeClockEntryInclude
   }
 
+  private calculateDay(
+    date: string,
+    schedule: ScheduleRecord | null | undefined,
+    entries: Array<{ type: TimeClockEventType; localDate: string; localTime: string }>,
+    sessions: Array<{ totalMinutes: number | null; endEntry?: { localDate: string; localTime: string } | null }>
+  ) {
+    const firstEntry = entries.find((entry) => entry.type === TimeClockEventType.ENTRY)
+    const lastExit = entries.slice().reverse().find((entry) => entry.type === TimeClockEventType.EXIT)
+    return calculateAttendance({
+      date,
+      schedule,
+      firstEntry,
+      lastExit,
+      workedMinutes: sessions.reduce((total, session) => total + (session.totalMinutes ?? 0), 0)
+    })
+  }
+
+  private overtimeDecision(
+    calculatedMinutes: number,
+    authorization?: {
+      id: string
+      status: OvertimeAuthorizationStatus
+      calculatedMinutes: number
+      authorizedMinutes: number | null
+      notes: string | null
+      authorizedAt: Date | null
+      authorizedBy?: { id: string; fullName: string; role: Role } | null
+    }
+  ) {
+    if (!calculatedMinutes) return { status: "NONE" as const, calculatedMinutes: 0, authorizedMinutes: 0 }
+    if (!authorization) {
+      return { status: OvertimeAuthorizationStatus.PENDING, calculatedMinutes, authorizedMinutes: null }
+    }
+    return {
+      ...authorization,
+      calculatedMinutes,
+      authorizedMinutes: authorization.status === OvertimeAuthorizationStatus.AUTHORIZED
+        ? Math.min(authorization.authorizedMinutes ?? calculatedMinutes, calculatedMinutes)
+        : 0
+    }
+  }
+
+  private scheduleResponse(schedule: ScheduleRecord | null | undefined) {
+    const defaults = {
+      lateGraceMinutes: 5,
+      overtimeThresholdMinutes: 15,
+      sundayEnabled: false, sundayStart: "09:00", sundayEnd: "17:00",
+      mondayEnabled: true, mondayStart: "09:00", mondayEnd: "17:00",
+      tuesdayEnabled: true, tuesdayStart: "09:00", tuesdayEnd: "17:00",
+      wednesdayEnabled: true, wednesdayStart: "09:00", wednesdayEnd: "17:00",
+      thursdayEnabled: true, thursdayStart: "09:00", thursdayEnd: "17:00",
+      fridayEnabled: true, fridayStart: "09:00", fridayEnd: "17:00",
+      saturdayEnabled: false, saturdayStart: "09:00", saturdayEnd: "17:00"
+    } satisfies ScheduleRecord
+    const value = schedule ?? defaults
+    return {
+      lateGraceMinutes: value.lateGraceMinutes,
+      overtimeThresholdMinutes: value.overtimeThresholdMinutes,
+      days: [1, 2, 3, 4, 5, 6, 0].map((dayOfWeek) => {
+        const name = scheduleDayNames[dayOfWeek]
+        return {
+          dayOfWeek,
+          enabled: value[`${name}Enabled`],
+          start: value[`${name}Start`],
+          end: value[`${name}End`]
+        }
+      })
+    }
+  }
+
   private localParts(date: Date) {
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone,
@@ -1394,6 +1628,7 @@ export class TimeClockService {
   private statusLabel(status: string) {
     if (status === "IN_SHIFT") return "En turno"
     if (status === "EXITED") return "Salio"
+    if (status === "OFF") return "Descanso"
     return "Sin checar"
   }
 
