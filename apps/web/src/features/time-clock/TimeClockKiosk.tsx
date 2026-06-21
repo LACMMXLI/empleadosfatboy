@@ -867,7 +867,6 @@ export function TimeClockKiosk() {
                     type="number"
                     inputMode="decimal"
                     min="0.01"
-                    max="50000"
                     step="0.01"
                     placeholder="0.00"
                     value={advanceAmount}

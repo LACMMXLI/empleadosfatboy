@@ -370,8 +370,8 @@ export class MovementsService {
     dto: CreateTimeClockSalaryAdvanceInput,
     metadata: RequestMetadata
   ) {
-    if (!Number.isFinite(dto.amount) || dto.amount <= 0 || dto.amount > 50_000) {
-      throw new BadRequestException("El adelanto debe ser mayor a $0 y no exceder $50,000")
+    if (!Number.isFinite(dto.amount) || dto.amount <= 0) {
+      throw new BadRequestException("El adelanto debe ser mayor a $0")
     }
 
     const { device, employee, approver } = await this.timeClock.authorizeSalaryAdvanceRequest(token, dto, metadata)

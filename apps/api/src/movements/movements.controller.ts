@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req } from "@nestjs/common"
-import { IsEnum, IsNumber, IsOptional, IsString, Length, Max, Min, ValidateIf } from "class-validator"
+import { IsEnum, IsNumber, IsOptional, IsString, Length, Min, ValidateIf } from "class-validator"
 import { MovementKind, MovementStatus, Role } from "@prisma/client"
 import { Roles } from "../auth/roles.decorator"
 import { Public } from "../auth/public.decorator"
@@ -144,7 +144,6 @@ class TimeClockSalaryAdvanceDto {
 
   @IsNumber()
   @Min(0.01)
-  @Max(50_000)
   amount!: number
 
   @IsOptional()

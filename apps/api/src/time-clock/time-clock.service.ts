@@ -619,6 +619,18 @@ export class TimeClockService {
     }
     if (!approver) {
       await this.loginThrottle.recordFailure("time-clock-advance-approver", approverThrottleId, metadata)
+      await this.audit.log({
+        action: AuditAction.BLOCKED,
+        entity: "Movement",
+        affectedEmployeeId: employee.id,
+        newValue: this.toJson({
+          reason: "INVALID_BRANCH_MANAGER_APPROVAL_CODE",
+          source: "time-clock-salary-advance",
+          deviceId: device.id,
+          branchId: device.branchId
+        }),
+        ipAddress: metadata.ipAddress
+      })
       throw new BadRequestException("Codigo del encargado invalido")
     }
     await this.loginThrottle.recordSuccess("time-clock-advance-approver", approverThrottleId)
