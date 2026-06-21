@@ -61,6 +61,7 @@ export function ExecutiveConfirmDialog({
   title,
   description,
   confirmLabel,
+  verificationText,
   onCancel,
   onConfirm
 }: {
@@ -68,9 +69,25 @@ export function ExecutiveConfirmDialog({
   title: string
   description: string
   confirmLabel: string
+  verificationText?: string
   onCancel: () => void
   onConfirm: () => void
 }) {
+  const [verification, setVerification] = useState("")
+
+  useEffect(() => {
+    if (!open) return
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel()
+    }
+    document.addEventListener("keydown", escape)
+    return () => document.removeEventListener("keydown", escape)
+  }, [onCancel, open])
+
+  useEffect(() => {
+    if (!open) setVerification("")
+  }, [open])
+
   if (!open) return null
 
   return (
@@ -81,10 +98,16 @@ export function ExecutiveConfirmDialog({
           <div className="executive-confirm-kicker">Sesión administrativa</div>
           <h2 id="executive-confirm-title">{title}</h2>
           <p>{description}</p>
+          {verificationText && (
+            <label className="executive-confirm-verification">
+              <span>Escribe <strong>{verificationText}</strong> para confirmar</span>
+              <input className="form-input" value={verification} onChange={(event) => setVerification(event.target.value)} autoComplete="off" />
+            </label>
+          )}
         </div>
         <div className="executive-confirm-actions">
-          <button className="btn-secondary" type="button" onClick={onCancel}>Permanecer</button>
-          <button className="btn-reject" type="button" onClick={onConfirm}>{confirmLabel}</button>
+          <button className="btn-secondary" type="button" onClick={onCancel} autoFocus>Permanecer</button>
+          <button className="btn-reject" type="button" onClick={onConfirm} disabled={Boolean(verificationText && verification !== verificationText)}>{confirmLabel}</button>
         </div>
       </section>
     </div>
@@ -156,6 +179,8 @@ export function ExecutiveDatePicker({
                   key={dayValue}
                   className={`${outside ? "outside" : ""} ${dayValue === value ? "selected" : ""} ${dayValue === today ? "today" : ""}`}
                   type="button"
+                  aria-current={dayValue === today ? "date" : undefined}
+                  aria-pressed={dayValue === value}
                   onClick={() => { onChange(dayValue); setOpen(false) }}
                 >
                   {day.getDate()}

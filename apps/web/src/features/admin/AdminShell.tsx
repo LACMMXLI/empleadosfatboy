@@ -1026,6 +1026,7 @@ function IncidentsAdmin({ user }: { user?: User }) {
   const [comment, setComment] = useState("")
   const [statusMessage, setStatusMessage] = useState("")
   const [previewFile, setPreviewFile] = useState<FileAsset | null>(null)
+  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (user?.branch?.id && !branchId) setBranchId(user.branch.id)
@@ -1149,10 +1150,7 @@ function IncidentsAdmin({ user }: { user?: User }) {
 
   const confirmIncidentPurge = () => {
     if (!selectedIncident) return
-    const confirmation = window.prompt(`Borrado definitivo de ${selectedIncident.folio}. Escribe BORRAR para confirmar.`)
-    if (confirmation === "BORRAR") {
-      purgeIncident.mutate()
-    }
+    setPurgeConfirmOpen(true)
   }
 
   const onCreateFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -1416,6 +1414,15 @@ function IncidentsAdmin({ user }: { user?: User }) {
       )}
 
       {previewFile && <EvidencePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />}
+      <ExecutiveConfirmDialog
+        open={purgeConfirmOpen}
+        title="Eliminar incidencia de prueba"
+        description={`Esta acción eliminará definitivamente ${selectedIncident?.folio ?? "la incidencia"} y sus evidencias.`}
+        confirmLabel="Eliminar definitivamente"
+        verificationText="BORRAR"
+        onCancel={() => setPurgeConfirmOpen(false)}
+        onConfirm={() => { setPurgeConfirmOpen(false); purgeIncident.mutate() }}
+      />
     </div>
   )
 }
@@ -1563,8 +1570,8 @@ function History() {
             border: 'none',
             cursor: 'pointer',
             transition: 'all 150ms ease',
-            background: tab === "all" ? 'rgba(0,229,255,0.1)' : 'transparent',
-            color: tab === "all" ? '#00e5ff' : 'hsl(var(--muted-foreground))'
+            background: tab === "all" ? 'rgba(255,90,31,0.16)' : 'transparent',
+            color: tab === "all" ? '#ffad42' : 'hsl(var(--muted-foreground))'
           }}
         >Todos los movimientos</button>
         <button
@@ -1578,8 +1585,8 @@ function History() {
             border: 'none',
             cursor: 'pointer',
             transition: 'all 150ms ease',
-            background: tab === "employee" ? 'rgba(0,229,255,0.1)' : 'transparent',
-            color: tab === "employee" ? '#00e5ff' : 'hsl(var(--muted-foreground))'
+            background: tab === "employee" ? 'rgba(255,90,31,0.16)' : 'transparent',
+            color: tab === "employee" ? '#ffad42' : 'hsl(var(--muted-foreground))'
           }}
         >Por empleado</button>
       </div>
@@ -2043,6 +2050,7 @@ function Employees({ user }: { user?: User }) {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [employeePurgeOpen, setEmployeePurgeOpen] = useState(false)
   const employees = useQuery({ queryKey: ["employees", "admin-all"], queryFn: () => api.employees(undefined, true) })
   const branches = useQuery({ queryKey: ["branches"], queryFn: () => api.branches() })
   const selectedEmployee = employees.data?.find((employee) => employee.id === selectedEmployeeId)
@@ -2097,10 +2105,8 @@ function Employees({ user }: { user?: User }) {
   })
 
   const confirmDeveloperPurge = (employee: Employee) => {
-    const confirmation = window.prompt(`Borrado definitivo de ${employee.fullName}. Escribe BORRAR para confirmar.`)
-            if (confirmation === "BORRAR") {
-      purgeDeveloperEmployee.mutate(employee)
-    }
+    setSelectedEmployeeId(employee.id)
+    setEmployeePurgeOpen(true)
   }
 
   useEffect(() => {
@@ -2260,6 +2266,15 @@ function Employees({ user }: { user?: User }) {
           </form>
         </AdminModal>
       )}
+      <ExecutiveConfirmDialog
+        open={employeePurgeOpen}
+        title="Eliminar empleado de prueba"
+        description={`Se eliminará definitivamente a ${selectedEmployee?.fullName ?? "este empleado"} y su información relacionada.`}
+        confirmLabel="Eliminar definitivamente"
+        verificationText="BORRAR"
+        onCancel={() => setEmployeePurgeOpen(false)}
+        onConfirm={() => { if (selectedEmployee) purgeDeveloperEmployee.mutate(selectedEmployee); setEmployeePurgeOpen(false); setEditOpen(false) }}
+      />
     </div>
   )
 }
@@ -2269,6 +2284,8 @@ function Configuration() {
   const [selectedUserId, setSelectedUserId] = useState("")
   const [editRuleId, setEditRuleId] = useState("")
   const [editBranchId, setEditBranchId] = useState("")
+  const [branchDeactivateId, setBranchDeactivateId] = useState("")
+  const [ruleDeleteId, setRuleDeleteId] = useState("")
   const [settingsTab, setSettingsTab] = useState<"general" | "branches" | "users" | "rules">("general")
 
   const configuration = useQuery({ queryKey: ["configuration"], queryFn: api.configuration })
@@ -2558,11 +2575,7 @@ function Configuration() {
                         {branch.active && (
                           <button
                             className="btn-icon danger"
-                            onClick={() => {
-                              if (confirm(`¿Estás seguro de que deseas desactivar la sucursal ${branch.name}?`)) {
-                                deleteBranch.mutate(branch.id)
-                              }
-                            }}
+                            onClick={() => setBranchDeactivateId(branch.id)}
                             type="button"
                             title="Desactivar sucursal"
                           >
@@ -2700,11 +2713,7 @@ function Configuration() {
                         </button>
                         <button
                           className="btn-icon danger"
-                          onClick={() => {
-                            if (confirm("¿Estás seguro de que deseas eliminar esta regla de autorización?")) {
-                              deleteRule.mutate(rule.id)
-                            }
-                          }}
+                          onClick={() => setRuleDeleteId(rule.id)}
                           type="button"
                           title="Eliminar regla"
                         >
@@ -2835,6 +2844,22 @@ function Configuration() {
           </form>
         </AdminModal>
       )}
+      <ExecutiveConfirmDialog
+        open={Boolean(branchDeactivateId)}
+        title="Desactivar sucursal"
+        description={`La sucursal ${branches.data?.find((item) => item.id === branchDeactivateId)?.name ?? "seleccionada"} dejará de estar disponible para nuevas operaciones.`}
+        confirmLabel="Desactivar sucursal"
+        onCancel={() => setBranchDeactivateId("")}
+        onConfirm={() => { deleteBranch.mutate(branchDeactivateId); setBranchDeactivateId("") }}
+      />
+      <ExecutiveConfirmDialog
+        open={Boolean(ruleDeleteId)}
+        title="Eliminar regla de autorización"
+        description="La regla dejará de aplicarse inmediatamente a las nuevas solicitudes."
+        confirmLabel="Eliminar regla"
+        onCancel={() => setRuleDeleteId("")}
+        onConfirm={() => { deleteRule.mutate(ruleDeleteId); setRuleDeleteId("") }}
+      />
     </div>
   )
 }

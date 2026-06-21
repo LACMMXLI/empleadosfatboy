@@ -6008,6 +6008,12 @@
     min-width: 0;
   }
 
+  .filter-bar .executive-date-picker {
+    width: auto;
+    min-width: 9.5rem;
+    flex: 1 1 10rem;
+  }
+
   .executive-date-picker.open {
     z-index: 120;
   }
@@ -6298,6 +6304,22 @@
     color: #aaa198;
     font-size: 0.82rem;
     line-height: 1.55;
+  }
+
+  .executive-confirm-verification {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 1rem;
+  }
+
+  .executive-confirm-verification > span {
+    color: #9f968d;
+    font-size: 0.7rem;
+  }
+
+  .executive-confirm-verification strong {
+    color: #ffd54f;
+    letter-spacing: 0.08em;
   }
 
   .executive-confirm-actions {

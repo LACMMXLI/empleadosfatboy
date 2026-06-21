@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { CalendarDays, Camera, CheckCircle2, Clock3, Download, History, KeyRound, Plus, RefreshCw, RotateCw, Save, Trash2, UserRound, Wrench, X } from "lucide-react"
 import { api } from "@/lib/api"
-import { ExecutiveDatePicker } from "@/components/common/AdminPrimitives"
+import { ExecutiveConfirmDialog, ExecutiveDatePicker } from "@/components/common/AdminPrimitives"
 import type { AttendanceRow, Branch, EmployeeTimeClockHistoryDay, TimeClockDevice, TimeClockEntry, TimeClockEventType, User, WorkScheduleDay } from "@/types/domain"
 
 const statusLabels: Record<AttendanceRow["status"], string> = {
@@ -37,6 +37,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
   const [deviceBranchId, setDeviceBranchId] = useState("")
   const [requestDrafts, setRequestDrafts] = useState<Record<string, { name: string; branchId: string }>>({})
   const [setupToken, setSetupToken] = useState<string | null>(null)
+  const [deviceToPurge, setDeviceToPurge] = useState<TimeClockDevice | null>(null)
   const [activePanel, setActivePanel] = useState<AttendancePanel>("day")
   const [adjustment, setAdjustment] = useState({
     employeeId: "",
@@ -195,10 +196,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
   }
 
   function confirmDevicePurge(device: TimeClockDevice) {
-    const confirmation = window.prompt(`Borrado definitivo del dispositivo ${device.name}. Escribe BORRAR para confirmar.`)
-    if (confirmation === "BORRAR") {
-      purgeDevice.mutate(device)
-    }
+    setDeviceToPurge(device)
   }
 
   return (
@@ -675,6 +673,15 @@ export function AttendanceAdmin({ user }: { user?: User }) {
           </div>
         </div>
       )}
+      <ExecutiveConfirmDialog
+        open={Boolean(deviceToPurge)}
+        title="Eliminar dispositivo de prueba"
+        description={`Se revocará y eliminará definitivamente ${deviceToPurge?.name ?? "el dispositivo"}.`}
+        confirmLabel="Eliminar definitivamente"
+        verificationText="BORRAR"
+        onCancel={() => setDeviceToPurge(null)}
+        onConfirm={() => { if (deviceToPurge) purgeDevice.mutate(deviceToPurge); setDeviceToPurge(null) }}
+      />
     </div>
   )
 }
