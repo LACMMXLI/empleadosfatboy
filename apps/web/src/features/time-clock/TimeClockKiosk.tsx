@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Banknote, CheckCircle2, Clock3, Coffee, Copy, KeyRound, LogIn, LogOut, Maximize, Minimize, RefreshCw, ShieldAlert, ShieldCheck, Utensils, UserRound, X } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
 import type { TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
+import fatboyLogo from "@/assets/logo.png"
 import "./TimeClockKiosk.css"
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replace(/\/$/, "")
@@ -688,6 +689,7 @@ export function TimeClockKiosk() {
         {!verifiedEmployee ? (
           <div className="timeclock-access-view">
             <section className="timeclock-access-intro">
+              <img className="timeclock-access-logo" src={fatboyLogo} alt="Fatboy" />
               <span className="timeclock-access-eyebrow">Control de asistencia</span>
               <div className="timeclock-access-clock">{timeString}</div>
               <div className="timeclock-access-date">{dateString}</div>

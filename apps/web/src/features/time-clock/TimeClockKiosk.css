@@ -1,3 +1,33 @@
+.timeclock-access-intro {
+  display: grid;
+  justify-items: start;
+  align-content: center;
+}
+
+.timeclock-access-logo {
+  width: clamp(22rem, 42vw, 34rem);
+  max-width: 100%;
+  max-height: clamp(13rem, 31vh, 18rem);
+  display: block;
+  object-fit: contain;
+  object-position: left center;
+  margin: -20px 0 -18px;
+  filter: drop-shadow(0 16px 34px rgba(239, 53, 22, 0.2));
+}
+
+.timeclock-access-intro .timeclock-access-eyebrow {
+  margin-top: 4px;
+}
+
+.timeclock-access-intro .timeclock-access-clock {
+  margin-top: clamp(0.8rem, 2.4vh, 1.4rem);
+  font-size: clamp(3.8rem, 9vw, 6.75rem);
+}
+
+.timeclock-access-intro .timeclock-access-date {
+  margin-top: 12px;
+}
+
 .timeclock-employee-view {
   gap: 8px;
 }
@@ -359,6 +389,8 @@
 }
 
 @media (max-width: 900px) {
+  .timeclock-access-intro { justify-items: center; }
+  .timeclock-access-logo { width: min(31rem, 82vw); object-position: center; }
   .timeclock-employee-heading { grid-template-columns: minmax(0, 1fr) auto; }
   .timeclock-employee-dashboard { grid-template-columns: 1fr; }
   .timeclock-shift-flow { min-height: 31rem; }
@@ -366,6 +398,12 @@
 }
 
 @media (max-width: 560px) {
+  .timeclock-access-logo {
+    width: min(24rem, 92vw);
+    max-height: 13rem;
+    margin-block: -16px -20px;
+  }
+  .timeclock-access-intro .timeclock-access-clock { font-size: clamp(3.5rem, 18vw, 5.5rem); }
   .timeclock-employee-heading { grid-template-columns: 1fr; }
   .timeclock-employee-heading-actions { justify-content: space-between; }
   .timeclock-shift-sequence { padding-inline: 4px; }
