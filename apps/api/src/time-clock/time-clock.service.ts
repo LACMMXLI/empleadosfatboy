@@ -517,7 +517,7 @@ export class TimeClockService {
           }
         },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 25,
         select: {
           id: true,
           folio: true,
