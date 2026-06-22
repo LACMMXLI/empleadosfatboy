@@ -786,7 +786,7 @@ export class TimeClockService {
 
     await this.loginThrottle.recordSuccess("time-clock", throttleId)
 
-    await this.ensureEmployeeHasActiveShiftToday(employee.id, MovementKind.DRINK, {
+    await this.ensureEmployeeHasActiveShift(employee.id, MovementKind.DRINK, {
       ...metadata,
       device: `time-clock:${device.id}`,
       context: "time-clock-drink"
@@ -1318,21 +1318,19 @@ export class TimeClockService {
     return `\uFEFF${header}\n${lines.join("\n")}`
   }
 
-  async ensureEmployeeHasActiveShiftToday(
+  async ensureEmployeeHasActiveShift(
     employeeId: string,
     kind: MovementKind,
     metadata: RequestMetadata & { userId?: string; device?: string; context?: string }
   ) {
     if (!movementKindsThatRequireActiveShift.has(kind)) return
 
-    const today = this.localParts(new Date()).localDate
     const active = await this.prisma.workSession.findFirst({
       where: {
         employeeId,
-        localDate: today,
         status: WorkSessionStatus.ACTIVE
       },
-      select: { id: true }
+      select: { id: true, localDate: true, startedAt: true }
     })
 
     if (active) return
@@ -1345,7 +1343,7 @@ export class TimeClockService {
       newValue: this.toJson({
         reason: "NO_ACTIVE_SHIFT",
         kind,
-        date: today,
+        checkedLocalDate: this.localParts(new Date()).localDate,
         context: metadata.context,
         device: metadata.device,
         userAgent: metadata.userAgent

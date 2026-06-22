@@ -25,7 +25,7 @@ async function registersAuthorizedAdvanceWithBranchManager() {
       employee: { id: "employee-1", branchId: "branch-1", fullName: "Empleado" },
       approver: { id: "manager-1", fullName: "Encargado", branchId: "branch-1" }
     }),
-    ensureEmployeeHasActiveShiftToday: async (_employeeId: string, _kind: string, metadata: Record<string, unknown>) => {
+    ensureEmployeeHasActiveShift: async (_employeeId: string, _kind: string, metadata: Record<string, unknown>) => {
       shiftCheck = metadata
     }
   }

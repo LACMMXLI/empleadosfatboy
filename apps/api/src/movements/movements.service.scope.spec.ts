@@ -83,7 +83,7 @@ function createWriteService() {
     log: async () => undefined
   }
   const timeClock = {
-    ensureEmployeeHasActiveShiftToday: async () => undefined
+    ensureEmployeeHasActiveShift: async () => undefined
   }
 
   return {

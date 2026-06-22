@@ -196,7 +196,7 @@ export class MovementsService {
       throw new BadRequestException("El motivo es requerido")
     }
 
-    await this.timeClock.ensureEmployeeHasActiveShiftToday(employee.id, dto.kind, {
+    await this.timeClock.ensureEmployeeHasActiveShift(employee.id, dto.kind, {
       ...metadata,
       userId: user.sub,
       context: "admin-movement"
@@ -258,7 +258,7 @@ export class MovementsService {
       throw new BadRequestException("El motivo es requerido")
     }
 
-    await this.timeClock.ensureEmployeeHasActiveShiftToday(employee.id, dto.kind, {
+    await this.timeClock.ensureEmployeeHasActiveShift(employee.id, dto.kind, {
       ...metadata,
       userId: user.sub,
       context: "admin-administrative-movement"
@@ -323,7 +323,7 @@ export class MovementsService {
     const status = isAdvance ? MovementStatus.PENDING : MovementStatus.AUTHORIZED
     const authorizedAt = status === MovementStatus.AUTHORIZED ? new Date() : null
 
-    await this.timeClock.ensureEmployeeHasActiveShiftToday(employee.id, dto.kind, {
+    await this.timeClock.ensureEmployeeHasActiveShift(employee.id, dto.kind, {
       ...metadata,
       context: "employee-portal-request"
     })
@@ -375,7 +375,7 @@ export class MovementsService {
     }
 
     const { device, employee, approver } = await this.timeClock.authorizeSalaryAdvanceRequest(token, dto, metadata)
-    await this.timeClock.ensureEmployeeHasActiveShiftToday(employee.id, MovementKind.SALARY_ADVANCE, {
+    await this.timeClock.ensureEmployeeHasActiveShift(employee.id, MovementKind.SALARY_ADVANCE, {
       ...metadata,
       userId: approver.id,
       device: `time-clock:${device.id}`,

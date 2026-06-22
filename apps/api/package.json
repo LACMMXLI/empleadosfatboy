@@ -11,6 +11,7 @@
     "test:scope:employees": "ts-node src/employees/employees.service.scope.spec.ts",
     "test:payroll:accounting": "ts-node src/payroll/payroll.service.accounting.spec.ts",
     "test:time-clock:advance": "ts-node src/movements/movements.service.time-clock-advance.spec.ts",
+    "test:time-clock:overnight": "ts-node src/time-clock/time-clock.service.overnight.spec.ts",
     "start": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
