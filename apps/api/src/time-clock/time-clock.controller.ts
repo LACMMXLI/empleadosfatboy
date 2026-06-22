@@ -76,6 +76,10 @@ class RegisterEntryDto {
 
   @IsEnum(TimeClockEventType)
   type!: TimeClockEventType
+
+  @IsOptional()
+  @IsString()
+  approverCode?: string
 }
 
 class RegisterDrinkDto {

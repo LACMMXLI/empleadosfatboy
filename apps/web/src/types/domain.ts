@@ -305,6 +305,20 @@ export type TimeClockEmployeeVerification = {
     statusLabel: string
     nextAction: TimeClockEventType
     allowedActions: TimeClockEventType[]
+    exitRequiresApproval: boolean
+    mealBreak: {
+      status: "NOT_STARTED" | "ON_BREAK" | "COMPLETED"
+      startedAt: {
+        occurredAt: string
+        localDate: string
+        localTime: string
+      } | null
+      endedAt: {
+        occurredAt: string
+        localDate: string
+        localTime: string
+      } | null
+    }
     activeSession?: {
       startedAt: string
       localDate: string

@@ -360,10 +360,11 @@ export const api = {
         body: JSON.stringify({ employeeCode })
       })
     },
-    registerEntry(payload: { employeeCode: string; type: TimeClockEventType; photo: Blob }) {
+    registerEntry(payload: { employeeCode: string; type: TimeClockEventType; photo: Blob; approverCode?: string }) {
       const formData = new FormData()
       formData.append("employeeCode", payload.employeeCode)
       formData.append("type", payload.type)
+      if (payload.approverCode) formData.append("approverCode", payload.approverCode)
       formData.append("photo", payload.photo, "checador.jpg")
       return timeClockFormRequest<{ ok: boolean; message: string; entry: TimeClockEntry }>("/time-clock/public/entries", formData)
     },

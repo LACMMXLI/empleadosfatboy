@@ -51,6 +51,7 @@ type UpdateDeviceInput = {
 type RegisterEntryInput = {
   employeeCode: string
   type: TimeClockEventType
+  approverCode?: string
 }
 
 type RegisterDrinkInput = {
@@ -529,13 +530,18 @@ export class TimeClockService {
         }
       })
     ])
-    const isOnBreak = Boolean(activeSession && lastEntry?.type === TimeClockEventType.BREAK_START)
+    const mealBreak = activeSession
+      ? await this.mealBreakState(employee.id, activeSession.startedAt)
+      : { status: "NOT_STARTED" as const, startedAt: null, endedAt: null }
+    const isOnBreak = mealBreak.status === "ON_BREAK"
     const attendanceState = isOnBreak ? "ON_BREAK" : activeSession ? "IN_SHIFT" : lastEntry?.type === TimeClockEventType.EXIT ? "EXITED" : "NO_RECORD"
     const allowedActions = !activeSession
       ? [TimeClockEventType.ENTRY]
       : isOnBreak
         ? [TimeClockEventType.BREAK_END]
-        : [TimeClockEventType.EXIT, TimeClockEventType.BREAK_START]
+        : mealBreak.status === "COMPLETED"
+          ? [TimeClockEventType.EXIT]
+          : [TimeClockEventType.BREAK_START, TimeClockEventType.EXIT]
 
     return {
       employee: {
@@ -553,6 +559,8 @@ export class TimeClockService {
         statusLabel: isOnBreak ? "En horario de comida" : activeSession ? "Jornada activa" : lastEntry?.type === TimeClockEventType.EXIT ? "Salida registrada" : "Sin entrada activa",
         nextAction: allowedActions[0],
         allowedActions,
+        exitRequiresApproval: Boolean(activeSession && mealBreak.status !== "COMPLETED"),
+        mealBreak,
         activeSession: activeSession
           ? {
               startedAt: activeSession.startedAt,
@@ -602,49 +610,15 @@ export class TimeClockService {
     }
     await this.loginThrottle.recordSuccess("time-clock", employeeThrottleId)
 
-    const approverThrottleId = `${device.id}:${metadata.ipAddress?.trim() || "unknown-ip"}`
-    await this.loginThrottle.assertCanAttempt("time-clock-advance-approver", approverThrottleId)
-    const approvers = await this.prisma.user.findMany({
-      where: {
-        branchId: device.branchId,
-        role: Role.ENCARGADO,
-        active: true,
-        approvalPinHash: { not: null }
-      },
-      select: { id: true, fullName: true, role: true, branchId: true, approvalPinHash: true }
-    })
-    if (!approvers.length) {
-      throw new BadRequestException("La sucursal no tiene un encargado con codigo de aprobacion configurado")
-    }
-
-    let approver: (typeof approvers)[number] | undefined
-    for (const candidate of approvers) {
-      if (candidate.approvalPinHash && await bcrypt.compare(approverCode, candidate.approvalPinHash)) {
-        approver = candidate
-        break
-      }
-    }
-    if (!approver) {
-      await this.loginThrottle.recordFailure("time-clock-advance-approver", approverThrottleId, metadata)
-      await this.audit.log({
-        action: AuditAction.BLOCKED,
-        entity: "Movement",
-        affectedEmployeeId: employee.id,
-        newValue: this.toJson({
-          reason: "INVALID_BRANCH_MANAGER_APPROVAL_CODE",
-          source: "time-clock-salary-advance",
-          deviceId: device.id,
-          branchId: device.branchId
-        }),
-        ipAddress: metadata.ipAddress
-      })
-      throw new BadRequestException("Codigo del encargado invalido")
-    }
-    await this.loginThrottle.recordSuccess("time-clock-advance-approver", approverThrottleId)
-
-    const { approvalPinHash, ...safeApprover } = approver
-    void approvalPinHash
-    return { device, employee, approver: safeApprover }
+    const approver = await this.verifyBranchManagerApprovalCode(
+      device,
+      employee,
+      approverCode,
+      metadata,
+      "time-clock-salary-advance",
+      "Movement"
+    )
+    return { device, employee, approver }
   }
 
   async registerEntry(
@@ -673,7 +647,17 @@ export class TimeClockService {
     const now = new Date()
     const local = this.localParts(now)
 
-    await this.assertEntryAllowed(employee.id, input.type)
+    const entryRule = await this.assertEntryAllowed(employee.id, input.type)
+    const approvedBy = entryRule.requiresManagerApproval
+      ? await this.verifyBranchManagerApprovalCode(
+          device,
+          employee,
+          input.approverCode,
+          metadata,
+          "time-clock-exit-without-meal",
+          "TimeClockEntry"
+        )
+      : null
     await this.assertMinimumGap(employee.id, now)
     const evidence = await this.files.uploadTimeClockEvidence(photo, employee.branchId, metadata.ipAddress)
 
@@ -744,7 +728,15 @@ export class TimeClockService {
             entity: "TimeClockEntry",
             entityId: entry.id,
             affectedEmployeeId: employee.id,
-            newValue: this.toJson({ entryId: entry.id, sessionId: session.id, type: input.type, deviceId: device.id }),
+            userId: approvedBy?.id,
+            newValue: this.toJson({
+              entryId: entry.id,
+              sessionId: session.id,
+              type: input.type,
+              deviceId: device.id,
+              approvedById: approvedBy?.id,
+              approvalReason: approvedBy ? "EXIT_WITHOUT_COMPLETED_MEAL_BREAK" : undefined
+            }),
             ipAddress: metadata.ipAddress
           }
         })
@@ -1354,17 +1346,13 @@ export class TimeClockService {
   }
 
   private async assertEntryAllowed(employeeId: string, type: TimeClockEventType) {
-    const [activeSession, lastEntry] = await Promise.all([
-      this.prisma.workSession.findFirst({
-        where: { employeeId, status: WorkSessionStatus.ACTIVE },
-        select: { id: true }
-      }),
-      this.prisma.timeClockEntry.findFirst({
-        where: { employeeId, status: { in: [TimeClockEntryStatus.VALID, TimeClockEntryStatus.MANUAL] } },
-        orderBy: { occurredAt: "desc" },
-        select: { type: true }
-      })
-    ])
+    const activeSession = await this.prisma.workSession.findFirst({
+      where: { employeeId, status: WorkSessionStatus.ACTIVE },
+      select: { id: true, startedAt: true }
+    })
+    const mealBreak = activeSession
+      ? await this.mealBreakState(employeeId, activeSession.startedAt)
+      : { status: "NOT_STARTED" as const, startedAt: null, endedAt: null }
 
     if (type === TimeClockEventType.ENTRY && activeSession) {
       throw new BadRequestException("El empleado ya tiene una entrada activa")
@@ -1372,18 +1360,108 @@ export class TimeClockService {
     if (type === TimeClockEventType.EXIT && !activeSession) {
       throw new BadRequestException("No existe entrada activa para registrar salida")
     }
-    if (type === TimeClockEventType.EXIT && lastEntry?.type === TimeClockEventType.BREAK_START) {
+    if (type === TimeClockEventType.EXIT && mealBreak.status === "ON_BREAK") {
       throw new BadRequestException("Registra la entrada de comida antes de finalizar la jornada")
     }
     if (type === TimeClockEventType.BREAK_START && !activeSession) {
       throw new BadRequestException("Debes registrar entrada antes de salir a comida")
     }
-    if (type === TimeClockEventType.BREAK_START && lastEntry?.type === TimeClockEventType.BREAK_START) {
+    if (type === TimeClockEventType.BREAK_START && mealBreak.status === "ON_BREAK") {
       throw new BadRequestException("La salida de comida ya esta registrada")
     }
-    if (type === TimeClockEventType.BREAK_END && (!activeSession || lastEntry?.type !== TimeClockEventType.BREAK_START)) {
+    if (type === TimeClockEventType.BREAK_START && mealBreak.status === "COMPLETED") {
+      throw new BadRequestException("El horario de comida de esta jornada ya fue completado")
+    }
+    if (type === TimeClockEventType.BREAK_END && (!activeSession || mealBreak.status !== "ON_BREAK")) {
       throw new BadRequestException("No existe una salida de comida pendiente")
     }
+
+    return {
+      requiresManagerApproval: type === TimeClockEventType.EXIT && mealBreak.status !== "COMPLETED"
+    }
+  }
+
+  private async mealBreakState(employeeId: string, sessionStartedAt: Date) {
+    const entries = await this.prisma.timeClockEntry.findMany({
+      where: {
+        employeeId,
+        occurredAt: { gte: sessionStartedAt },
+        type: { in: [TimeClockEventType.BREAK_START, TimeClockEventType.BREAK_END] },
+        status: { in: [TimeClockEntryStatus.VALID, TimeClockEntryStatus.MANUAL] }
+      },
+      orderBy: { occurredAt: "asc" },
+      select: { type: true, occurredAt: true, localDate: true, localTime: true }
+    })
+    const startedAt = entries.find((entry) => entry.type === TimeClockEventType.BREAK_START) ?? null
+    const endedAt = startedAt
+      ? entries.find((entry) => entry.type === TimeClockEventType.BREAK_END && entry.occurredAt >= startedAt.occurredAt) ?? null
+      : null
+
+    return {
+      status: endedAt ? "COMPLETED" as const : startedAt ? "ON_BREAK" as const : "NOT_STARTED" as const,
+      startedAt: startedAt
+        ? { occurredAt: startedAt.occurredAt, localDate: startedAt.localDate, localTime: startedAt.localTime }
+        : null,
+      endedAt: endedAt
+        ? { occurredAt: endedAt.occurredAt, localDate: endedAt.localDate, localTime: endedAt.localTime }
+        : null
+    }
+  }
+
+  private async verifyBranchManagerApprovalCode(
+    device: { id: string; branchId: string },
+    employee: { id: string },
+    rawApproverCode: string | undefined,
+    metadata: RequestMetadata,
+    source: string,
+    entity: "Movement" | "TimeClockEntry"
+  ) {
+    const approverCode = this.normalizeEmployeeCode(rawApproverCode ?? "")
+    if (approverCode.length !== 6) throw new BadRequestException("Codigo del encargado invalido")
+
+    const approverThrottleId = `${device.id}:${metadata.ipAddress?.trim() || "unknown-ip"}`
+    await this.loginThrottle.assertCanAttempt("time-clock-manager-approver", approverThrottleId)
+    const approvers = await this.prisma.user.findMany({
+      where: {
+        branchId: device.branchId,
+        role: Role.ENCARGADO,
+        active: true,
+        approvalPinHash: { not: null }
+      },
+      select: { id: true, fullName: true, role: true, branchId: true, approvalPinHash: true }
+    })
+    if (!approvers.length) {
+      throw new BadRequestException("La sucursal no tiene un encargado con codigo de aprobacion configurado")
+    }
+
+    let approver: (typeof approvers)[number] | undefined
+    for (const candidate of approvers) {
+      if (candidate.approvalPinHash && await bcrypt.compare(approverCode, candidate.approvalPinHash)) {
+        approver = candidate
+        break
+      }
+    }
+    if (!approver) {
+      await this.loginThrottle.recordFailure("time-clock-manager-approver", approverThrottleId, metadata)
+      await this.audit.log({
+        action: AuditAction.BLOCKED,
+        entity,
+        affectedEmployeeId: employee.id,
+        newValue: this.toJson({
+          reason: "INVALID_BRANCH_MANAGER_APPROVAL_CODE",
+          source,
+          deviceId: device.id,
+          branchId: device.branchId
+        }),
+        ipAddress: metadata.ipAddress
+      })
+      throw new BadRequestException("Codigo del encargado invalido")
+    }
+    await this.loginThrottle.recordSuccess("time-clock-manager-approver", approverThrottleId)
+
+    const { approvalPinHash, ...safeApprover } = approver
+    void approvalPinHash
+    return safeApprover
   }
 
   private timeClockEventLabel(type: TimeClockEventType) {
