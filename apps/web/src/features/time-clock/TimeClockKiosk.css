@@ -305,34 +305,46 @@
 
 .timeclock-secondary-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .timeclock-utility-action {
+  width: 100%;
   min-width: 0;
-  min-height: 52px;
+  min-height: 58px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
-  background: #151f30;
-  padding: 8px 10px;
-  color: #e2e8f0;
+  padding: 8px 12px;
+  color: #fff;
   text-align: left;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.1), 0 10px 24px rgba(0, 0, 0, 0.18);
+  transition: transform 140ms ease, filter 140ms ease;
 }
 
-.timeclock-utility-action > svg { width: 20px; flex: 0 0 auto; }
 .timeclock-utility-action > span { min-width: 0; display: grid; gap: 2px; }
+.timeclock-utility-action .timeclock-utility-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.timeclock-utility-icon svg { width: 21px; height: 21px; }
 .timeclock-utility-action strong,
 .timeclock-utility-action small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.timeclock-utility-action strong { font-size: 11px; font-weight: 850; }
-.timeclock-utility-action small { color: #7f8da3; font-size: 9px; font-weight: 700; }
-.timeclock-utility-action.drink > svg { color: #c4b5fd; }
-.timeclock-utility-action.advance > svg { color: #fcd34d; }
+.timeclock-utility-action strong { font-size: 13px; font-weight: 900; }
+.timeclock-utility-action small { color: rgba(255, 255, 255, 0.72); font-size: 10px; font-weight: 700; }
+.timeclock-utility-action.drink { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
+.timeclock-utility-action.advance { background: linear-gradient(135deg, #f59e0b, #c65d08); }
+.timeclock-utility-action:not(:disabled):active { transform: scale(0.985); }
 .timeclock-utility-action:disabled { opacity: 0.28; filter: grayscale(0.8); }
 
 .timeclock-modal-error {

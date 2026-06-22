@@ -781,7 +781,8 @@ export function TimeClockKiosk() {
 
                 <div className="timeclock-secondary-actions">
                   <button type="button" className="timeclock-utility-action drink" disabled={!canRegisterDrink} onClick={handleRegisterDrink}>
-                    <Coffee /><span><strong>Registrar bebida</strong><small>{money.format(beveragePrice)}</small></span>
+                    <span className="timeclock-utility-icon"><Coffee /></span>
+                    <span><strong>Registrar bebida</strong><small>Consumo interno · {money.format(beveragePrice)}</small></span>
                   </button>
                   <button
                     type="button"
@@ -789,7 +790,8 @@ export function TimeClockKiosk() {
                     disabled={!canRequestAdvance}
                     onClick={() => { playClick(); markSessionActivity(); setAdvanceAmount(""); setApproverCode(""); setAdvanceOpen(true) }}
                   >
-                    <Banknote /><span><strong>Solicitar adelanto</strong><small>Cantidad personalizada</small></span>
+                    <span className="timeclock-utility-icon"><Banknote /></span>
+                    <span><strong>Adelanto de sueldo</strong><small>Ingresa una cantidad personalizada</small></span>
                   </button>
                 </div>
               </aside>
