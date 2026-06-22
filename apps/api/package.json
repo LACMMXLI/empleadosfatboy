@@ -12,6 +12,7 @@
     "test:payroll:accounting": "ts-node src/payroll/payroll.service.accounting.spec.ts",
     "test:time-clock:advance": "ts-node src/movements/movements.service.time-clock-advance.spec.ts",
     "test:time-clock:overnight": "ts-node src/time-clock/time-clock.service.overnight.spec.ts",
+    "test:time-clock:sequence": "ts-node src/time-clock/time-clock.service.sequence.spec.ts",
     "start": "node dist/main.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
