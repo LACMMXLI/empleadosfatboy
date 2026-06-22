@@ -721,18 +721,22 @@ export function TimeClockKiosk() {
         ) : (
           <div className="timeclock-employee-view">
             <section className="timeclock-employee-heading">
-              <div className="timeclock-employee-avatar"><UserRound /></div>
-              <div>
-                <span className="timeclock-access-eyebrow">Sesión del empleado</span>
-                <h2>{verifiedEmployee.fullName}</h2>
-                <p>{verifiedEmployee.position} · {verifiedEmployee.branch.name}</p>
+              <div className="timeclock-employee-identity">
+                <div className="timeclock-employee-avatar"><UserRound /></div>
+                <div>
+                  <span className="timeclock-access-eyebrow">Empleado verificado</span>
+                  <h2>{verifiedEmployee.fullName}</h2>
+                  <p>{verifiedEmployee.position} · {verifiedEmployee.branch.name}</p>
+                </div>
               </div>
-              <div className={`timeclock-employee-state ${verifiedEmployee.attendance.state.toLowerCase()}`}>
-                <span />{verifiedEmployee.attendance.statusLabel}
+              <div className="timeclock-employee-heading-actions">
+                <div className={`timeclock-employee-state ${verifiedEmployee.attendance.state.toLowerCase()}`}>
+                  <span />{verifiedEmployee.attendance.statusLabel}
+                </div>
+                <button type="button" className="timeclock-employee-back" onClick={() => { playClick(); clearEmployeeSession() }}>
+                  <ArrowLeft /> Salir
+                </button>
               </div>
-              <button type="button" className="timeclock-employee-back" onClick={() => { playClick(); clearEmployeeSession() }}>
-                <ArrowLeft /> Cerrar sesión
-              </button>
             </section>
 
             <div className="timeclock-employee-dashboard">
