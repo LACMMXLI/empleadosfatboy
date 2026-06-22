@@ -391,7 +391,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
                     {employeeHistory.data.entries.map((entry) => (
                       <div key={entry.id} className="employee-history-entry">
                         <div>
-                          <strong>{entry.type === "ENTRY" ? "Entrada" : "Salida"} · {entry.localDate} {entry.localTime}</strong>
+                          <strong>{timeClockEntryLabel(entry.type)} · {entry.localDate} {entry.localTime}</strong>
                           <span>{entry.status === "MANUAL" ? "Manual" : "Checador"} · {entry.device?.name ?? entry.createdByUser?.fullName ?? "Sin dispositivo"} · {entry.branch?.name ?? "Sucursal"}</span>
                           {entry.notes && <span>{entry.notes}</span>}
                         </div>
@@ -652,6 +652,8 @@ export function AttendanceAdmin({ user }: { user?: User }) {
               <select className="form-select" value={adjustment.type} onChange={(event) => setAdjustment((current) => ({ ...current, type: event.target.value as TimeClockEventType }))}>
                 <option value="ENTRY">Entrada</option>
                 <option value="EXIT">Salida</option>
+                <option value="BREAK_START">Salida de comida</option>
+                <option value="BREAK_END">Entrada de comida</option>
               </select>
               <input className="form-input" type="datetime-local" value={adjustment.occurredAt} onChange={(event) => setAdjustment((current) => ({ ...current, occurredAt: event.target.value }))} />
             </div>
@@ -768,6 +770,16 @@ function formatDateTime(value?: string | null) {
     dateStyle: "short",
     timeStyle: "short"
   }).format(new Date(value))
+}
+
+function timeClockEntryLabel(type: TimeClockEventType) {
+  const labels: Record<TimeClockEventType, string> = {
+    ENTRY: "Entrada",
+    EXIT: "Salida",
+    BREAK_START: "Salida de comida",
+    BREAK_END: "Entrada de comida"
+  }
+  return labels[type]
 }
 
 function updateScheduleDay(

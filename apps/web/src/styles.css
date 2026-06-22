@@ -87,6 +87,326 @@
   }
 }
 
+@layer components {
+  .timeclock-shell-kiosk .timeclock-panel-kiosk {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: clamp(0.75rem, 2vh, 1.25rem);
+  }
+
+  @media (max-width: 980px) {
+    .timeclock-shell-kiosk .timeclock-kiosk-header {
+      grid-template-columns: minmax(14rem, 1fr) minmax(16rem, 1fr) minmax(12rem, 1fr);
+    }
+
+    .timeclock-shell-kiosk .timeclock-panel-kiosk {
+      height: auto;
+      min-height: 100svh;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .timeclock-shell-kiosk .timeclock-kiosk-header {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .timeclock-shell-kiosk.employee-session .timeclock-kiosk-header {
+      grid-template-columns: minmax(12rem, 1fr) minmax(15rem, 1fr) auto;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .timeclock-shell-kiosk.employee-session .timeclock-kiosk-header {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .timeclock-shell-kiosk.employee-session .timeclock-kiosk-time-block {
+      display: none;
+    }
+  }
+}
+
+@layer components {
+  /* Two-step time clock: public PIN view -> private employee action view. */
+  .timeclock-panel-kiosk {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: clamp(0.75rem, 2vh, 1.25rem);
+  }
+
+  .timeclock-access-view {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(18rem, 0.9fr) minmax(22rem, 30rem);
+    align-items: center;
+    justify-content: center;
+    gap: clamp(2rem, 7vw, 7rem);
+    padding: clamp(0.5rem, 3vh, 2rem) clamp(1rem, 6vw, 5rem);
+  }
+
+  .timeclock-access-intro {
+    max-width: 38rem;
+  }
+
+  .timeclock-access-eyebrow {
+    display: block;
+    color: #9fe870;
+    font-size: clamp(0.72rem, 1.7vh, 0.92rem);
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .timeclock-access-clock {
+    margin-top: clamp(0.6rem, 2vh, 1.25rem);
+    color: #fff;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: clamp(4rem, 12vw, 8.5rem);
+    font-weight: 900;
+    letter-spacing: -0.07em;
+    line-height: 0.9;
+  }
+
+  .timeclock-access-date {
+    margin-top: 1rem;
+    color: #e2e8f0;
+    font-size: clamp(1.05rem, 2.6vw, 1.6rem);
+    font-weight: 750;
+    text-transform: capitalize;
+  }
+
+  .timeclock-access-intro p {
+    max-width: 30rem;
+    margin: 1.25rem 0 0;
+    color: #94a3b8;
+    font-size: clamp(0.9rem, 2vw, 1.12rem);
+    line-height: 1.5;
+  }
+
+  .timeclock-access-card {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto auto auto minmax(18rem, 1fr) auto;
+    gap: clamp(0.55rem, 1.4vh, 0.9rem);
+    width: 100%;
+    max-height: 100%;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 1.5rem;
+    background: rgba(15, 23, 42, 0.78);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.36);
+    padding: clamp(0.9rem, 2vh, 1.35rem);
+    text-align: center;
+  }
+
+  .timeclock-access-user,
+  .timeclock-employee-avatar {
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(159, 232, 112, 0.12);
+    color: #9fe870;
+  }
+
+  .timeclock-access-user {
+    width: clamp(3rem, 7vh, 4rem);
+    height: clamp(3rem, 7vh, 4rem);
+    justify-self: center;
+  }
+
+  .timeclock-access-user svg { width: 55%; height: 55%; }
+
+  .timeclock-access-card .timeclock-kiosk-keypad {
+    min-height: 18rem;
+  }
+
+  .timeclock-access-card .timeclock-kiosk-key {
+    min-height: 3.5rem;
+    border-radius: 0.8rem;
+    background: #1b2636;
+    font-size: clamp(1.4rem, 4vh, 2.15rem);
+    transition: transform 120ms ease, background 120ms ease;
+  }
+
+  .timeclock-access-card .timeclock-kiosk-key:not(:disabled):active {
+    background: #334155;
+    transform: scale(0.96);
+  }
+
+  .timeclock-employee-view {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .timeclock-employee-heading {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 1rem;
+    background: rgba(15, 23, 42, 0.64);
+    padding: 0.8rem 1rem;
+  }
+
+  .timeclock-employee-avatar {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .timeclock-employee-heading h2,
+  .timeclock-employee-heading p,
+  .timeclock-employee-actions h3,
+  .timeclock-employee-summary-card h3 {
+    margin: 0;
+  }
+
+  .timeclock-employee-heading h2 {
+    overflow: hidden;
+    color: #f8fafc;
+    font-size: clamp(1.15rem, 3vh, 1.7rem);
+    font-weight: 950;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .timeclock-employee-heading p {
+    margin-top: 0.2rem;
+    color: #94a3b8;
+    font-size: 0.86rem;
+  }
+
+  .timeclock-employee-back {
+    min-height: 2.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    border-radius: 0.7rem;
+    background: #111827;
+    padding: 0 0.85rem;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    font-weight: 850;
+  }
+
+  .timeclock-employee-back svg { width: 1rem; }
+
+  .timeclock-employee-content {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(28rem, 1.35fr) minmax(20rem, 0.9fr);
+    gap: 1rem;
+  }
+
+  .timeclock-employee-actions,
+  .timeclock-employee-summary-card {
+    min-height: 0;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 1rem;
+    background: rgba(15, 23, 42, 0.62);
+    padding: clamp(0.8rem, 1.8vh, 1.15rem);
+  }
+
+  .timeclock-employee-actions {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    gap: 0.7rem;
+  }
+
+  .timeclock-employee-actions h3,
+  .timeclock-employee-summary-card h3 {
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .timeclock-action-grid {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .timeclock-action-button {
+    min-width: 0;
+    min-height: 6.5rem;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 0.45rem;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 1rem;
+    background: #172033;
+    color: #fff;
+    padding: 0.7rem;
+    transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
+  }
+
+  .timeclock-action-button > span {
+    width: clamp(2.5rem, 6vh, 3.5rem);
+    height: clamp(2.5rem, 6vh, 3.5rem);
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .timeclock-action-button svg { width: 55%; height: 55%; }
+  .timeclock-action-button strong { font-size: clamp(0.82rem, 2.1vh, 1.05rem); font-weight: 950; }
+  .timeclock-action-button small { color: rgba(255,255,255,0.7); font-size: 0.7rem; font-weight: 700; }
+  .timeclock-action-button.entry { background: linear-gradient(145deg, #207544, #14532d); }
+  .timeclock-action-button.exit { background: linear-gradient(145deg, #b4232c, #7f1d1d); }
+  .timeclock-action-button.meal-out { background: linear-gradient(145deg, #b96810, #78350f); }
+  .timeclock-action-button.meal-in { background: linear-gradient(145deg, #087b73, #134e4a); }
+  .timeclock-action-button.drink { background: linear-gradient(145deg, #713bb0, #4c1d95); }
+  .timeclock-action-button.advance { background: linear-gradient(145deg, #b58a13, #713f12); }
+  .timeclock-action-button:not(:disabled):active { transform: scale(0.98); }
+  .timeclock-action-button:disabled { opacity: 0.25; filter: grayscale(0.8); }
+
+  .timeclock-employee-summary-card {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0.7rem;
+    overflow: hidden;
+  }
+
+  .timeclock-employee-summary-card .timeclock-kiosk-employee-summary {
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+
+  .timeclock-kiosk-attendance-pill.on_break {
+    border-color: rgba(251, 191, 36, 0.45);
+    background: rgba(146, 64, 14, 0.38);
+    color: #fde68a;
+  }
+
+  @media (max-width: 900px) {
+    .timeclock-panel-kiosk { height: auto; min-height: 100svh; overflow: auto; }
+    .timeclock-access-view,
+    .timeclock-employee-content { grid-template-columns: 1fr; }
+    .timeclock-access-intro { text-align: center; justify-self: center; }
+    .timeclock-access-intro p { margin-inline: auto; }
+    .timeclock-access-card { max-width: 30rem; justify-self: center; }
+    .timeclock-employee-content { min-height: 50rem; }
+  }
+
+  @media (max-width: 560px) {
+    .timeclock-kiosk-header { grid-template-columns: minmax(0, 1fr) auto; }
+    .timeclock-kiosk-header > div:empty,
+    .timeclock-kiosk-authorized span,
+    .timeclock-kiosk-device-name { display: none; }
+    .timeclock-access-view { padding: 0.5rem 0; gap: 1.5rem; }
+    .timeclock-access-clock { font-size: clamp(3.8rem, 20vw, 6rem); }
+    .timeclock-employee-heading { grid-template-columns: auto minmax(0, 1fr); }
+    .timeclock-employee-back { grid-column: 1 / -1; justify-content: center; }
+    .timeclock-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(7rem, 1fr)); }
+  }
+}
+
 /* =============================================
    ADMIN SHELL
    ============================================= */

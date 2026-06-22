@@ -529,7 +529,13 @@ export class TimeClockService {
         }
       })
     ])
-    const attendanceState = activeSession ? "IN_SHIFT" : lastEntry?.type === TimeClockEventType.EXIT ? "EXITED" : "NO_RECORD"
+    const isOnBreak = Boolean(activeSession && lastEntry?.type === TimeClockEventType.BREAK_START)
+    const attendanceState = isOnBreak ? "ON_BREAK" : activeSession ? "IN_SHIFT" : lastEntry?.type === TimeClockEventType.EXIT ? "EXITED" : "NO_RECORD"
+    const allowedActions = !activeSession
+      ? [TimeClockEventType.ENTRY]
+      : isOnBreak
+        ? [TimeClockEventType.BREAK_END]
+        : [TimeClockEventType.EXIT, TimeClockEventType.BREAK_START]
 
     return {
       employee: {
@@ -544,8 +550,9 @@ export class TimeClockService {
       },
       attendance: {
         state: attendanceState,
-        statusLabel: activeSession ? "Jornada activa" : lastEntry?.type === TimeClockEventType.EXIT ? "Salida registrada" : "Sin entrada activa",
-        nextAction: activeSession ? TimeClockEventType.EXIT : TimeClockEventType.ENTRY,
+        statusLabel: isOnBreak ? "En horario de comida" : activeSession ? "Jornada activa" : lastEntry?.type === TimeClockEventType.EXIT ? "Salida registrada" : "Sin entrada activa",
+        nextAction: allowedActions[0],
+        allowedActions,
         activeSession: activeSession
           ? {
               startedAt: activeSession.startedAt,
@@ -709,7 +716,7 @@ export class TimeClockService {
               status: WorkSessionStatus.ACTIVE
             }
           })
-        } else {
+        } else if (input.type === TimeClockEventType.EXIT) {
           const activeSession = await tx.workSession.findFirst({
             where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
             orderBy: { startedAt: "desc" }
@@ -723,6 +730,11 @@ export class TimeClockService {
               status: WorkSessionStatus.CLOSED,
               totalMinutes: this.minutesBetween(activeSession.startedAt, now)
             }
+          })
+        } else {
+          session = await tx.workSession.findFirstOrThrow({
+            where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
+            orderBy: { startedAt: "desc" }
           })
         }
 
@@ -742,7 +754,7 @@ export class TimeClockService {
 
       return {
         ok: true,
-        message: input.type === TimeClockEventType.ENTRY ? "Entrada registrada" : "Salida registrada",
+        message: this.timeClockEventLabel(input.type),
         entry: result.entry,
         session: result.session
       }
@@ -1173,6 +1185,27 @@ export class TimeClockService {
         if (!activeSession) throw new BadRequestException("No existe entrada activa para registrar salida manual")
       }
 
+      if (input.type === TimeClockEventType.BREAK_START || input.type === TimeClockEventType.BREAK_END) {
+        const [activeSession, lastEntry] = await Promise.all([
+          tx.workSession.findFirst({
+            where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
+            orderBy: { startedAt: "desc" }
+          }),
+          tx.timeClockEntry.findFirst({
+            where: { employeeId: employee.id, status: { in: [TimeClockEntryStatus.VALID, TimeClockEntryStatus.MANUAL] } },
+            orderBy: { occurredAt: "desc" },
+            select: { type: true }
+          })
+        ])
+        if (!activeSession) throw new BadRequestException("No existe una jornada activa")
+        if (input.type === TimeClockEventType.BREAK_START && lastEntry?.type === TimeClockEventType.BREAK_START) {
+          throw new BadRequestException("La salida de comida ya esta registrada")
+        }
+        if (input.type === TimeClockEventType.BREAK_END && lastEntry?.type !== TimeClockEventType.BREAK_START) {
+          throw new BadRequestException("No existe una salida de comida pendiente")
+        }
+      }
+
       const entry = await tx.timeClockEntry.create({
         data: {
           employeeId: employee.id,
@@ -1203,7 +1236,7 @@ export class TimeClockService {
             notes: input.notes?.trim() || undefined
           }
         })
-      } else {
+      } else if (input.type === TimeClockEventType.EXIT) {
         const activeSession = await tx.workSession.findFirstOrThrow({
           where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
           orderBy: { startedAt: "desc" }
@@ -1219,6 +1252,12 @@ export class TimeClockService {
             notes: input.notes?.trim() || activeSession.notes
           }
         })
+      } else {
+        session = await tx.workSession.findFirstOrThrow({
+          where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
+          orderBy: { startedAt: "desc" }
+        })
+        oldValue = this.toJson(session)
       }
 
       const adjustment = await tx.attendanceAdjustment.create({
@@ -1317,10 +1356,17 @@ export class TimeClockService {
   }
 
   private async assertEntryAllowed(employeeId: string, type: TimeClockEventType) {
-    const activeSession = await this.prisma.workSession.findFirst({
-      where: { employeeId, status: WorkSessionStatus.ACTIVE },
-      select: { id: true }
-    })
+    const [activeSession, lastEntry] = await Promise.all([
+      this.prisma.workSession.findFirst({
+        where: { employeeId, status: WorkSessionStatus.ACTIVE },
+        select: { id: true }
+      }),
+      this.prisma.timeClockEntry.findFirst({
+        where: { employeeId, status: { in: [TimeClockEntryStatus.VALID, TimeClockEntryStatus.MANUAL] } },
+        orderBy: { occurredAt: "desc" },
+        select: { type: true }
+      })
+    ])
 
     if (type === TimeClockEventType.ENTRY && activeSession) {
       throw new BadRequestException("El empleado ya tiene una entrada activa")
@@ -1328,6 +1374,28 @@ export class TimeClockService {
     if (type === TimeClockEventType.EXIT && !activeSession) {
       throw new BadRequestException("No existe entrada activa para registrar salida")
     }
+    if (type === TimeClockEventType.EXIT && lastEntry?.type === TimeClockEventType.BREAK_START) {
+      throw new BadRequestException("Registra la entrada de comida antes de finalizar la jornada")
+    }
+    if (type === TimeClockEventType.BREAK_START && !activeSession) {
+      throw new BadRequestException("Debes registrar entrada antes de salir a comida")
+    }
+    if (type === TimeClockEventType.BREAK_START && lastEntry?.type === TimeClockEventType.BREAK_START) {
+      throw new BadRequestException("La salida de comida ya esta registrada")
+    }
+    if (type === TimeClockEventType.BREAK_END && (!activeSession || lastEntry?.type !== TimeClockEventType.BREAK_START)) {
+      throw new BadRequestException("No existe una salida de comida pendiente")
+    }
+  }
+
+  private timeClockEventLabel(type: TimeClockEventType) {
+    const labels: Record<TimeClockEventType, string> = {
+      ENTRY: "Entrada registrada",
+      EXIT: "Salida registrada",
+      BREAK_START: "Salida de comida registrada",
+      BREAK_END: "Entrada de comida registrada"
+    }
+    return labels[type]
   }
 
   private async assertMinimumGap(employeeId: string, now: Date) {

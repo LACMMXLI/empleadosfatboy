@@ -87,6 +87,8 @@ enum IncidentStatus {
 enum TimeClockEventType {
   ENTRY
   EXIT
+  BREAK_START
+  BREAK_END
 }
 
 enum TimeClockEntryStatus {

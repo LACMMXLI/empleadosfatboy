@@ -1,7 +1,7 @@
 export type Role = "ADMINISTRADOR" | "GERENTE" | "ENCARGADO" | "CAJERO" | "EMPLEADO"
 export type SalaryType = "WEEKLY" | "BIWEEKLY" | "DAILY"
 export type PayrollStatus = "BORRADOR" | "GENERADA" | "PAGADA" | "CANCELADA"
-export type TimeClockEventType = "ENTRY" | "EXIT"
+export type TimeClockEventType = "ENTRY" | "EXIT" | "BREAK_START" | "BREAK_END"
 export type TimeClockEntryStatus = "VALID" | "MANUAL" | "VOIDED"
 export type WorkSessionStatus = "ACTIVE" | "CLOSED" | "ADJUSTED"
 export type TimeClockDeviceRequestStatus = "PENDING" | "AUTHORIZED" | "REJECTED" | "EXPIRED"
@@ -301,9 +301,10 @@ export type TimeClockEmployeeVerification = {
     branch: Pick<Branch, "id" | "name" | "code">
   }
   attendance: {
-    state: "IN_SHIFT" | "EXITED" | "NO_RECORD"
+    state: "IN_SHIFT" | "ON_BREAK" | "EXITED" | "NO_RECORD"
     statusLabel: string
     nextAction: TimeClockEventType
+    allowedActions: TimeClockEventType[]
     activeSession?: {
       startedAt: string
       localDate: string
