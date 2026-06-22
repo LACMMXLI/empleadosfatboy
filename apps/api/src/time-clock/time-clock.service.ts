@@ -1420,7 +1420,7 @@ export class TimeClockService {
     if (approverCode.length !== 6) throw new BadRequestException("Codigo del encargado invalido")
 
     const approverThrottleId = `${device.id}:${metadata.ipAddress?.trim() || "unknown-ip"}`
-    await this.loginThrottle.assertCanAttempt("time-clock-manager-approver", approverThrottleId)
+    await this.loginThrottle.assertCanAttempt("time-clock-advance-approver", approverThrottleId)
     const approvers = await this.prisma.user.findMany({
       where: {
         branchId: device.branchId,
@@ -1442,7 +1442,7 @@ export class TimeClockService {
       }
     }
     if (!approver) {
-      await this.loginThrottle.recordFailure("time-clock-manager-approver", approverThrottleId, metadata)
+      await this.loginThrottle.recordFailure("time-clock-advance-approver", approverThrottleId, metadata)
       await this.audit.log({
         action: AuditAction.BLOCKED,
         entity,
@@ -1457,7 +1457,7 @@ export class TimeClockService {
       })
       throw new BadRequestException("Codigo del encargado invalido")
     }
-    await this.loginThrottle.recordSuccess("time-clock-manager-approver", approverThrottleId)
+    await this.loginThrottle.recordSuccess("time-clock-advance-approver", approverThrottleId)
 
     const { approvalPinHash, ...safeApprover } = approver
     void approvalPinHash
