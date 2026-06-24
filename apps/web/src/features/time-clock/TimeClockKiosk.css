@@ -478,16 +478,16 @@
 
 .timeclock-advance-modal {
   box-sizing: border-box;
-  width: fit-content;
-  max-width: min(96vw, 980px);
+  width: fit-content !important;
+  max-width: min(96vw, 980px) !important;
   justify-items: center;
   gap: 0.85rem;
   padding: 1.15rem 1.25rem;
 }
 
 .timeclock-advance-modal.timeclock-exit-approval-modal {
-  width: fit-content;
-  max-width: min(96vw, 920px);
+  width: fit-content !important;
+  max-width: min(96vw, 920px) !important;
 }
 
 .timeclock-advance-heading {
@@ -517,9 +517,14 @@
   gap: 0.7rem;
 }
 
-.timeclock-advance-modal .timeclock-advance-amount,
-.timeclock-advance-modal .timeclock-advance-code {
+.timeclock-advance-modal .timeclock-advance-amount {
   border-color: rgba(251, 191, 36, 0.34);
+  background: rgba(15, 23, 42, 0.96) !important;
+  color: #f8fafc !important;
+}
+
+.timeclock-advance-modal .timeclock-advance-code {
+  border-color: rgba(148, 163, 184, 0.28);
   background: rgba(15, 23, 42, 0.96) !important;
   color: #f8fafc !important;
 }
