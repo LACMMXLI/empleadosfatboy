@@ -776,7 +776,7 @@ export function TimeClockKiosk() {
             <div className="timeclock-advance-modal timeclock-exit-approval-modal">
               <button className="timeclock-advance-close" type="button" onClick={() => { setExitApprovalOpen(false); setExitApproverCode("") }} disabled={isProcessing} aria-label="Cerrar"><X /></button>
               <div className="timeclock-advance-icon"><KeyRound /></div>
-              <div>
+              <div className="timeclock-advance-heading">
                 <h2 id="exit-approval-title">Autorizar salida sin comida</h2>
                 <p>{verifiedEmployee.fullName} no completó la secuencia de comida.</p>
               </div>
@@ -817,7 +817,7 @@ export function TimeClockKiosk() {
                 <X />
               </button>
               <div className="timeclock-advance-icon"><Banknote /></div>
-              <div>
+              <div className="timeclock-advance-heading">
                 <h2 id="advance-title">Adelanto de sueldo</h2>
                 <p>{verifiedEmployee.fullName} · {verifiedEmployee.branch.name}</p>
               </div>
