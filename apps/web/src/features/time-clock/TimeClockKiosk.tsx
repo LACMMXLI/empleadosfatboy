@@ -126,8 +126,9 @@ export function TimeClockKiosk() {
   const canRegisterExit = Boolean(canUseActions && allowedActions.includes("EXIT"))
   const canStartBreak = Boolean(canUseActions && allowedActions.includes("BREAK_START"))
   const canEndBreak = Boolean(canUseActions && allowedActions.includes("BREAK_END"))
-  const canRegisterDrink = Boolean(canUseActions && verifiedEmployee?.attendance.state === "IN_SHIFT")
-  const canRequestAdvance = canRegisterDrink
+  const canUseFinancialActions = Boolean(canUseActions && verifiedEmployee?.attendance.activeSession)
+  const canRegisterDrink = canUseFinancialActions
+  const canRequestAdvance = canUseFinancialActions
   const { playClick, playError, playSuccess } = useKioskSounds()
 
   const clearTimeoutRef = useCallback((ref: MutableRefObject<number | null>) => {
@@ -468,7 +469,7 @@ export function TimeClockKiosk() {
 
     try {
       const employee = await validateEmployeeCode()
-      if (employee.attendance.state !== "IN_SHIFT") {
+      if (!employee.attendance.activeSession) {
         throw new Error("La bebida requiere una jornada activa.")
       }
 
