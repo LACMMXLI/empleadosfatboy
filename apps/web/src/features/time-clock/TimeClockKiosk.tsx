@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { Dispatch, ReactNode, SetStateAction } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Banknote, CheckCircle2, Clock3, Coffee, Copy, KeyRound, LogIn, LogOut, Maximize, Minimize, RefreshCw, ShieldAlert, ShieldCheck, Utensils, UserRound, X } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
@@ -12,6 +12,7 @@ const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replac
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
 const KIOSK_PIN_LENGTH = 6
 const KIOSK_SESSION_TIMEOUT_MS = 20_000
+const PIN_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const
 
 type KioskStatus = "idle" | "validating_pin" | "capturing_photo" | "registering" | "success" | "error"
 type VerifiedEmployee = TimeClockEmployeeVerification["employee"] & {
@@ -89,9 +90,10 @@ function useKioskSounds() {
 export function TimeClockKiosk() {
   const queryClient = useQueryClient()
   const setupToken = useMemo(() => new URLSearchParams(window.location.search).get("token"), [])
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const statusResetTimeoutRef = useRef<number | null>(null)
+  const lastSuccessTimeoutRef = useRef<number | null>(null)
+  const messageTimeoutRef = useRef<number | null>(null)
   
   const [deviceToken, setDeviceToken] = useState(timeClockDeviceSession.token)
   const [requestToken, setRequestToken] = useState(() => {
@@ -103,11 +105,8 @@ export function TimeClockKiosk() {
   })
 
   const [employeeCode, setEmployeeCode] = useState("")
-  const [cameraError, setCameraError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
-  const [now, setNow] = useState<Date>(() => new Date())
 
   // States for the registration flow
   const [status, setStatus] = useState<KioskStatus>("idle")
@@ -131,6 +130,47 @@ export function TimeClockKiosk() {
   const canRequestAdvance = canRegisterDrink
   const { playClick, playError, playSuccess } = useKioskSounds()
 
+  const clearTimeoutRef = useCallback((ref: MutableRefObject<number | null>) => {
+    if (ref.current !== null) {
+      window.clearTimeout(ref.current)
+      ref.current = null
+    }
+  }, [])
+
+  const scheduleStatusReset = useCallback((delayMs: number, nextMessage = "Ingresa tu PIN para comenzar") => {
+    clearTimeoutRef(statusResetTimeoutRef)
+    statusResetTimeoutRef.current = window.setTimeout(() => {
+      statusResetTimeoutRef.current = null
+      setStatus("idle")
+      setStatusMessage(nextMessage)
+    }, delayMs)
+  }, [clearTimeoutRef])
+
+  const scheduleLastSuccessClear = useCallback((delayMs: number) => {
+    clearTimeoutRef(lastSuccessTimeoutRef)
+    lastSuccessTimeoutRef.current = window.setTimeout(() => {
+      lastSuccessTimeoutRef.current = null
+      setLastSuccess(null)
+    }, delayMs)
+  }, [clearTimeoutRef])
+
+  const scheduleMessageClear = useCallback((delayMs: number) => {
+    clearTimeoutRef(messageTimeoutRef)
+    messageTimeoutRef.current = window.setTimeout(() => {
+      messageTimeoutRef.current = null
+      setMessage(null)
+    }, delayMs)
+  }, [clearTimeoutRef])
+
+  const releaseCamera = useCallback((stream = streamRef.current) => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop())
+    }
+    if (!stream || streamRef.current === stream) {
+      streamRef.current = null
+    }
+  }, [])
+
   const markSessionActivity = useCallback(() => {
     setSessionActivityAt(Date.now())
   }, [])
@@ -146,6 +186,15 @@ export function TimeClockKiosk() {
     setExitApprovalOpen(false)
     setExitApproverCode("")
   }, [])
+
+  useEffect(() => {
+    return () => {
+      clearTimeoutRef(statusResetTimeoutRef)
+      clearTimeoutRef(lastSuccessTimeoutRef)
+      clearTimeoutRef(messageTimeoutRef)
+      releaseCamera()
+    }
+  }, [clearTimeoutRef, releaseCamera])
 
   // Fullscreen event listener
   useEffect(() => {
@@ -184,68 +233,6 @@ export function TimeClockKiosk() {
     refetchInterval: (query) => query.state.data?.status === "AUTHORIZED" ? false : 5000
   })
 
-  // Synchronize with server time via health check endpoint
-  useEffect(() => {
-    async function syncTime() {
-      try {
-        const start = Date.now()
-        const res = await fetch(`${API_URL}/health`)
-        if (res.ok) {
-          const data = await res.json()
-          const serverTime = new Date(data.timestamp).getTime()
-          const end = Date.now()
-          const latency = (end - start) / 2
-          const offset = serverTime - (Date.now() - latency)
-          setServerTimeOffset(offset)
-        }
-      } catch (err) {
-        console.error("Error syncing time with server:", err)
-      }
-    }
-    void syncTime()
-    const interval = setInterval(syncTime, 5 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Real-time clock tick
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(new Date())
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
-
-  const serverNow = useMemo(() => new Date(now.getTime() + serverTimeOffset), [now, serverTimeOffset])
-
-  const timeString = useMemo(() => {
-    try {
-      return new Intl.DateTimeFormat("es-MX", {
-        timeZone: "America/Tijuana",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false
-      }).format(serverNow)
-    } catch {
-      return serverNow.toTimeString().split(" ")[0]
-    }
-  }, [serverNow])
-
-  const dateString = useMemo(() => {
-    try {
-      const formatted = new Intl.DateTimeFormat("es-MX", {
-        timeZone: "America/Tijuana",
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      }).format(serverNow)
-      return formatted.charAt(0).toUpperCase() + formatted.slice(1)
-    } catch {
-      return serverNow.toLocaleDateString("es-MX")
-    }
-  }, [serverNow])
-
   const beveragePrice = 30
 
   // Device authorization status listener
@@ -258,54 +245,6 @@ export function TimeClockKiosk() {
   }, [deviceRequest.data?.status, queryClient, requestToken])
 
   useEffect(() => {
-    if (needsAuthorization) return
-    if (employeeCode.length !== KIOSK_PIN_LENGTH) {
-      setVerifiedEmployee(null)
-      if (status === "validating_pin") {
-        setStatus("idle")
-        setStatusMessage("Ingresa tu PIN para comenzar")
-      }
-      return
-    }
-
-    let cancelled = false
-    setVerifiedEmployee(null)
-    setStatus("validating_pin")
-    setStatusMessage("Validando PIN...")
-
-    api.timeClock.verifyEmployeeCode(employeeCode)
-      .then((result) => {
-        if (cancelled) return
-        setVerifiedEmployee({
-          ...result.employee,
-          attendance: result.attendance,
-          recentMovements: result.recentMovements
-        })
-        setSessionActivityAt(Date.now())
-        setStatus("idle")
-        setStatusMessage(`PIN confirmado: ${result.employee.fullName}`)
-        playSuccess()
-      })
-      .catch((error: Error) => {
-        if (cancelled) return
-        setVerifiedEmployee(null)
-        setStatus("error")
-        setStatusMessage(error.message || "PIN inválido")
-        playError()
-        window.setTimeout(() => {
-          if (cancelled) return
-          setEmployeeCode("")
-          setStatus("idle")
-          setStatusMessage("Ingresa tu PIN para comenzar")
-        }, 1600)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [employeeCode, needsAuthorization, playError, playSuccess])
-
-  useEffect(() => {
     if (!verifiedEmployee || isProcessing) return
     const timeout = window.setTimeout(() => {
       clearEmployeeSession("Sesión cerrada por inactividad. Ingresa tu PIN.")
@@ -313,50 +252,74 @@ export function TimeClockKiosk() {
     return () => window.clearTimeout(timeout)
   }, [clearEmployeeSession, isProcessing, sessionActivityAt, verifiedEmployee])
 
-  // Initialize and run the camera stream in background (hidden video element)
-  useEffect(() => {
-    let cancelled = false
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop())
-          return
-        }
-        streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play()
-        }
-        setCameraError(null)
-      } catch {
-        setCameraError("Cámara no disponible. Revisa permisos del navegador.")
-      }
-    }
-
-    if (hasToken && !device.error) void startCamera()
-    return () => {
-      cancelled = true
-      streamRef.current?.getTracks().forEach((track) => track.stop())
-      streamRef.current = null
-    }
-  }, [hasToken, device.error])
-
   async function capturePhotoOnce() {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas || video.readyState < 2) {
-      throw new Error("La cámara no está lista para capturar evidencia.")
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("Este equipo no permite abrir la cámara desde el navegador.")
     }
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height)
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82))
-    if (!blob) throw new Error("No se pudo procesar la fotografía de evidencia.")
-    return blob
+
+    let stream: MediaStream | null = null
+    const video = document.createElement("video")
+    const canvas = document.createElement("canvas")
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+      streamRef.current = stream
+      video.muted = true
+      video.playsInline = true
+      video.srcObject = stream
+      await video.play()
+      await new Promise((resolve) => window.setTimeout(resolve, 250))
+
+      if (video.readyState < 2) {
+        throw new Error("La cámara no está lista para capturar evidencia.")
+      }
+
+      canvas.width = video.videoWidth || 640
+      canvas.height = video.videoHeight || 480
+      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82))
+      if (!blob) throw new Error("No se pudo procesar la fotografía de evidencia.")
+      return blob
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("No se pudo capturar la fotografía de evidencia.")
+    } finally {
+      video.pause()
+      video.srcObject = null
+      releaseCamera(stream)
+    }
   }
 
-  const handleKeyPress = (key: string) => {
+  const toVerifiedEmployee = useCallback((result: TimeClockEmployeeVerification): VerifiedEmployee => ({
+    ...result.employee,
+    attendance: result.attendance,
+    recentMovements: result.recentMovements
+  }), [])
+
+  const actionUnavailableMessage = useCallback((type: TimeClockEventType, employee: VerifiedEmployee) => {
+    if (type === "ENTRY") return "El empleado ya tiene una jornada activa."
+    if (type === "EXIT") {
+      return employee.attendance.state === "ON_BREAK"
+        ? "Primero debe registrar el regreso de comida."
+        : "No existe una entrada activa para registrar salida."
+    }
+    if (type === "BREAK_START") return "No se puede iniciar comida en este momento."
+    return "No se puede regresar de comida en este momento."
+  }, [])
+
+  const validateEmployeeCode = useCallback(async () => {
+    if (needsAuthorization) throw new Error("Este dispositivo no está autorizado.")
+    if (employeeCode.length !== KIOSK_PIN_LENGTH) throw new Error("Ingresa un PIN válido de 6 dígitos.")
+
+    setStatus("validating_pin")
+    setStatusMessage("Validando PIN...")
+    const result = await api.timeClock.verifyEmployeeCode(employeeCode)
+    const employee = toVerifiedEmployee(result)
+    setVerifiedEmployee(employee)
+    setSessionActivityAt(Date.now())
+    return employee
+  }, [employeeCode, needsAuthorization, toVerifiedEmployee])
+
+  const handleKeyPress = useCallback((key: string) => {
     if (isProcessing) return
     playClick()
     markSessionActivity()
@@ -373,11 +336,32 @@ export function TimeClockKiosk() {
       setEmployeeCode((prev) => prev.slice(0, -1))
       setVerifiedEmployee(null)
     } else {
-      if (employeeCode.length < KIOSK_PIN_LENGTH) {
-        setEmployeeCode((prev) => prev + key)
-      }
+      setEmployeeCode((prev) => prev.length < KIOSK_PIN_LENGTH ? prev + key : prev)
+      setVerifiedEmployee(null)
     }
-  }
+  }, [isProcessing, markSessionActivity, playClick, status])
+
+  const handleOpenEmployeeOptions = useCallback(async () => {
+    if (isProcessing) return
+    playClick()
+    markSessionActivity()
+    releaseCamera()
+
+    try {
+      const employee = await validateEmployeeCode()
+      setStatus("idle")
+      setStatusMessage(`PIN confirmado: ${employee.fullName}`)
+      playSuccess()
+    } catch (error) {
+      releaseCamera()
+      setVerifiedEmployee(null)
+      setStatus("error")
+      setStatusMessage(error instanceof Error ? error.message : "PIN inválido")
+      setEmployeeCode("")
+      playError()
+      scheduleStatusReset(1800)
+    }
+  }, [isProcessing, markSessionActivity, playClick, playError, playSuccess, releaseCamera, scheduleStatusReset, validateEmployeeCode])
 
   const handleApprovalCodeKeyPress = (
     key: string,
@@ -399,46 +383,35 @@ export function TimeClockKiosk() {
   const handleRegister = async (type: TimeClockEventType, managerCode?: string) => {
     playClick()
     markSessionActivity()
-    if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
-      setStatus('error')
-      setStatusMessage("Ingresa un PIN válido para habilitar el registro.")
-      playError()
-      window.setTimeout(() => {
-        setStatus('idle')
-        setStatusMessage("Ingresa tu PIN para comenzar")
-      }, 4000)
-      return
-    }
-
-    setStatus('validating_pin')
-    setStatusMessage("Preparando registro...")
+    releaseCamera()
 
     try {
-      // 2. Prepare capturing photo state
-      setStatus('capturing_photo')
-      setStatusMessage(`Capturando evidencia para ${verifiedEmployee.fullName}...`)
-
-      // Brief delay to ensure camera stream frame is completely synced
-      await new Promise((resolve) => setTimeout(resolve, 300))
-
-      if (cameraError) {
-        throw new Error("Cámara sin permiso o no disponible. No se puede registrar asistencia.")
+      const employee = await validateEmployeeCode()
+      if (!employee.attendance.allowedActions.includes(type)) {
+        throw new Error(actionUnavailableMessage(type, employee))
       }
+      if (type === "EXIT" && employee.attendance.exitRequiresApproval && !managerCode) {
+        setExitApproverCode("")
+        setExitApprovalOpen(true)
+        setStatus("idle")
+        setStatusMessage("Ingresa el código del encargado para autorizar la salida.")
+        return
+      }
+
+      setStatus("capturing_photo")
+      setStatusMessage(`Abriendo cámara para ${employee.fullName}...`)
 
       const photo = await capturePhotoOnce()
 
-      // 3. Register assistant check-in/out
-      setStatus('registering')
+      setStatus("registering")
       setStatusMessage("Guardando registro de asistencia...")
 
       await api.timeClock.registerEntry({ employeeCode, type, photo, approverCode: managerCode })
 
-      // 4. Handle success
-      setStatus('success')
-      const successMsg = `${entryTypeLabel(type)} registrada - ${verifiedEmployee.fullName}`
+      setStatus("success")
+      const successMsg = `${entryTypeLabel(type)} registrada - ${employee.fullName}`
       setStatusMessage(successMsg)
 
-      // Time formatting for Mexican border
       const timeStr = new Intl.DateTimeFormat("es-MX", {
         timeZone: "America/Tijuana",
         hour: "2-digit",
@@ -447,59 +420,43 @@ export function TimeClockKiosk() {
       }).format(new Date())
 
       setLastSuccess({
-        employeeName: verifiedEmployee.fullName,
+        employeeName: employee.fullName,
         type,
         time: timeStr
       })
       playSuccess()
 
-      // Clean input automatically
       setEmployeeCode("")
       setVerifiedEmployee(null)
       setExitApprovalOpen(false)
       setExitApproverCode("")
 
-      // Reset status to idle after 6 seconds
-      window.setTimeout(() => {
-        setStatus('idle')
-        setStatusMessage("Ingresa tu PIN para comenzar")
-      }, 6000)
-
-      // Fade out last success after 10 seconds
-      window.setTimeout(() => {
-        setLastSuccess(null)
-      }, 10000)
+      scheduleStatusReset(6000)
+      scheduleLastSuccessClear(10000)
 
     } catch (error: any) {
-      setStatus('error')
+      releaseCamera()
+      setStatus("error")
       setStatusMessage(error.message || "Error al registrar asistencia")
       playError()
       setExitApproverCode("")
+      scheduleStatusReset(5000)
     }
   }
 
   const handleRegisterDrink = async () => {
     playClick()
     markSessionActivity()
-    if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
-      setStatus("error")
-      setStatusMessage("Ingresa un PIN válido para habilitar bebida.")
-      playError()
-      window.setTimeout(() => {
-        setStatus("idle")
-        setStatusMessage("Ingresa tu PIN para comenzar")
-      }, 4000)
-      return
-    }
+    releaseCamera()
 
     try {
-      setStatus("capturing_photo")
-      setStatusMessage(`Capturando evidencia para ${verifiedEmployee.fullName}...`)
-      await new Promise((resolve) => setTimeout(resolve, 300))
-
-      if (cameraError) {
-        throw new Error("Cámara sin permiso o no disponible. No se puede registrar bebida.")
+      const employee = await validateEmployeeCode()
+      if (employee.attendance.state !== "IN_SHIFT") {
+        throw new Error("La bebida requiere una jornada activa.")
       }
+
+      setStatus("capturing_photo")
+      setStatusMessage(`Abriendo cámara para ${employee.fullName}...`)
 
       const photo = await capturePhotoOnce()
 
@@ -528,24 +485,16 @@ export function TimeClockKiosk() {
       setEmployeeCode("")
       setVerifiedEmployee(null)
 
-      window.setTimeout(() => {
-        setStatus("idle")
-        setStatusMessage("Ingresa tu PIN para comenzar")
-      }, 6000)
-
-      window.setTimeout(() => {
-        setLastSuccess(null)
-      }, 10000)
+      scheduleStatusReset(6000)
+      scheduleLastSuccessClear(10000)
     } catch (error: any) {
+      releaseCamera()
       setStatus("error")
       setStatusMessage(error.message || "Error al registrar bebida")
       playError()
       setEmployeeCode("")
       setVerifiedEmployee(null)
-      window.setTimeout(() => {
-        setStatus("idle")
-        setStatusMessage("Ingresa tu PIN para comenzar")
-      }, 5000)
+      scheduleStatusReset(5000)
     }
   }
 
@@ -593,17 +542,15 @@ export function TimeClockKiosk() {
       playSuccess()
       setEmployeeCode("")
       setVerifiedEmployee(null)
-      window.setTimeout(() => {
-        setStatus("idle")
-        setStatusMessage("Ingresa tu PIN para comenzar")
-      }, 6000)
-      window.setTimeout(() => setLastSuccess(null), 10000)
+      scheduleStatusReset(6000)
+      scheduleLastSuccessClear(10000)
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "No se pudo registrar el adelanto"
       setStatus("error")
       setStatusMessage(errorMessage)
       setApproverCode("")
       playError()
+      scheduleStatusReset(5000)
     }
   }
 
@@ -620,7 +567,7 @@ export function TimeClockKiosk() {
     playClick()
     await navigator.clipboard?.writeText(code).catch(() => undefined)
     setMessage("Código copiado")
-    window.setTimeout(() => setMessage(null), 1800)
+    scheduleMessageClear(1800)
   }
 
   if (needsAuthorization) {
@@ -676,10 +623,7 @@ export function TimeClockKiosk() {
           </div>
 
           {verifiedEmployee ? (
-            <div className="timeclock-kiosk-time-block">
-              <div className="timeclock-kiosk-time">{timeString}</div>
-              <div className="timeclock-kiosk-date">{dateString}</div>
-            </div>
+            <KioskClockBlock variant="header" />
           ) : <div />}
 
           <div className="timeclock-kiosk-device-block">
@@ -709,8 +653,7 @@ export function TimeClockKiosk() {
             <section className="timeclock-access-intro">
               <img className="timeclock-access-logo" src={fatboyLogo} alt="Fatboy" />
               <span className="timeclock-access-eyebrow">Control de asistencia</span>
-              <div className="timeclock-access-clock">{timeString}</div>
-              <div className="timeclock-access-date">{dateString}</div>
+              <KioskClockBlock variant="access" />
               <p>Ingresa tu código personal para ver tus opciones.</p>
             </section>
 
@@ -725,15 +668,19 @@ export function TimeClockKiosk() {
                   <span key={i} className={i < employeeCode.length ? "filled" : ""} />
                 ))}
               </div>
-              <div className="timeclock-kiosk-keypad">
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key) => (
-                  <button key={key} type="button" className="timeclock-kiosk-key" onClick={() => handleKeyPress(key)} disabled={isProcessing || employeeCode.length >= KIOSK_PIN_LENGTH}>
-                    {key}
-                  </button>
-                ))}
-                <button type="button" className="timeclock-kiosk-key action-key" onClick={() => handleKeyPress("Limpiar")} disabled={isProcessing} aria-label="Limpiar código">×</button>
-                <button type="button" className="timeclock-kiosk-key" onClick={() => handleKeyPress("0")} disabled={isProcessing || employeeCode.length >= KIOSK_PIN_LENGTH}>0</button>
-                <button type="button" className="timeclock-kiosk-key action-key" onClick={() => handleKeyPress("Borrar")} disabled={isProcessing} aria-label="Borrar último dígito">⌫</button>
+              <EmployeePinKeypad valueLength={employeeCode.length} disabled={isProcessing} onKeyPress={handleKeyPress} />
+              <div className="timeclock-access-direct-actions">
+                <button type="button" className="timeclock-access-action entry" disabled={isProcessing || employeeCode.length !== KIOSK_PIN_LENGTH} onClick={() => handleRegister("ENTRY")}>
+                  <LogIn />
+                  <span>Registrar entrada</span>
+                </button>
+                <button type="button" className="timeclock-access-action exit" disabled={isProcessing || employeeCode.length !== KIOSK_PIN_LENGTH} onClick={() => handleRegister("EXIT")}>
+                  <LogOut />
+                  <span>Registrar salida</span>
+                </button>
+                <button type="button" className="timeclock-access-options" disabled={isProcessing || employeeCode.length !== KIOSK_PIN_LENGTH} onClick={handleOpenEmployeeOptions}>
+                  Ver opciones
+                </button>
               </div>
               <div className={`timeclock-kiosk-status-card ${status}`}><span className="timeclock-kiosk-status-text">{statusMessage}</span></div>
             </section>
@@ -924,18 +871,116 @@ export function TimeClockKiosk() {
           </div>
         )}
 
-        {/* Hidden Camera Elements */}
-        <video
-          ref={videoRef}
-          muted
-          playsInline
-          style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, pointerEvents: "none" }}
-        />
-        <canvas ref={canvasRef} style={{ display: "none" }} />
       </section>
     </main>
   )
 }
+
+function useKioskTime() {
+  const [serverTimeOffset, setServerTimeOffset] = useState(0)
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function syncTime() {
+      try {
+        const start = Date.now()
+        const res = await fetch(`${API_URL}/health`)
+        if (!res.ok || cancelled) return
+
+        const data = await res.json()
+        const serverTime = new Date(data.timestamp).getTime()
+        const latency = (Date.now() - start) / 2
+        setServerTimeOffset(serverTime - (Date.now() - latency))
+      } catch {
+        // Keep the local clock if the health endpoint is unavailable.
+      }
+    }
+
+    void syncTime()
+    const syncInterval = window.setInterval(syncTime, 5 * 60 * 1000)
+    const tickInterval = window.setInterval(() => setNow(new Date()), 1000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(syncInterval)
+      window.clearInterval(tickInterval)
+    }
+  }, [])
+
+  const serverNow = useMemo(() => new Date(now.getTime() + serverTimeOffset), [now, serverTimeOffset])
+
+  const timeString = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat("es-MX", {
+        timeZone: "America/Tijuana",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      }).format(serverNow)
+    } catch {
+      return serverNow.toTimeString().split(" ")[0]
+    }
+  }, [serverNow])
+
+  const dateString = useMemo(() => {
+    try {
+      const formatted = new Intl.DateTimeFormat("es-MX", {
+        timeZone: "America/Tijuana",
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      }).format(serverNow)
+      return formatted.charAt(0).toUpperCase() + formatted.slice(1)
+    } catch {
+      return serverNow.toLocaleDateString("es-MX")
+    }
+  }, [serverNow])
+
+  return { timeString, dateString }
+}
+
+const KioskClockBlock = memo(function KioskClockBlock({ variant }: { variant: "access" | "header" }) {
+  const { timeString, dateString } = useKioskTime()
+
+  if (variant === "header") {
+    return (
+      <div className="timeclock-kiosk-time-block">
+        <div className="timeclock-kiosk-time">{timeString}</div>
+        <div className="timeclock-kiosk-date">{dateString}</div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="timeclock-access-clock">{timeString}</div>
+      <div className="timeclock-access-date">{dateString}</div>
+    </>
+  )
+})
+
+const EmployeePinKeypad = memo(function EmployeePinKeypad({ valueLength, disabled, onKeyPress }: {
+  valueLength: number
+  disabled: boolean
+  onKeyPress: (key: string) => void
+}) {
+  return (
+    <div className="timeclock-kiosk-keypad">
+      {PIN_KEYS.map((key) => (
+        <button key={key} type="button" className="timeclock-kiosk-key" onClick={() => onKeyPress(key)} disabled={disabled || valueLength >= KIOSK_PIN_LENGTH}>
+          {key}
+        </button>
+      ))}
+      <button type="button" className="timeclock-kiosk-key action-key" onClick={() => onKeyPress("Limpiar")} disabled={disabled || valueLength === 0} aria-label="Limpiar código">×</button>
+      <button type="button" className="timeclock-kiosk-key" onClick={() => onKeyPress("0")} disabled={disabled || valueLength >= KIOSK_PIN_LENGTH}>0</button>
+      <button type="button" className="timeclock-kiosk-key action-key" onClick={() => onKeyPress("Borrar")} disabled={disabled || valueLength === 0} aria-label="Borrar último dígito">⌫</button>
+    </div>
+  )
+})
 
 function PrimaryShiftAction({ icon, title, detail, tone, disabled, onClick }: {
   icon: ReactNode
@@ -960,7 +1005,7 @@ function ApprovalCodeKeypad({ value, disabled, onKeyPress }: {
 }) {
   return (
     <div className="timeclock-approval-keypad" aria-label="Teclado para código de encargado">
-      {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key) => (
+      {PIN_KEYS.map((key) => (
         <button
           key={key}
           type="button"
