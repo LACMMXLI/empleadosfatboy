@@ -476,73 +476,6 @@
 .timeclock-financial-empty strong { color: #cbd5e1; font-size: 12px; }
 .timeclock-financial-empty span { font-size: 10px; }
 
-.timeclock-access-card {
-  grid-template-rows: auto auto auto minmax(13rem, 1fr) auto auto;
-}
-
-.timeclock-access-card .timeclock-kiosk-keypad {
-  min-height: 13rem;
-}
-
-.timeclock-access-direct-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-}
-
-.timeclock-access-action,
-.timeclock-access-options {
-  min-width: 0;
-  min-height: 3.1rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 0.85rem;
-  color: #fff;
-  font-size: 0.84rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.timeclock-access-action svg {
-  width: 1.05rem;
-  height: 1.05rem;
-  flex: 0 0 auto;
-}
-
-.timeclock-access-action.entry {
-  background: linear-gradient(145deg, #287e4b, #165a34);
-}
-
-.timeclock-access-action.exit {
-  background: linear-gradient(145deg, #b9363c, #86242b);
-}
-
-.timeclock-access-options {
-  grid-column: 1 / -1;
-  min-height: 2.7rem;
-  border-color: rgba(148, 163, 184, 0.2);
-  background: rgba(30, 41, 59, 0.76);
-  color: #cbd5e1;
-  font-size: 0.76rem;
-}
-
-.timeclock-access-action:not(:disabled):active,
-.timeclock-access-options:not(:disabled):active {
-  transform: scale(0.98);
-}
-
-.timeclock-access-action:disabled,
-.timeclock-access-options:disabled {
-  cursor: not-allowed;
-  opacity: 0.38;
-  filter: grayscale(0.7);
-}
-
 .timeclock-advance-modal {
   width: min(43rem, calc(100vw - 2rem));
   justify-items: center;
@@ -628,9 +561,6 @@
   .timeclock-employee-dashboard { grid-template-columns: 1fr; }
   .timeclock-shift-flow { min-height: 31rem; }
   .timeclock-financial-panel { min-height: 30rem; }
-  .timeclock-access-card .timeclock-kiosk-keypad {
-    min-height: 12rem;
-  }
   .timeclock-advance-modal,
   .timeclock-advance-modal.timeclock-exit-approval-modal {
     width: min(29rem, calc(100vw - 2rem));
@@ -658,12 +588,6 @@
   .timeclock-critical-grid { grid-template-columns: 1fr; }
   .timeclock-critical-grid > div.featured { grid-column: auto; }
   .timeclock-secondary-actions { grid-template-columns: 1fr; }
-  .timeclock-access-direct-actions {
-    grid-template-columns: 1fr;
-  }
-  .timeclock-access-options {
-    grid-column: auto;
-  }
   .timeclock-advance-modal,
   .timeclock-advance-modal.timeclock-exit-approval-modal {
     width: calc(100vw - 1rem);

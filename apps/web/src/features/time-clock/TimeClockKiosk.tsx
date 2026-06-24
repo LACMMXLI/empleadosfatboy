@@ -319,6 +319,45 @@ export function TimeClockKiosk() {
     return employee
   }, [employeeCode, needsAuthorization, toVerifiedEmployee])
 
+  useEffect(() => {
+    if (needsAuthorization) return
+    if (employeeCode.length !== KIOSK_PIN_LENGTH) {
+      setVerifiedEmployee(null)
+      return
+    }
+
+    let cancelled = false
+    releaseCamera()
+    setVerifiedEmployee(null)
+    setStatus("validating_pin")
+    setStatusMessage("Validando PIN...")
+
+    api.timeClock.verifyEmployeeCode(employeeCode)
+      .then((result) => {
+        if (cancelled) return
+        const employee = toVerifiedEmployee(result)
+        setVerifiedEmployee(employee)
+        setSessionActivityAt(Date.now())
+        setStatus("idle")
+        setStatusMessage(`PIN confirmado: ${employee.fullName}`)
+        playSuccess()
+      })
+      .catch((error: Error) => {
+        if (cancelled) return
+        releaseCamera()
+        setVerifiedEmployee(null)
+        setStatus("error")
+        setStatusMessage(error.message || "PIN inválido")
+        setEmployeeCode("")
+        playError()
+        scheduleStatusReset(1600)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [employeeCode, needsAuthorization, playError, playSuccess, releaseCamera, scheduleStatusReset, toVerifiedEmployee])
+
   const handleKeyPress = useCallback((key: string) => {
     if (isProcessing) return
     playClick()
@@ -340,28 +379,6 @@ export function TimeClockKiosk() {
       setVerifiedEmployee(null)
     }
   }, [isProcessing, markSessionActivity, playClick, status])
-
-  const handleOpenEmployeeOptions = useCallback(async () => {
-    if (isProcessing) return
-    playClick()
-    markSessionActivity()
-    releaseCamera()
-
-    try {
-      const employee = await validateEmployeeCode()
-      setStatus("idle")
-      setStatusMessage(`PIN confirmado: ${employee.fullName}`)
-      playSuccess()
-    } catch (error) {
-      releaseCamera()
-      setVerifiedEmployee(null)
-      setStatus("error")
-      setStatusMessage(error instanceof Error ? error.message : "PIN inválido")
-      setEmployeeCode("")
-      playError()
-      scheduleStatusReset(1800)
-    }
-  }, [isProcessing, markSessionActivity, playClick, playError, playSuccess, releaseCamera, scheduleStatusReset, validateEmployeeCode])
 
   const handleApprovalCodeKeyPress = (
     key: string,
@@ -669,19 +686,6 @@ export function TimeClockKiosk() {
                 ))}
               </div>
               <EmployeePinKeypad valueLength={employeeCode.length} disabled={isProcessing} onKeyPress={handleKeyPress} />
-              <div className="timeclock-access-direct-actions">
-                <button type="button" className="timeclock-access-action entry" disabled={isProcessing || employeeCode.length !== KIOSK_PIN_LENGTH} onClick={() => handleRegister("ENTRY")}>
-                  <LogIn />
-                  <span>Registrar entrada</span>
-                </button>
-                <button type="button" className="timeclock-access-action exit" disabled={isProcessing || employeeCode.length !== KIOSK_PIN_LENGTH} onClick={() => handleRegister("EXIT")}>
-                  <LogOut />
-                  <span>Registrar salida</span>
-                </button>
-                <button type="button" className="timeclock-access-options" disabled={isProcessing || employeeCode.length !== KIOSK_PIN_LENGTH} onClick={handleOpenEmployeeOptions}>
-                  Ver opciones
-                </button>
-              </div>
               <div className={`timeclock-kiosk-status-card ${status}`}><span className="timeclock-kiosk-status-text">{statusMessage}</span></div>
             </section>
           </div>
