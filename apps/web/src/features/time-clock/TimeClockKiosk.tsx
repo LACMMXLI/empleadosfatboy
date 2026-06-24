@@ -117,6 +117,7 @@ export function TimeClockKiosk() {
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [advanceAmount, setAdvanceAmount] = useState("")
   const [approverCode, setApproverCode] = useState("")
+  const [activeAdvanceField, setActiveAdvanceField] = useState<"amount" | "code">("amount")
   const [exitApprovalOpen, setExitApprovalOpen] = useState(false)
   const [exitApproverCode, setExitApproverCode] = useState("")
   const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
@@ -839,6 +840,7 @@ export function TimeClockKiosk() {
                           setAdvanceAmount(event.target.value)
                           markSessionActivity()
                         }}
+                        onFocus={() => setActiveAdvanceField("amount")}
                         autoFocus
                       />
                     </div>
@@ -856,6 +858,7 @@ export function TimeClockKiosk() {
                         setApproverCode(event.target.value.replace(/\D/g, "").slice(0, 6))
                         markSessionActivity()
                       }}
+                      onFocus={() => setActiveAdvanceField("code")}
                     />
                   </label>
                   <div className="timeclock-advance-note">
@@ -867,9 +870,25 @@ export function TimeClockKiosk() {
                   </button>
                 </div>
                 <ApprovalCodeKeypad
-                  value={approverCode}
+                  value={activeAdvanceField === "amount" ? advanceAmount : approverCode}
+                  maxLength={activeAdvanceField === "amount" ? 8 : KIOSK_PIN_LENGTH}
                   disabled={isProcessing}
-                  onKeyPress={(key) => handleApprovalCodeKeyPress(key, setApproverCode)}
+                  onKeyPress={(key) => {
+                    if (activeAdvanceField === "amount") {
+                      if (isProcessing) return
+                      playClick()
+                      markSessionActivity()
+                      if (key === "Limpiar") {
+                        setAdvanceAmount("")
+                      } else if (key === "Borrar") {
+                        setAdvanceAmount((prev) => prev.slice(0, -1))
+                      } else {
+                        setAdvanceAmount((prev) => prev.length < 8 ? prev + key : prev)
+                      }
+                    } else {
+                      handleApprovalCodeKeyPress(key, setApproverCode)
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -1003,10 +1022,11 @@ function PrimaryShiftAction({ icon, title, detail, tone, disabled, onClick }: {
   )
 }
 
-function ApprovalCodeKeypad({ value, disabled, onKeyPress }: {
+function ApprovalCodeKeypad({ value, disabled, onKeyPress, maxLength = KIOSK_PIN_LENGTH }: {
   value: string
   disabled: boolean
   onKeyPress: (key: string) => void
+  maxLength?: number
 }) {
   return (
     <div className="timeclock-approval-keypad" aria-label="Teclado para código de encargado">
@@ -1016,7 +1036,7 @@ function ApprovalCodeKeypad({ value, disabled, onKeyPress }: {
           type="button"
           className="timeclock-approval-key"
           onClick={() => onKeyPress(key)}
-          disabled={disabled || value.length >= KIOSK_PIN_LENGTH}
+          disabled={disabled || value.length >= maxLength}
         >
           {key}
         </button>
@@ -1024,7 +1044,7 @@ function ApprovalCodeKeypad({ value, disabled, onKeyPress }: {
       <button type="button" className="timeclock-approval-key action-key" onClick={() => onKeyPress("Limpiar")} disabled={disabled || value.length === 0}>
         Limpiar
       </button>
-      <button type="button" className="timeclock-approval-key" onClick={() => onKeyPress("0")} disabled={disabled || value.length >= KIOSK_PIN_LENGTH}>
+      <button type="button" className="timeclock-approval-key" onClick={() => onKeyPress("0")} disabled={disabled || value.length >= maxLength}>
         0
       </button>
       <button type="button" className="timeclock-approval-key action-key" onClick={() => onKeyPress("Borrar")} disabled={disabled || value.length === 0}>
