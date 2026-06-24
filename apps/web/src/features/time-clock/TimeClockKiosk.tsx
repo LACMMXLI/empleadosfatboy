@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { ReactNode } from "react"
+import type { Dispatch, ReactNode, SetStateAction } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Banknote, CheckCircle2, Clock3, Coffee, Copy, KeyRound, LogIn, LogOut, Maximize, Minimize, RefreshCw, ShieldAlert, ShieldCheck, Utensils, UserRound, X } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
@@ -376,6 +376,23 @@ export function TimeClockKiosk() {
       if (employeeCode.length < KIOSK_PIN_LENGTH) {
         setEmployeeCode((prev) => prev + key)
       }
+    }
+  }
+
+  const handleApprovalCodeKeyPress = (
+    key: string,
+    setCode: Dispatch<SetStateAction<string>>
+  ) => {
+    if (isProcessing) return
+    playClick()
+    markSessionActivity()
+
+    if (key === "Limpiar") {
+      setCode("")
+    } else if (key === "Borrar") {
+      setCode((prev) => prev.slice(0, -1))
+    } else {
+      setCode((prev) => prev.length < KIOSK_PIN_LENGTH ? prev + key : prev)
     }
   }
 
@@ -812,24 +829,32 @@ export function TimeClockKiosk() {
                 <h2 id="exit-approval-title">Autorizar salida sin comida</h2>
                 <p>{verifiedEmployee.fullName} no completó la secuencia de comida.</p>
               </div>
-              <label>
-                <span>Código del encargado de sucursal</span>
-                <input
-                  className="timeclock-advance-code"
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="••••••"
+              <div className="timeclock-approval-layout">
+                <div className="timeclock-approval-form">
+                  <label>
+                    <span>Código del encargado de sucursal</span>
+                    <input
+                      className="timeclock-advance-code"
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="••••••"
+                      value={exitApproverCode}
+                      onChange={(event) => { setExitApproverCode(event.target.value.replace(/\D/g, "").slice(0, 6)); markSessionActivity() }}
+                    />
+                  </label>
+                  <div className="timeclock-advance-note"><ShieldCheck /><span>Esta excepción quedará registrada con el encargado responsable.</span></div>
+                  {status === "error" && <div className="timeclock-modal-error">{statusMessage}</div>}
+                  <button className="timeclock-advance-submit" type="button" disabled={isProcessing || exitApproverCode.length !== 6} onClick={() => handleRegister("EXIT", exitApproverCode)}>
+                    {isProcessing ? "Registrando..." : "Autorizar y finalizar turno"}
+                  </button>
+                </div>
+                <ApprovalCodeKeypad
                   value={exitApproverCode}
-                  onChange={(event) => { setExitApproverCode(event.target.value.replace(/\D/g, "").slice(0, 6)); markSessionActivity() }}
-                  autoFocus
+                  disabled={isProcessing}
+                  onKeyPress={(key) => handleApprovalCodeKeyPress(key, setExitApproverCode)}
                 />
-              </label>
-              <div className="timeclock-advance-note"><ShieldCheck /><span>Esta excepción quedará registrada con el encargado responsable.</span></div>
-              {status === "error" && <div className="timeclock-modal-error">{statusMessage}</div>}
-              <button className="timeclock-advance-submit" type="button" disabled={isProcessing || exitApproverCode.length !== 6} onClick={() => handleRegister("EXIT", exitApproverCode)}>
-                {isProcessing ? "Registrando..." : "Autorizar y finalizar turno"}
-              </button>
+              </div>
             </div>
           </div>
         )}
@@ -845,47 +870,56 @@ export function TimeClockKiosk() {
                 <h2 id="advance-title">Adelanto de sueldo</h2>
                 <p>{verifiedEmployee.fullName} · {verifiedEmployee.branch.name}</p>
               </div>
-              <label>
-                <span>Cantidad solicitada</span>
-                <div className="timeclock-advance-amount">
-                  <b>$</b>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={advanceAmount}
-                    onChange={(event) => {
-                      setAdvanceAmount(event.target.value)
-                      markSessionActivity()
-                    }}
-                    autoFocus
-                  />
+              <div className="timeclock-approval-layout">
+                <div className="timeclock-approval-form">
+                  <label>
+                    <span>Cantidad solicitada</span>
+                    <div className="timeclock-advance-amount">
+                      <b>$</b>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={advanceAmount}
+                        onChange={(event) => {
+                          setAdvanceAmount(event.target.value)
+                          markSessionActivity()
+                        }}
+                        autoFocus
+                      />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Código del encargado de sucursal</span>
+                    <input
+                      className="timeclock-advance-code"
+                      type="password"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="••••••"
+                      value={approverCode}
+                      onChange={(event) => {
+                        setApproverCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                        markSessionActivity()
+                      }}
+                    />
+                  </label>
+                  <div className="timeclock-advance-note">
+                    <ShieldCheck />
+                    <span>El adelanto se registrará autorizado, con folio y responsable.</span>
+                  </div>
+                  <button className="timeclock-advance-submit" type="button" disabled={isProcessing || !advanceAmount || approverCode.length !== 6} onClick={handleSalaryAdvance}>
+                    {isProcessing ? "Registrando..." : "Autorizar y registrar adelanto"}
+                  </button>
                 </div>
-              </label>
-              <label>
-                <span>Código del encargado de sucursal</span>
-                <input
-                  className="timeclock-advance-code"
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="••••••"
+                <ApprovalCodeKeypad
                   value={approverCode}
-                  onChange={(event) => {
-                    setApproverCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                    markSessionActivity()
-                  }}
+                  disabled={isProcessing}
+                  onKeyPress={(key) => handleApprovalCodeKeyPress(key, setApproverCode)}
                 />
-              </label>
-              <div className="timeclock-advance-note">
-                <ShieldCheck />
-                <span>El adelanto se registrará autorizado, con folio y responsable.</span>
               </div>
-              <button className="timeclock-advance-submit" type="button" disabled={isProcessing || !advanceAmount || approverCode.length !== 6} onClick={handleSalaryAdvance}>
-                {isProcessing ? "Registrando..." : "Autorizar y registrar adelanto"}
-              </button>
             </div>
           </div>
         )}
@@ -916,6 +950,37 @@ function PrimaryShiftAction({ icon, title, detail, tone, disabled, onClick }: {
       <span className="timeclock-primary-action-icon">{icon}</span>
       <span><strong>{title}</strong><small>{detail}</small></span>
     </button>
+  )
+}
+
+function ApprovalCodeKeypad({ value, disabled, onKeyPress }: {
+  value: string
+  disabled: boolean
+  onKeyPress: (key: string) => void
+}) {
+  return (
+    <div className="timeclock-approval-keypad" aria-label="Teclado para código de encargado">
+      {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((key) => (
+        <button
+          key={key}
+          type="button"
+          className="timeclock-approval-key"
+          onClick={() => onKeyPress(key)}
+          disabled={disabled || value.length >= KIOSK_PIN_LENGTH}
+        >
+          {key}
+        </button>
+      ))}
+      <button type="button" className="timeclock-approval-key action-key" onClick={() => onKeyPress("Limpiar")} disabled={disabled || value.length === 0}>
+        Limpiar
+      </button>
+      <button type="button" className="timeclock-approval-key" onClick={() => onKeyPress("0")} disabled={disabled || value.length >= KIOSK_PIN_LENGTH}>
+        0
+      </button>
+      <button type="button" className="timeclock-approval-key action-key" onClick={() => onKeyPress("Borrar")} disabled={disabled || value.length === 0}>
+        Borrar
+      </button>
+    </div>
   )
 }
 
