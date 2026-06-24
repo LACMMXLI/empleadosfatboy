@@ -478,14 +478,16 @@
 
 .timeclock-advance-modal {
   box-sizing: border-box;
-  width: min(52rem, calc(100vw - 3rem));
+  width: fit-content;
+  max-width: min(96vw, 980px);
   justify-items: center;
   gap: 0.85rem;
   padding: 1.15rem 1.25rem;
 }
 
 .timeclock-advance-modal.timeclock-exit-approval-modal {
-  width: min(46rem, calc(100vw - 3rem));
+  width: fit-content;
+  max-width: min(96vw, 920px);
 }
 
 .timeclock-advance-heading {
@@ -499,12 +501,13 @@
 }
 
 .timeclock-approval-layout {
-  width: 100%;
+  width: max-content;
+  max-width: 100%;
   display: grid;
-  grid-template-columns: minmax(22rem, 1fr) 18rem;
-  align-items: center;
+  grid-template-columns: minmax(320px, 420px) auto;
+  align-items: start;
   justify-content: center;
-  gap: 1.15rem;
+  gap: 18px;
 }
 
 .timeclock-approval-form {
@@ -547,7 +550,7 @@
 .timeclock-approval-keypad {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 5.35rem);
   gap: 0.6rem;
 }
 
@@ -601,12 +604,21 @@
   .timeclock-employee-dashboard { grid-template-columns: 1fr; }
   .timeclock-shift-flow { min-height: 31rem; }
   .timeclock-financial-panel { min-height: 30rem; }
+}
+
+@media (max-width: 760px) {
   .timeclock-advance-modal,
   .timeclock-advance-modal.timeclock-exit-approval-modal {
     width: min(29rem, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
   }
   .timeclock-approval-layout {
+    width: 100%;
     grid-template-columns: 1fr;
+  }
+  .timeclock-approval-keypad {
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .timeclock-approval-key {
     min-height: 3.25rem;
