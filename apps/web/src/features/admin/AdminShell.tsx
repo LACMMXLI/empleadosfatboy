@@ -381,7 +381,7 @@ function Dashboard() {
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="section-title mb-0">
-            <LayoutDashboard style={{ width: 16, height: 16, color: '#00e5ff' }} />
+            <LayoutDashboard style={{ width: 16, height: 16, color: 'hsl(var(--primary))' }} />
             Resumen del periodo
           </div>
           <div className="flex items-center gap-2">
@@ -406,33 +406,33 @@ function Dashboard() {
         </div>
         <div className="grid metric-grid gap-3">
           <div className="stat-card stat-card-amber">
-            <ShieldCheck className="stat-icon" style={{ color: '#f59e0b' }} />
+            <ShieldCheck className="stat-icon" style={{ color: 'hsl(var(--warning))' }} />
             <div className="stat-label">Pendientes</div>
             <div className="stat-value stat-value-amber">
               {pendingRequests}
             </div>
           </div>
           <div className="stat-card stat-card-cyan">
-            <Banknote className="stat-icon" style={{ color: '#00e5ff' }} />
+            <Banknote className="stat-icon" style={{ color: 'hsl(var(--primary))' }} />
             <div className="stat-label">Adelantos autorizados</div>
             <div className="stat-value stat-value-cyan" style={{ fontSize: '1.35rem' }}>
               {money.format(authorizedAdvances)}
             </div>
           </div>
           <div className="stat-card stat-card-violet">
-            <Building2 className="stat-icon" style={{ color: '#a855f7' }} />
+            <Building2 className="stat-icon" style={{ color: 'hsl(var(--primary))' }} />
             <div className="stat-label">Movim. administrativos</div>
             <div className="stat-value stat-value-violet">{administrativeMovements}</div>
           </div>
           <div className="stat-card stat-card-green">
-            <WalletCards className="stat-icon" style={{ color: '#22c55e' }} />
+            <WalletCards className="stat-icon" style={{ color: 'hsl(var(--success))' }} />
             <div className="stat-label">Por descontar</div>
             <div className="stat-value stat-value-green" style={{ fontSize: '1.35rem' }}>
               {money.format(pendingToDiscount)}
             </div>
           </div>
           <div className="stat-card stat-card-blue">
-            <UsersRound className="stat-icon" style={{ color: '#60a5fa' }} />
+            <UsersRound className="stat-icon" style={{ color: 'hsl(var(--primary))' }} />
             <div className="stat-label">Costo Nómina Semanal</div>
             <div className="stat-value stat-value-blue" style={{ fontSize: '1.35rem' }}>
               {money.format(totalWeeklyPayroll)}
@@ -456,7 +456,7 @@ function Dashboard() {
             </div>
             <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
               <div className="stat-label">Autorizados activos</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#4ade80' }}>{totalAuthorizedDetails}</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'hsl(var(--success))' }}>{totalAuthorizedDetails}</div>
             </div>
             <div style={{ ...insetPanelStyle, padding: '0.75rem', borderRadius: '0.625rem' }}>
               <div className="stat-label">Estado</div>
@@ -558,7 +558,7 @@ function AdministrativeMovements({ user }: { user?: User }) {
       <div className="admin-card min-w-0">
         <div className="admin-card-header">
           <div className="admin-card-title">
-            <Building2 style={{ width: 14, height: 14, color: '#00e5ff' }} />
+            <Building2 style={{ width: 14, height: 14, color: 'hsl(var(--primary))' }} />
             Movimientos Administrativos
           </div>
         </div>
@@ -611,7 +611,7 @@ function AdministrativeMovements({ user }: { user?: User }) {
       <div className="admin-card min-w-0">
         <div className="admin-card-header">
           <div className="admin-card-title">
-            <CheckCircle2 style={{ width: 14, height: 14, color: '#4ade80' }} />
+            <CheckCircle2 style={{ width: 14, height: 14, color: 'hsl(var(--success))' }} />
             Liquidar por empleado
           </div>
         </div>
@@ -732,7 +732,7 @@ function Deliveries() {
     <div className="space-y-4">
       <div className="section-header">
         <div className="section-title">
-          <CheckCircle2 style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          <CheckCircle2 style={{ width: 16, height: 16, color: 'hsl(var(--primary))' }} />
           Control de Caja y Entregas
         </div>
         <div className="section-subtitle">
@@ -867,7 +867,7 @@ function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
     <div className="space-y-4">
       <div className="section-header">
         <div className="section-title">
-          <ShieldCheck style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          <ShieldCheck style={{ width: 16, height: 16, color: 'hsl(var(--primary))' }} />
           Aprobaciones pendientes
         </div>
         {count > 0 && <span className="section-count">{count}</span>}
@@ -876,7 +876,7 @@ function PendingAuthorizations({ currentRole }: { currentRole?: Role }) {
       {pending.isLoading && <StatusEmpty text="Cargando solicitudes..." />}
       {!pending.isLoading && count === 0 && (
         <div className="empty-state">
-          <CheckCircle2 className="empty-state-icon" style={{ width: 48, height: 48, color: '#4ade80' }} />
+          <CheckCircle2 className="empty-state-icon" style={{ width: 48, height: 48, color: 'hsl(var(--success))' }} />
           <div className="empty-state-text">Todo al día — No hay solicitudes pendientes</div>
         </div>
       )}
@@ -1551,7 +1551,7 @@ function History() {
       {/* Header + Tabs */}
       <div className="section-header">
         <div className="section-title">
-          <ClipboardList style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          <ClipboardList style={{ width: 16, height: 16, color: 'hsl(var(--primary))' }} />
           Historial
         </div>
         {count > 0 && <span className="section-count">{count}</span>}
@@ -1679,7 +1679,7 @@ function PayrollAdmin() {
     <div className="space-y-4">
       <div className="section-header">
         <div className="section-title">
-          <WalletCards style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          <WalletCards style={{ width: 16, height: 16, color: 'hsl(var(--primary))' }} />
           Nómina
         </div>
       </div>
@@ -1704,8 +1704,8 @@ function PayrollAdmin() {
               Generar
             </button>
           </div>
-          {preview.error && <div className="status-empty" style={{ marginTop: '0.75rem', color: '#f87171' }}>{preview.error.message}</div>}
-          {generate.error && <div className="status-empty" style={{ marginTop: '0.75rem', color: '#f87171' }}>{generate.error.message}</div>}
+          {preview.error && <div className="status-empty" style={{ marginTop: '0.75rem', color: 'hsl(var(--destructive))' }}>{preview.error.message}</div>}
+          {generate.error && <div className="status-empty" style={{ marginTop: '0.75rem', color: 'hsl(var(--destructive))' }}>{generate.error.message}</div>}
           {preview.data && (
             <div style={{ marginTop: '1rem' }} className="space-y-4">
               <PayrollTotals
@@ -1751,7 +1751,7 @@ function PayrollAdmin() {
                   <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>Generada: {formatDateTime(payroll.generatedAt)}</div>
                 </div>
                 <span className={getPayrollBadgeClass(payroll.status)}>{payrollStatusLabels[payroll.status]}</span>
-                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontSize: '0.95rem', color: '#4ade80' }}>
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 700, fontSize: '0.95rem', color: 'hsl(var(--success))' }}>
                   {money.format(payroll.totalNet)}
                 </div>
                 <button className="btn-ghost" style={{ fontSize: '0.75rem', padding: '0.375rem 0.75rem', height: 'auto' }} onClick={() => setSelectedPayrollId(payroll.id)} type="button">
@@ -1806,8 +1806,8 @@ function PayrollAdmin() {
                 </button>
               </div>
             )}
-            {cancel.error && <div className="status-empty" style={{ color: '#f87171' }}>{cancel.error.message}</div>}
-            {markPaid.error && <div className="status-empty" style={{ color: '#f87171' }}>{markPaid.error.message}</div>}
+            {cancel.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))' }}>{cancel.error.message}</div>}
+            {markPaid.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))' }}>{markPaid.error.message}</div>}
           </div>
         </div>
       )}
@@ -1873,11 +1873,11 @@ function PayrollItemsTable({ items, onSelect }: { items: PayrollItem[]; onSelect
                 <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>{item.position}</div>
               </td>
               <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem' }}>{money.format(item.baseSalary)}</td>
-              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem', color: '#fbbf24' }}>{money.format(item.totalAdvances)}</td>
+              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem', color: 'hsl(var(--warning))' }}>{money.format(item.totalAdvances)}</td>
               <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem' }}>{money.format(item.totalInternalConsumption)}</td>
               <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem' }}>{money.format(item.totalAdminCharges + item.totalPenalties)}</td>
               <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.825rem' }}>{money.format(item.totalPositiveAdjustments - item.totalNegativeAdjustments)}</td>
-              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.9rem', fontWeight: 700, color: '#4ade80' }}>{money.format(item.netPay)}</td>
+              <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.9rem', fontWeight: 700, color: 'hsl(var(--success))' }}>{money.format(item.netPay)}</td>
               <td>
                 <button className="btn-ghost" style={{ fontSize: '0.725rem', padding: '0.25rem 0.625rem', height: 'auto' }} onClick={() => onSelect(item)} type="button">
                   Detalle
@@ -2127,7 +2127,7 @@ function Employees({ user }: { user?: User }) {
     <div className="space-y-4">
       <div className="section-header">
         <div className="section-title">
-          <UsersRound style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          <UsersRound style={{ width: 16, height: 16, color: 'hsl(var(--primary))' }} />
           Empleados
         </div>
         <div className="section-actions">
@@ -2200,7 +2200,7 @@ function Employees({ user }: { user?: User }) {
             <button className="btn-primary modal-submit" disabled={create.isPending} type="submit">
               Guardar empleado
             </button>
-            {create.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{create.error.message}</div>}
+            {create.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))', padding: '0.5rem' }}>{create.error.message}</div>}
           </form>
         </AdminModal>
       )}
@@ -2260,9 +2260,9 @@ function Employees({ user }: { user?: User }) {
                 Purga dev
               </button>
             )}
-            {update.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{update.error.message}</div>}
-            {toggleActive.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{toggleActive.error.message}</div>}
-            {purgeDeveloperEmployee.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{purgeDeveloperEmployee.error.message}</div>}
+            {update.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))', padding: '0.5rem' }}>{update.error.message}</div>}
+            {toggleActive.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))', padding: '0.5rem' }}>{toggleActive.error.message}</div>}
+            {purgeDeveloperEmployee.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))', padding: '0.5rem' }}>{purgeDeveloperEmployee.error.message}</div>}
           </form>
         </AdminModal>
       )}
@@ -2454,7 +2454,7 @@ function Configuration() {
     <div className="space-y-4">
       <div className="section-header">
         <div className="section-title">
-          <Settings style={{ width: 16, height: 16, color: '#00e5ff' }} />
+          <Settings style={{ width: 16, height: 16, color: 'hsl(var(--primary))' }} />
           Configuración
         </div>
         <div className="section-actions">
@@ -2491,7 +2491,7 @@ function Configuration() {
             <div className="admin-card">
               <div className="admin-card-header">
                 <div className="admin-card-title">
-                  <Banknote style={{ width: 14, height: 14, color: '#fbbf24' }} />
+                  <Banknote style={{ width: 14, height: 14, color: 'hsl(var(--warning))' }} />
                   Precio de bebida
                 </div>
               </div>
@@ -2537,7 +2537,7 @@ function Configuration() {
             <div className="admin-card">
               <div className="admin-card-header">
                 <div className="admin-card-title">
-                  <Building2 style={{ width: 14, height: 14, color: '#00e5ff' }} />
+                  <Building2 style={{ width: 14, height: 14, color: 'hsl(var(--primary))' }} />
                   Nueva sucursal
                 </div>
               </div>
@@ -2599,7 +2599,7 @@ function Configuration() {
             <div className="admin-card">
               <div className="admin-card-header">
                 <div className="admin-card-title">
-                  <UserRoundPlus style={{ width: 14, height: 14, color: '#00e5ff' }} />
+                  <UserRoundPlus style={{ width: 14, height: 14, color: 'hsl(var(--primary))' }} />
                   Nuevo usuario
                 </div>
               </div>
@@ -2665,7 +2665,7 @@ function Configuration() {
             <div className="admin-card">
               <div className="admin-card-header">
                 <div className="admin-card-title">
-                  <ShieldCheck style={{ width: 14, height: 14, color: '#a855f7' }} />
+                  <ShieldCheck style={{ width: 14, height: 14, color: 'hsl(var(--primary))' }} />
                   Nueva regla
                 </div>
               </div>
@@ -2806,7 +2806,7 @@ function Configuration() {
             <button className="btn-primary modal-submit mt-2" disabled={updateRule.isPending} type="submit">
               Guardar regla
             </button>
-            {updateRule.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{updateRule.error.message}</div>}
+            {updateRule.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))', padding: '0.5rem' }}>{updateRule.error.message}</div>}
           </form>
         </AdminModal>
       )}
@@ -2830,7 +2830,7 @@ function Configuration() {
               <input
                 type="checkbox"
                 id="branch-active-checkbox"
-                style={{ width: '1.15rem', height: '1.15rem', accentColor: '#00e5ff' }}
+                style={{ width: '1.15rem', height: '1.15rem', accentColor: 'hsl(var(--primary))' }}
                 {...branchEditForm.register("active")}
               />
               <label htmlFor="branch-active-checkbox" className="text-sm font-semibold text-foreground select-none cursor-pointer">
@@ -2840,7 +2840,7 @@ function Configuration() {
             <button className="btn-primary modal-submit mt-4" disabled={updateBranch.isPending} type="submit">
               Guardar cambios
             </button>
-            {updateBranch.error && <div className="status-empty" style={{ color: '#f87171', padding: '0.5rem' }}>{updateBranch.error.message}</div>}
+            {updateBranch.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))', padding: '0.5rem' }}>{updateBranch.error.message}</div>}
           </form>
         </AdminModal>
       )}

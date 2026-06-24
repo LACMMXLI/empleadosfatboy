@@ -4,44 +4,45 @@
 
 @layer base {
   :root {
-    /* === Core Dark Theme === */
-    --background: 224 50% 2.5%;     /* #03040a - Deep Void background */
-    --foreground: 213 27% 89%;      /* #dde4ed */
-    --card: 220 24% 15.5%;          /* #1e2637 - Clear elevated card background */
-    --card-foreground: 213 27% 89%;
-    --popover: 220 24% 16.5%;       /* #20293b */
-    --popover-foreground: 213 27% 89%;
+    /* === Core Dark Theme (Professional & Sleek) === */
+    --background: 0 0% 3%;          /* #080808 - Near black background */
+    --foreground: 0 0% 93%;         /* #ededed */
+    --card: 0 0% 7%;                /* #121212 - Subtle elevated card */
+    --card-foreground: 0 0% 93%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 93%;
 
-    /* === Electric Cyan Primary === */
-    --primary: 191 100% 50%;        /* #00e5ff */
-    --primary-foreground: 228 47% 4%;
+    /* === Primary Accent === */
+    --primary: 210 100% 60%;        /* #3388ff - Professional Blue */
+    --primary-foreground: 0 0% 100%;
 
-    /* === Violet Accent === */
-    --secondary: 220 24% 20%;       /* #283144 */
-    --secondary-foreground: 213 27% 89%;
-    --muted: 220 20% 17%;           /* #222935 */
-    --muted-foreground: 215 16% 62%;/* #8e9bb3 */
-    --accent: 271 91% 65%;          /* #a855f7 violet */
+    /* === Secondary & Accents === */
+    --secondary: 0 0% 15%;          /* #262626 */
+    --secondary-foreground: 0 0% 93%;
+    --muted: 0 0% 12%;              /* #1f1f1f */
+    --muted-foreground: 0 0% 60%;   /* #999999 */
+    --accent: 210 100% 60%;         /* Same professional blue for accents */
     --accent-foreground: 0 0% 100%;
 
-    /* === Semantic Colors === */
+    /* === Semantic Colors (Standard, non-neon) === */
     --destructive: 0 84% 60%;       /* #ef4444 */
     --destructive-foreground: 0 0% 98%;
-    --success: 142 76% 46%;         /* #22c55e */
+    --success: 142 76% 36%;         /* #16a34a */
     --warning: 38 92% 50%;          /* #f59e0b */
 
-    --border: 220 20% 26%;          /* #353d4c - Defined high-contrast borders */
-    --input: 222 28% 10%;           /* #121825 - Sunken input background */
-    --ring: 191 100% 50%;
-    --radius: 0.875rem;
+    --border: 0 0% 15%;             /* #262626 */
+    --input: 0 0% 10%;              /* #1a1a1a */
+    --ring: 210 100% 60%;
+    --radius: 0.5rem;               /* Less rounded, more professional */
 
-    --surface-shell: 3 4 10;        /* #03040a */
-    --surface-shell-soft: 6 8 18;   /* #060812 */
-    --surface-panel: 30 38 55;      /* #1e2637 */
-    --surface-panel-strong: 37 47 68;/* #252f44 */
-    --surface-control: 15 20 31;    /* #0f141f */
-    --surface-control-strong: 18 24 37;/* #121825 */
-    --surface-line: 71 85 115;      /* #475573 - Sharp dividing lines */
+    /* Surface RGBs for advanced blending */
+    --surface-shell: 8 8 8;         /* #080808 */
+    --surface-shell-soft: 12 12 12; /* #0c0c0c */
+    --surface-panel: 18 18 18;      /* #121212 */
+    --surface-panel-strong: 26 26 26;/* #1a1a1a */
+    --surface-control: 20 20 20;    /* #141414 */
+    --surface-control-strong: 30 30 30;/* #1e1e1e */
+    --surface-line: 38 38 38;       /* #262626 */
   }
 
   * {
@@ -416,8 +417,6 @@
   .admin-shell {
     min-height: 100vh;
     background:
-      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(0, 229, 255, 0.045) 0%, transparent 60%),
-      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(168, 85, 247, 0.035) 0%, transparent 50%),
       linear-gradient(180deg, rgb(var(--surface-shell)) 0%, rgb(var(--surface-shell-soft)) 100%),
       hsl(var(--background));
   }
@@ -444,7 +443,6 @@
     width: 32px;
     height: 32px;
     object-fit: contain;
-    filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.4));
   }
 
   .admin-sidebar-title {
@@ -503,7 +501,6 @@
     width: 2px;
     border-radius: 99px;
     background: hsl(var(--primary));
-    box-shadow: 0 0 8px hsl(var(--primary));
   }
 
   .nav-item .nav-icon {
@@ -514,7 +511,7 @@
   }
 
   .nav-item.active .nav-icon {
-    filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.6));
+    color: hsl(var(--primary));
   }
 
   /* === Admin Header === */
@@ -573,7 +570,7 @@
 
   .admin-card:hover {
     border-color: rgb(var(--surface-line) / 0.58);
-    box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 0 20px rgba(0, 229, 255, 0.02);
+    box-shadow: 0 24px 54px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
   }
 
   .admin-card-header {
@@ -627,49 +624,21 @@
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
   }
 
-  .stat-card-cyan {
-    border-color: rgba(0, 229, 255, 0.28);
-    background: linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
-  }
-
-  .stat-card-cyan::before {
-    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.35), transparent);
-  }
-
-  .stat-card-blue {
-    border-color: rgba(59, 130, 246, 0.28);
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
-  }
-
-  .stat-card-blue::before {
-    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.35), transparent);
-  }
-
-  .stat-card-violet {
-    border-color: rgba(168, 85, 247, 0.28);
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
-  }
-
-  .stat-card-violet::before {
-    background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.35), transparent);
-  }
-
-  .stat-card-green {
-    border-color: rgba(34, 197, 94, 0.28);
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
-  }
-
-  .stat-card-green::before {
-    background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.35), transparent);
-  }
-
+  .stat-card-cyan,
+  .stat-card-blue,
+  .stat-card-violet,
+  .stat-card-green,
   .stat-card-amber {
-    border-color: rgba(245, 158, 11, 0.28);
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgb(var(--surface-panel-strong) / 0.98) 62%);
+    border-color: rgb(var(--surface-line) / 0.4);
+    background: rgb(var(--surface-panel-strong) / 0.96);
   }
-
+  
+  .stat-card-cyan::before,
+  .stat-card-blue::before,
+  .stat-card-violet::before,
+  .stat-card-green::before,
   .stat-card-amber::before {
-    background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.35), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
   }
 
   .stat-label {
@@ -690,11 +659,13 @@
     line-height: 1;
   }
 
-  .stat-value-cyan { color: #00e5ff; }
-  .stat-value-violet { color: #c084fc; }
-  .stat-value-green { color: #4ade80; }
-  .stat-value-amber { color: #fbbf24; }
-  .stat-value-blue { color: #60a5fa; }
+  .stat-value-cyan,
+  .stat-value-violet,
+  .stat-value-green,
+  .stat-value-amber,
+  .stat-value-blue { 
+    color: hsl(var(--foreground)); 
+  }
 
   .stat-icon {
     position: absolute;
@@ -769,9 +740,9 @@
   }
 
   .approval-card:hover {
-    border-color: rgba(0, 229, 255, 0.34);
+    border-color: rgba(255, 255, 255, 0.15);
     transform: translateY(-1.5px);
-    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.28), 0 0 15px rgba(0, 229, 255, 0.03);
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.28);
   }
 
   .approval-card::before {
@@ -794,8 +765,8 @@
     width: 2.5rem;
     height: 2.5rem;
     border-radius: 50%;
-    background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(168, 85, 247, 0.15));
-    border: 1px solid rgba(0, 229, 255, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1234,8 +1205,7 @@
   }
 
   .btn-primary:hover {
-    background: #33ecff;
-    box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
+    background: hsl(var(--primary) / 0.9);
     transform: translateY(-1px);
   }
 
@@ -2229,30 +2199,26 @@
   }
 
   .login-input:focus-visible {
-    border-color: rgba(0, 229, 255, 0.45);
+    border-color: hsl(var(--primary) / 0.5);
     box-shadow:
-      0 0 0 3px rgba(0, 229, 255, 0.08),
-      0 0 20px rgba(0, 229, 255, 0.12);
+      0 0 0 3px hsl(var(--primary) / 0.1),
+      0 0 20px hsl(var(--primary) / 0.1);
   }
 
   .login-primary {
     border-radius: 0.75rem;
-    background: linear-gradient(135deg, #00e5ff, #38bdf8 50%, #818cf8);
-    color: #020409;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
     font-weight: 800;
     font-family: 'Space Grotesk', sans-serif;
-    box-shadow:
-      0 16px 36px rgba(0, 229, 255, 0.25),
-      0 1px 0 rgba(255, 255, 255, 0.25) inset;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     transition: all 160ms ease;
   }
 
   .login-primary:hover {
-    box-shadow:
-      0 20px 42px rgba(0, 229, 255, 0.35),
-      0 1px 0 rgba(255, 255, 255, 0.35) inset;
+    background: hsl(var(--primary) / 0.9);
     transform: translateY(-1px);
-    filter: brightness(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   }
 
   .login-primary:active {

@@ -166,13 +166,13 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
           <form className="space-y-4" onSubmit={form.handleSubmit((values) => login.mutate(values))}>
             <div className="space-y-3">
               <Input 
-                className="login-input h-12 transition-all focus-visible:ring-2 focus-visible:ring-cyan-500" 
+                className="login-input h-12 transition-all focus-visible:ring-2 focus-visible:ring-blue-500" 
                 placeholder="Email" 
                 aria-invalid={!!error}
                 {...form.register("email")} 
               />
               <Input 
-                className="login-input h-12 transition-all focus-visible:ring-2 focus-visible:ring-cyan-500" 
+                className="login-input h-12 transition-all focus-visible:ring-2 focus-visible:ring-blue-500" 
                 placeholder="Password" 
                 type="password" 
                 aria-invalid={!!error}
@@ -185,7 +185,7 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
               )}
             </div>
             <Button 
-              className="login-primary h-12 w-full text-base font-semibold transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background" 
+              className="login-primary h-12 w-full text-base font-semibold transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background" 
               disabled={login.isPending} 
               type="submit"
             >
@@ -194,7 +194,7 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
             
             {!isInstalled && (
               <Button 
-                className="w-full h-11 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center gap-2 mt-2 transition-all font-semibold"
+                className="w-full h-11 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center gap-2 mt-2 transition-all font-semibold"
                 onClick={install}
                 type="button"
               >
@@ -204,13 +204,13 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
             )}
 
             {showIOSInstructions && (
-              <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-3 text-xs text-cyan-300 mt-2 space-y-1 text-left">
+              <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-blue-300 mt-2 space-y-1 text-left">
                 <p className="font-semibold">Instrucciones para iOS:</p>
                 <ol className="list-decimal pl-4 space-y-0.5">
                   <li>Pulsa el botón <strong>Compartir</strong> en Safari (abajo en el centro).</li>
                   <li>Selecciona <strong>Agregar a inicio</strong> en la lista de opciones.</li>
                 </ol>
-                <button className="text-cyan-400 font-bold block pt-1 hover:underline text-left" onClick={() => setShowIOSInstructions(false)} type="button">
+                <button className="text-blue-400 font-bold block pt-1 hover:underline text-left" onClick={() => setShowIOSInstructions(false)} type="button">
                   Entendido, cerrar
                 </button>
               </div>
@@ -251,9 +251,9 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
           <form className="space-y-5" onSubmit={employeeForm.handleSubmit((values) => employeeLogin.mutate(values))}>
             <div className="space-y-4">
               <div className="relative">
-                <Phone className="absolute left-4 top-3.5 h-5 w-5 text-amber-500" />
+                <Phone className="absolute left-4 top-3.5 h-5 w-5 text-blue-500" />
                 <input 
-                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" 
+                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" 
                   placeholder="Teléfono" 
                   inputMode="tel" 
                   aria-invalid={!!employeeError}
@@ -261,9 +261,9 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
                 />
               </div>
               <div className="relative">
-                <KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-amber-500" />
+                <KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-blue-500" />
                 <input 
-                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" 
+                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" 
                   placeholder="PIN de 6 dígitos" 
                   type="password" 
                   inputMode="numeric" 
@@ -279,7 +279,7 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
               )}
             </div>
             <button 
-              className="login-primary h-12 w-full text-base font-semibold rounded-xl transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background" 
+              className="login-primary h-12 w-full text-base font-semibold rounded-xl transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background" 
               disabled={employeeLogin.isPending} 
               type="submit"
             >
@@ -288,7 +288,7 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
 
             {!isInstalled && (
               <button
-                className="w-full mt-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-xl h-12 flex items-center justify-center gap-2 font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="w-full mt-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 border border-blue-500/30 rounded-xl h-12 flex items-center justify-center gap-2 font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 onClick={install}
                 type="button"
               >
@@ -298,14 +298,14 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
             )}
 
             {showIOSInstructions && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-400 mt-2 space-y-2 text-left animate-in fade-in slide-in-from-top-2">
-                <p className="font-semibold text-sm text-amber-500">Instrucciones para iOS:</p>
+              <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 text-xs text-blue-400 mt-2 space-y-2 text-left animate-in fade-in slide-in-from-top-2">
+                <p className="font-semibold text-sm text-blue-500">Instrucciones para iOS:</p>
                 <ol className="list-decimal pl-4 space-y-1">
                   <li>Pulsa el botón <strong>Compartir</strong> en Safari (abajo en el centro).</li>
                   <li>Selecciona <strong>Agregar a inicio</strong> en la lista de opciones.</li>
                 </ol>
                 <button 
-                  className="text-amber-500 font-bold block pt-2 hover:underline text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded px-1 -mx-1" 
+                  className="text-blue-500 font-bold block pt-2 hover:underline text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded px-1 -mx-1" 
                   onClick={() => setShowIOSInstructions(false)} 
                   type="button"
                 >
