@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { CalendarDays, Camera, CheckCircle2, Clock3, Download, History, KeyRound, Plus, RefreshCw, RotateCw, Save, Trash2, UserRound, Wrench, X } from "lucide-react"
+import { CalendarDays, Camera, CheckCircle2, Clock3, Copy, Download, History, KeyRound, Plus, RefreshCw, RotateCw, Save, Trash2, UserRound, Wrench, X } from "lucide-react"
 import { api } from "@/lib/api"
 import { ExecutiveConfirmDialog, ExecutiveDatePicker } from "@/components/common/AdminPrimitives"
 import type { AttendanceRow, Branch, EmployeeTimeClockHistoryDay, TimeClockDevice, TimeClockEntry, TimeClockEventType, User, WorkScheduleDay } from "@/types/domain"
@@ -465,6 +465,16 @@ export function AttendanceAdmin({ user }: { user?: User }) {
                       <span>a</span>
                       <input className="form-input" type="time" value={day.end} disabled={!day.enabled} onChange={(event) => updateScheduleDay(setScheduleDraft, day.dayOfWeek, { end: event.target.value })} />
                       <small>{day.enabled && day.end <= day.start ? "Termina al día siguiente" : day.enabled ? formatScheduleDuration(day) : "Descanso"}</small>
+                      <button
+                        className="schedule-copy-day"
+                        type="button"
+                        disabled={saveSchedule.isPending}
+                        title={`Copiar turno de ${dayLabels[day.dayOfWeek]} a todos los días`}
+                        onClick={() => copyScheduleDayToAll(setScheduleDraft, day)}
+                      >
+                        <Copy style={{ width: 13, height: 13 }} />
+                        Copiar a todos
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -790,6 +800,21 @@ function updateScheduleDay(
   setDraft((current) => ({
     ...current,
     days: current.days.map((day) => day.dayOfWeek === dayOfWeek ? { ...day, ...patch } : day)
+  }))
+}
+
+function copyScheduleDayToAll(
+  setDraft: (updater: (current: ScheduleDraft) => ScheduleDraft) => void,
+  sourceDay: WorkScheduleDay
+) {
+  setDraft((current) => ({
+    ...current,
+    days: current.days.map((day) => ({
+      ...day,
+      enabled: sourceDay.enabled,
+      start: sourceDay.start,
+      end: sourceDay.end
+    }))
   }))
 }
 

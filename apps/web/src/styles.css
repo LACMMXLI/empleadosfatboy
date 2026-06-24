@@ -2009,7 +2009,7 @@
 
   .schedule-day-row {
     display: grid;
-    grid-template-columns: minmax(120px, 0.8fr) 130px auto 130px minmax(120px, 0.8fr);
+    grid-template-columns: minmax(120px, 0.8fr) 130px auto 130px minmax(120px, 0.8fr) auto;
     gap: 0.55rem;
     align-items: center;
     border: 1px solid rgb(var(--surface-line) / 0.35);
@@ -2037,6 +2037,28 @@
     font-weight: 700;
   }
 
+  .schedule-copy-day {
+    min-height: 2.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border: 1px solid rgba(103, 232, 249, 0.2);
+    border-radius: 0.55rem;
+    background: rgba(8, 47, 73, 0.34);
+    padding: 0 0.7rem;
+    color: #bae6fd;
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .schedule-copy-day:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+  }
+
   @media (max-width: 900px) {
     .attendance-dashboard-tabs {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2055,6 +2077,10 @@
     .schedule-policy-grid,
     .schedule-day-row {
       grid-template-columns: 1fr;
+    }
+
+    .schedule-copy-day {
+      width: 100%;
     }
 
     .timeclock-code-form {
