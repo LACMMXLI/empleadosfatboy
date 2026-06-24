@@ -679,7 +679,7 @@ export function TimeClockKiosk() {
               <p>Ingresa tu código personal para ver tus opciones.</p>
             </section>
 
-            <section className="timeclock-access-card">
+            <section className={`timeclock-access-card ${status === "error" ? "shake-animation" : ""}`}>
               <div className="timeclock-access-user"><UserRound /></div>
               <div className="timeclock-kiosk-pin-title">
                 <h2>Código de empleado</h2>
@@ -790,7 +790,7 @@ export function TimeClockKiosk() {
                   <label>
                     <span>Código del encargado de sucursal</span>
                     <input
-                      className="timeclock-advance-code"
+                      className={`timeclock-advance-code ${status === "error" ? "border-red-500 text-red-400" : ""}`}
                       type="password"
                       inputMode="numeric"
                       maxLength={6}
@@ -800,16 +800,18 @@ export function TimeClockKiosk() {
                     />
                   </label>
                   <div className="timeclock-advance-note"><ShieldCheck /><span>Esta excepción quedará registrada con el encargado responsable.</span></div>
-                  {status === "error" && <div className="timeclock-modal-error">{statusMessage}</div>}
+                  {status === "error" && <div className="timeclock-modal-error shake-animation">{statusMessage}</div>}
                   <button className="timeclock-advance-submit" type="button" disabled={isProcessing || exitApproverCode.length !== 6} onClick={() => handleRegister("EXIT", exitApproverCode)}>
                     {isProcessing ? "Registrando..." : "Autorizar y finalizar turno"}
                   </button>
                 </div>
-                <ApprovalCodeKeypad
-                  value={exitApproverCode}
-                  disabled={isProcessing}
-                  onKeyPress={(key) => handleApprovalCodeKeyPress(key, setExitApproverCode)}
-                />
+                <div className={status === "error" ? "shake-animation" : ""}>
+                  <ApprovalCodeKeypad
+                    value={exitApproverCode}
+                    disabled={isProcessing}
+                    onKeyPress={(key) => handleApprovalCodeKeyPress(key, setExitApproverCode)}
+                  />
+                </div>
               </div>
             </div>
           </div>

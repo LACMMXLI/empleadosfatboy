@@ -143,7 +143,7 @@ export function Shell({
             {views.map((item) => (
               <button
                 key={item.id}
-                className={`nav-item ${activeView === item.id ? "active" : ""}`}
+                className={`nav-item ${activeView === item.id ? "active" : ""} transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-inset`}
                 onClick={() => onViewChange(item.id)}
                 type="button"
                 title={sidebarCollapsed ? item.label : undefined}
@@ -155,7 +155,7 @@ export function Shell({
           </nav>
           <div className="p-2 border-t border-white/5">
             <button
-              className="nav-item w-full"
+              className="nav-item w-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-inset"
               onClick={handleLogout}
               type="button"
               title={sidebarCollapsed ? "Cerrar sesión" : undefined}
@@ -284,7 +284,7 @@ function MobileBottomNav({
           return (
             <button
               key={item.id}
-              className={`bottom-nav-item ${active ? "active" : ""}`}
+              className={`bottom-nav-item ${active ? "active" : ""} transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400`}
               onClick={() => onViewChange(item.id)}
               type="button"
             >

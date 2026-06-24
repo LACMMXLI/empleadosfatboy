@@ -34,30 +34,39 @@ function PwaUpdateNotice({
   if (!update) return null
 
   return (
-    <div className="fixed inset-x-3 bottom-3 z-[100] mx-auto max-w-md rounded-xl border border-cyan-400/40 bg-[#06111a]/95 p-3 text-sm text-slate-100 shadow-2xl shadow-black/40 backdrop-blur md:bottom-5">
+    <div 
+      role="alert" 
+      aria-live="polite"
+      className="fixed inset-x-4 bottom-4 z-[100] mx-auto max-w-sm rounded-xl border border-cyan-500/30 bg-slate-900/95 p-4 text-sm shadow-2xl shadow-cyan-900/20 backdrop-blur-md transition-all duration-300 ease-out sm:bottom-6"
+    >
       <div className="flex items-start gap-3">
-        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
+        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-cyan-400" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <p className="font-semibold">Nueva versión disponible</p>
-          <p className="mt-0.5 text-xs text-slate-300">Actualiza para cargar los cambios recientes del sistema.</p>
-          <div className="mt-3 flex gap-2">
+          <p className="font-semibold text-slate-100">Nueva versión disponible</p>
+          <p className="mt-1 text-xs text-slate-300">Actualiza para cargar los cambios recientes del sistema.</p>
+          <div className="mt-4 flex gap-3">
             <button
-              className="h-9 rounded-lg bg-cyan-400 px-3 text-xs font-semibold text-slate-950"
+              className="flex-1 h-9 rounded-lg bg-cyan-500 px-3 text-xs font-semibold text-slate-950 transition-colors hover:bg-cyan-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               onClick={update.applyUpdate}
               type="button"
             >
               Actualizar
             </button>
             <button
-              className="h-9 rounded-lg border border-white/15 px-3 text-xs font-semibold text-slate-200"
+              className="flex-1 h-9 rounded-lg border border-slate-700 bg-slate-800 px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
               onClick={onDismiss}
               type="button"
             >
-              Luego
+              Más tarde
             </button>
           </div>
         </div>
-        <button className="rounded-lg p-1 text-slate-400 hover:bg-white/10 hover:text-white" onClick={onDismiss} type="button">
+        <button 
+          className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400" 
+          onClick={onDismiss} 
+          type="button"
+          aria-label="Cerrar notificación"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>

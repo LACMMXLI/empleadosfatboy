@@ -34,6 +34,15 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))"
+        },
+        surface: {
+          shell: "rgb(var(--surface-shell))",
+          "shell-soft": "rgb(var(--surface-shell-soft))",
+          panel: "rgb(var(--surface-panel))",
+          "panel-strong": "rgb(var(--surface-panel-strong))",
+          control: "rgb(var(--surface-control))",
+          "control-strong": "rgb(var(--surface-control-strong))",
+          line: "rgb(var(--surface-line))"
         }
       },
       borderRadius: {

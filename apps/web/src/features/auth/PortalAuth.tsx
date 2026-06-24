@@ -97,30 +97,36 @@ export function PortalSelector({ onNavigate }: { onNavigate: (route: PortalRoute
           <p className="text-sm text-muted-foreground">Selecciona el portal que quieres abrir</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Card>
+          <Card className="transition-all duration-200 hover:shadow-lg hover:border-cyan-500/30">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <UsersRound className="h-4 w-4" />
+              <CardTitle className="flex items-center gap-2 text-base text-foreground">
+                <UsersRound className="h-5 w-5 text-cyan-400" />
                 Portal del Empleado
               </CardTitle>
-              <p className="text-sm text-muted-foreground">Solicitudes, saldo e historial personal.</p>
+              <p className="text-sm text-muted-foreground mt-1">Solicitudes, saldo e historial personal.</p>
             </CardHeader>
             <CardContent>
-              <Button className="h-12 w-full" onClick={() => goToPortal("employee", onNavigate)}>
+              <Button 
+                className="h-12 w-full transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background" 
+                onClick={() => goToPortal("employee", onNavigate)}
+              >
                 Abrir empleado
               </Button>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="transition-all duration-200 hover:shadow-lg hover:border-violet-500/30">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <KeyRound className="h-4 w-4" />
+              <CardTitle className="flex items-center gap-2 text-base text-foreground">
+                <KeyRound className="h-5 w-5 text-violet-400" />
                 Administración RH
               </CardTitle>
-              <p className="text-sm text-muted-foreground">Adelantos, empleados y control interno de recursos humanos.</p>
+              <p className="text-sm text-muted-foreground mt-1">Adelantos, empleados y control interno de recursos humanos.</p>
             </CardHeader>
             <CardContent>
-              <Button className="h-12 w-full" onClick={() => goToPortal("admin", onNavigate)}>
+              <Button 
+                className="h-12 w-full transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background" 
+                onClick={() => goToPortal("admin", onNavigate)}
+              >
                 Abrir administración
               </Button>
             </CardContent>
@@ -157,11 +163,32 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
           </div>
         </CardHeader>
         <CardContent className="p-5 pt-2">
-          <form className="space-y-3" onSubmit={form.handleSubmit((values) => login.mutate(values))}>
-            <Input className="login-input h-12" placeholder="Email" {...form.register("email")} />
-            <Input className="login-input h-12" placeholder="Password" type="password" {...form.register("password")} />
-            {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-sm">{error}</div>}
-            <Button className="login-primary h-12 w-full text-base font-semibold" disabled={login.isPending} type="submit">
+          <form className="space-y-4" onSubmit={form.handleSubmit((values) => login.mutate(values))}>
+            <div className="space-y-3">
+              <Input 
+                className="login-input h-12 transition-all focus-visible:ring-2 focus-visible:ring-cyan-500" 
+                placeholder="Email" 
+                aria-invalid={!!error}
+                {...form.register("email")} 
+              />
+              <Input 
+                className="login-input h-12 transition-all focus-visible:ring-2 focus-visible:ring-cyan-500" 
+                placeholder="Password" 
+                type="password" 
+                aria-invalid={!!error}
+                {...form.register("password")} 
+              />
+              {error && (
+                <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-sm text-destructive-foreground animate-in fade-in slide-in-from-top-1">
+                  {error}
+                </div>
+              )}
+            </div>
+            <Button 
+              className="login-primary h-12 w-full text-base font-semibold transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background" 
+              disabled={login.isPending} 
+              type="submit"
+            >
               Entrar a administración
             </Button>
             
@@ -221,23 +248,47 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
           </div>
         </CardHeader>
         <CardContent className="p-5 pt-2">
-          <form className="space-y-4" onSubmit={employeeForm.handleSubmit((values) => employeeLogin.mutate(values))}>
-            <div className="relative">
-              <Phone className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" style={{ color: 'hsl(var(--primary))' }} />
-              <input className="form-input login-input h-12 pl-12" placeholder="Teléfono" inputMode="tel" {...employeeForm.register("phone")} />
+          <form className="space-y-5" onSubmit={employeeForm.handleSubmit((values) => employeeLogin.mutate(values))}>
+            <div className="space-y-4">
+              <div className="relative">
+                <Phone className="absolute left-4 top-3.5 h-5 w-5 text-amber-500" />
+                <input 
+                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" 
+                  placeholder="Teléfono" 
+                  inputMode="tel" 
+                  aria-invalid={!!employeeError}
+                  {...employeeForm.register("phone")} 
+                />
+              </div>
+              <div className="relative">
+                <KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-amber-500" />
+                <input 
+                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" 
+                  placeholder="PIN de 6 dígitos" 
+                  type="password" 
+                  inputMode="numeric" 
+                  maxLength={6} 
+                  aria-invalid={!!employeeError}
+                  {...employeeForm.register("pin")} 
+                />
+              </div>
+              {employeeError && (
+                <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-center text-destructive-foreground animate-in fade-in slide-in-from-top-1">
+                  {employeeError}
+                </div>
+              )}
             </div>
-            <div className="relative">
-              <KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" style={{ color: 'hsl(var(--accent))' }} />
-              <input className="form-input login-input h-12 pl-12" placeholder="PIN de 6 dígitos" type="password" inputMode="numeric" maxLength={6} {...employeeForm.register("pin")} />
-            </div>
-            {employeeError && <div className="rounded-2xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-center">{employeeError}</div>}
-            <button className="login-primary h-12 w-full text-base font-semibold" disabled={employeeLogin.isPending} type="submit">
+            <button 
+              className="login-primary h-12 w-full text-base font-semibold rounded-xl transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background" 
+              disabled={employeeLogin.isPending} 
+              type="submit"
+            >
               {employeeLogin.isPending ? "Ingresando..." : "Ingresar"}
             </button>
 
             {!isInstalled && (
               <button
-                className="w-full mt-2 bg-[#f97316]/10 hover:bg-[#f97316]/20 text-[#f97316] border border-[#f97316]/30 rounded-2xl h-12 flex items-center justify-center gap-2 font-semibold transition-all"
+                className="w-full mt-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-xl h-12 flex items-center justify-center gap-2 font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 onClick={install}
                 type="button"
               >
@@ -247,13 +298,17 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
             )}
 
             {showIOSInstructions && (
-              <div className="rounded-2xl border border-[#f97316]/30 bg-[#f97316]/5 p-3 text-xs text-[#f97316] mt-2 space-y-1 text-left">
-                <p className="font-semibold">Instrucciones para iOS:</p>
-                <ol className="list-decimal pl-4 space-y-0.5">
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-xs text-amber-400 mt-2 space-y-2 text-left animate-in fade-in slide-in-from-top-2">
+                <p className="font-semibold text-sm text-amber-500">Instrucciones para iOS:</p>
+                <ol className="list-decimal pl-4 space-y-1">
                   <li>Pulsa el botón <strong>Compartir</strong> en Safari (abajo en el centro).</li>
                   <li>Selecciona <strong>Agregar a inicio</strong> en la lista de opciones.</li>
                 </ol>
-                <button className="text-[#f97316] font-bold block pt-1 hover:underline text-left" onClick={() => setShowIOSInstructions(false)} type="button">
+                <button 
+                  className="text-amber-500 font-bold block pt-2 hover:underline text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded px-1 -mx-1" 
+                  onClick={() => setShowIOSInstructions(false)} 
+                  type="button"
+                >
                   Entendido, cerrar
                 </button>
               </div>
