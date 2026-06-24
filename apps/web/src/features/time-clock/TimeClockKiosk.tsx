@@ -94,6 +94,7 @@ export function TimeClockKiosk() {
   const statusResetTimeoutRef = useRef<number | null>(null)
   const lastSuccessTimeoutRef = useRef<number | null>(null)
   const messageTimeoutRef = useRef<number | null>(null)
+  const salaryAdvanceSubmittingRef = useRef(false)
   
   const [deviceToken, setDeviceToken] = useState(timeClockDeviceSession.token)
   const [requestToken, setRequestToken] = useState(() => {
@@ -517,30 +518,24 @@ export function TimeClockKiosk() {
     }
   }
 
-  const handleSalaryAdvance = async () => {
-    playClick()
+  const handleSalaryAdvance = useCallback(async (trigger: "manual" | "auto" = "manual") => {
+    if (salaryAdvanceSubmittingRef.current) return
+    salaryAdvanceSubmittingRef.current = true
+    if (trigger === "manual") playClick()
     markSessionActivity()
-    const amount = Number(advanceAmount)
-    if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
-      setStatus("error")
-      setStatusMessage("La sesión del empleado ya no es válida.")
-      playError()
-      return
-    }
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setStatus("error")
-      setStatusMessage("Ingresa una cantidad válida para el adelanto.")
-      playError()
-      return
-    }
-    if (approverCode.length !== KIOSK_PIN_LENGTH) {
-      setStatus("error")
-      setStatusMessage("El encargado debe ingresar su código de 6 dígitos.")
-      playError()
-      return
-    }
 
     try {
+      const amount = Number(advanceAmount)
+      if (!verifiedEmployee || employeeCode.length !== KIOSK_PIN_LENGTH) {
+        throw new Error("La sesión del empleado ya no es válida.")
+      }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Ingresa una cantidad válida para el adelanto.")
+      }
+      if (approverCode.length !== KIOSK_PIN_LENGTH) {
+        throw new Error("El encargado debe ingresar su código de 6 dígitos.")
+      }
+
       setStatus("registering")
       setStatusMessage("Validando encargado y registrando adelanto...")
       const movement = await api.timeClock.registerSalaryAdvance({ employeeCode, approverCode, amount })
@@ -558,6 +553,7 @@ export function TimeClockKiosk() {
       setAdvanceOpen(false)
       setAdvanceAmount("")
       setApproverCode("")
+      setActiveAdvanceField("amount")
       playSuccess()
       setEmployeeCode("")
       setVerifiedEmployee(null)
@@ -570,8 +566,15 @@ export function TimeClockKiosk() {
       setApproverCode("")
       playError()
       scheduleStatusReset(5000)
+    } finally {
+      salaryAdvanceSubmittingRef.current = false
     }
-  }
+  }, [advanceAmount, approverCode, employeeCode, markSessionActivity, playClick, playError, playSuccess, scheduleLastSuccessClear, scheduleStatusReset, verifiedEmployee])
+
+  useEffect(() => {
+    if (!advanceOpen || activeAdvanceField !== "code" || isProcessing || approverCode.length !== KIOSK_PIN_LENGTH) return
+    void handleSalaryAdvance("auto")
+  }, [activeAdvanceField, advanceOpen, approverCode, handleSalaryAdvance, isProcessing])
 
   function regenerateRequestCode() {
     playClick()
@@ -760,7 +763,7 @@ export function TimeClockKiosk() {
                     type="button"
                     className="timeclock-utility-action advance"
                     disabled={!canRequestAdvance}
-                    onClick={() => { playClick(); markSessionActivity(); setAdvanceAmount(""); setApproverCode(""); setAdvanceOpen(true) }}
+                    onClick={() => { playClick(); markSessionActivity(); setAdvanceAmount(""); setApproverCode(""); setActiveAdvanceField("amount"); setAdvanceOpen(true) }}
                   >
                     <span className="timeclock-utility-icon"><Banknote /></span>
                     <span><strong>Adelanto de sueldo</strong><small>Ingresa una cantidad personalizada</small></span>
@@ -865,7 +868,7 @@ export function TimeClockKiosk() {
                     <ShieldCheck />
                     <span>El adelanto se registrará autorizado, con folio y responsable.</span>
                   </div>
-                  <button className="timeclock-advance-submit" type="button" disabled={isProcessing || !advanceAmount || approverCode.length !== 6} onClick={handleSalaryAdvance}>
+                  <button className="timeclock-advance-submit" type="button" disabled={isProcessing || !advanceAmount || approverCode.length !== 6} onClick={() => handleSalaryAdvance("manual")}>
                     {isProcessing ? "Registrando..." : "Autorizar y registrar adelanto"}
                   </button>
                 </div>
