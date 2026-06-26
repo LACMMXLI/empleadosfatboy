@@ -784,11 +784,32 @@ export function TimeClockKiosk() {
             <div className="timeclock-employee-dashboard">
               <section className="timeclock-shift-flow">
                 <div className="timeclock-section-heading">
-                  <span>Secuencia del turno</span>
-                  <strong>Sigue el orden indicado</strong>
+                  <span>Asistencia</span>
+                  <strong>Acciones principales</strong>
                 </div>
                 <ShiftSequence attendance={verifiedEmployee.attendance} />
 
+                <div className="timeclock-primary-zone">
+                  <PrimaryShiftAction icon={<LogIn />} title="Registrar entrada" detail="Inicia turno" tone="entry" disabled={!canRegisterEntry} onClick={() => handleRegister("ENTRY")} />
+                  <PrimaryShiftAction icon={<Utensils />} title="Salir a comida" detail="Pausa de comida" tone="meal-out" disabled={!canStartBreak} onClick={() => handleRegister("BREAK_START")} />
+                  <PrimaryShiftAction icon={<Utensils />} title="Regresar de comida" detail="Continúa turno" tone="meal-in" disabled={!canEndBreak} onClick={() => handleRegister("BREAK_END")} />
+                  <PrimaryShiftAction icon={<LogOut />} title="Checar salida" detail="Finaliza turno" tone="exit" disabled={!canRegisterExit} onClick={() => handleRegister("EXIT")} />
+                  {verifiedEmployee.attendance.activeSession && verifiedEmployee.attendance.mealBreak.status === "NOT_STARTED" && (
+                    <button className="timeclock-exception-exit" type="button" disabled={!canRegisterExit} onClick={() => { playClick(); markSessionActivity(); setExitApproverCode(""); setExitApprovalOpen(true) }}>
+                      <KeyRound />
+                      <span><strong>Salida sin comida</strong><small>Requiere encargado</small></span>
+                    </button>
+                  )}
+                </div>
+
+                <div className={`timeclock-kiosk-status-card ${status}`}><span className="timeclock-kiosk-status-text">{statusMessage}</span></div>
+              </section>
+
+              <section className="timeclock-camera-panel">
+                <div className="timeclock-section-heading">
+                  <span>Cámara</span>
+                  <strong>Foto automática</strong>
+                </div>
                 <div className="timeclock-live-camera">
                   <div className="timeclock-live-frame">
                     <video ref={cameraPreviewRef} autoPlay muted playsInline />
@@ -799,30 +820,6 @@ export function TimeClockKiosk() {
                     <span>Centra tu rostro dentro del óvalo antes de tocar una acción.</span>
                   </div>
                 </div>
-
-                <div className="timeclock-primary-zone">
-                  {!verifiedEmployee.attendance.activeSession && (
-                    <PrimaryShiftAction icon={<LogIn />} title="Registrar entrada" detail="Inicia tu jornada laboral" tone="entry" disabled={!canRegisterEntry} onClick={() => handleRegister("ENTRY")} />
-                  )}
-                  {verifiedEmployee.attendance.activeSession && verifiedEmployee.attendance.mealBreak.status === "NOT_STARTED" && (
-                    <>
-                      <PrimaryShiftAction icon={<Utensils />} title="Salir a comida" detail="Siguiente paso de tu jornada" tone="meal-out" disabled={!canStartBreak} onClick={() => handleRegister("BREAK_START")} />
-                      <button className="timeclock-exception-exit" type="button" disabled={!canRegisterExit} onClick={() => { playClick(); markSessionActivity(); setExitApproverCode(""); setExitApprovalOpen(true) }}>
-                        <KeyRound />
-                        <span><strong>Finalizar sin registrar comida</strong><small>Requiere código de encargado</small></span>
-                      </button>
-                    </>
-                  )}
-                  {verifiedEmployee.attendance.mealBreak.status === "ON_BREAK" && (
-                    <PrimaryShiftAction icon={<Utensils />} title="Regresar de comida" detail="Continúa con tu jornada" tone="meal-in" disabled={!canEndBreak} onClick={() => handleRegister("BREAK_END")} />
-                  )}
-                  {verifiedEmployee.attendance.activeSession && verifiedEmployee.attendance.mealBreak.status === "COMPLETED" && (
-                    <PrimaryShiftAction icon={<LogOut />} title="Finalizar turno" detail="La secuencia está completa" tone="exit" disabled={!canRegisterExit} onClick={() => handleRegister("EXIT")} />
-                  )}
-                </div>
-
-                <div className={`timeclock-kiosk-status-card ${status}`}><span className="timeclock-kiosk-status-text">{statusMessage}</span></div>
-                <div className="timeclock-kiosk-photo-note"><ShieldCheck /><span>La asistencia se registra con evidencia fotográfica.</span></div>
               </section>
 
               <aside className="timeclock-financial-panel">
