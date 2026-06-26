@@ -25,6 +25,12 @@ type LastKioskSuccess = {
   time: string
   amount?: number
 }
+type PhotoCaptureState = {
+  employeeName: string
+  blob: Blob | null
+  previewUrl: string | null
+  error: string | null
+}
 
 type BrowserAudioContext = typeof AudioContext
 
@@ -91,9 +97,13 @@ export function TimeClockKiosk() {
   const queryClient = useQueryClient()
   const setupToken = useMemo(() => new URLSearchParams(window.location.search).get("token"), [])
   const streamRef = useRef<MediaStream | null>(null)
+  const cameraPreviewRef = useRef<HTMLVideoElement | null>(null)
+  const photoResolveRef = useRef<((blob: Blob) => void) | null>(null)
+  const photoRejectRef = useRef<((error: Error) => void) | null>(null)
   const statusResetTimeoutRef = useRef<number | null>(null)
   const lastSuccessTimeoutRef = useRef<number | null>(null)
   const messageTimeoutRef = useRef<number | null>(null)
+  const toastTimeoutRef = useRef<number | null>(null)
   const salaryAdvanceSubmittingRef = useRef(false)
   
   const [deviceToken, setDeviceToken] = useState(timeClockDeviceSession.token)
@@ -112,7 +122,9 @@ export function TimeClockKiosk() {
   // States for the registration flow
   const [status, setStatus] = useState<KioskStatus>("idle")
   const [statusMessage, setStatusMessage] = useState<string>("Ingresa tu PIN para comenzar")
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [lastSuccess, setLastSuccess] = useState<LastKioskSuccess | null>(null)
+  const [photoCapture, setPhotoCapture] = useState<PhotoCaptureState | null>(null)
   const [verifiedEmployee, setVerifiedEmployee] = useState<VerifiedEmployee | null>(null)
   const [sessionActivityAt, setSessionActivityAt] = useState<number>(0)
   const [advanceOpen, setAdvanceOpen] = useState(false)
@@ -165,6 +177,15 @@ export function TimeClockKiosk() {
     }, delayMs)
   }, [clearTimeoutRef])
 
+  const showToast = useCallback((text: string) => {
+    clearTimeoutRef(toastTimeoutRef)
+    setToastMessage(text)
+    toastTimeoutRef.current = window.setTimeout(() => {
+      toastTimeoutRef.current = null
+      setToastMessage(null)
+    }, 2200)
+  }, [clearTimeoutRef])
+
   const releaseCamera = useCallback((stream = streamRef.current) => {
     if (stream) {
       stream.getTracks().forEach((track) => track.stop())
@@ -207,11 +228,18 @@ export function TimeClockKiosk() {
     releaseCamera()
   }, [releaseCamera])
 
+  const finishSuccessfulAction = useCallback((message: string) => {
+    showToast(message)
+    clearEmployeeSession()
+  }, [clearEmployeeSession, showToast])
+
   useEffect(() => {
     return () => {
       clearTimeoutRef(statusResetTimeoutRef)
       clearTimeoutRef(lastSuccessTimeoutRef)
       clearTimeoutRef(messageTimeoutRef)
+      clearTimeoutRef(toastTimeoutRef)
+      photoRejectRef.current?.(new Error("Captura cancelada."))
       releaseCamera()
     }
   }, [clearTimeoutRef, releaseCamera])
@@ -272,39 +300,97 @@ export function TimeClockKiosk() {
     return () => window.clearTimeout(timeout)
   }, [clearEmployeeSession, isProcessing, sessionActivityAt, verifiedEmployee])
 
-  async function capturePhotoOnce() {
-    let stream: MediaStream | null = null
-    const video = document.createElement("video")
-    const canvas = document.createElement("canvas")
-
-    try {
-      stream = await getCameraStream()
-      video.muted = true
-      video.playsInline = true
-      video.srcObject = stream
-      await video.play()
-      if (video.readyState < 2) {
-        await new Promise((resolve) => window.setTimeout(resolve, 120))
-      }
-
-      if (video.readyState < 2) {
-        throw new Error("La cámara no está lista para capturar evidencia.")
-      }
-
-      canvas.width = video.videoWidth || 640
-      canvas.height = video.videoHeight || 480
-      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82))
-      if (!blob) throw new Error("No se pudo procesar la fotografía de evidencia.")
-      return blob
-    } catch (error) {
-      throw error instanceof Error ? error : new Error("No se pudo capturar la fotografía de evidencia.")
-    } finally {
-      video.pause()
-      video.srcObject = null
-      releaseCamera(stream)
-    }
+  function capturePhotoOnce(employeeName: string) {
+    setStatus("capturing_photo")
+    setStatusMessage(`Centra tu rostro en el óvalo para ${employeeName}.`)
+    return new Promise<Blob>((resolve, reject) => {
+      photoResolveRef.current = resolve
+      photoRejectRef.current = reject
+      setPhotoCapture({ employeeName, blob: null, previewUrl: null, error: null })
+    })
   }
+
+  useEffect(() => {
+    if (!photoCapture || photoCapture.previewUrl) return
+
+    let cancelled = false
+    const video = cameraPreviewRef.current
+
+    getCameraStream()
+      .then(async (stream) => {
+        if (cancelled || !cameraPreviewRef.current) return
+        cameraPreviewRef.current.srcObject = stream
+        cameraPreviewRef.current.muted = true
+        cameraPreviewRef.current.playsInline = true
+        await cameraPreviewRef.current.play()
+      })
+      .catch((error: Error) => {
+        if (cancelled) return
+        photoRejectRef.current?.(error)
+        photoResolveRef.current = null
+        photoRejectRef.current = null
+        setPhotoCapture(null)
+      })
+
+    return () => {
+      cancelled = true
+      if (video) {
+        video.pause()
+        video.srcObject = null
+      }
+    }
+  }, [getCameraStream, photoCapture?.employeeName, photoCapture?.previewUrl])
+
+  const takePreviewPhoto = useCallback(async () => {
+    const video = cameraPreviewRef.current
+    if (!video || video.readyState < 2) {
+      setPhotoCapture((current) => current ? { ...current, error: "La cámara aún no está lista." } : current)
+      return
+    }
+
+    const canvas = document.createElement("canvas")
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82))
+    if (!blob) {
+      setPhotoCapture((current) => current ? { ...current, error: "No se pudo procesar la fotografía." } : current)
+      return
+    }
+
+    const previewUrl = URL.createObjectURL(blob)
+    setPhotoCapture((current) => {
+      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
+      return current ? { ...current, blob, previewUrl, error: null } : current
+    })
+    releaseCamera()
+  }, [releaseCamera])
+
+  const repeatPreviewPhoto = useCallback(() => {
+    setPhotoCapture((current) => {
+      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
+      return current ? { ...current, blob: null, previewUrl: null, error: null } : current
+    })
+    setStatusMessage(photoCapture ? `Centra tu rostro en el óvalo para ${photoCapture.employeeName}.` : "Centra tu rostro en el óvalo.")
+  }, [photoCapture])
+
+  const confirmPreviewPhoto = useCallback(() => {
+    if (!photoCapture?.blob) return
+    photoResolveRef.current?.(photoCapture.blob)
+    photoResolveRef.current = null
+    photoRejectRef.current = null
+    if (photoCapture.previewUrl) URL.revokeObjectURL(photoCapture.previewUrl)
+    setPhotoCapture(null)
+  }, [photoCapture])
+
+  const cancelPreviewPhoto = useCallback(() => {
+    photoRejectRef.current?.(new Error("Captura cancelada."))
+    photoResolveRef.current = null
+    photoRejectRef.current = null
+    if (photoCapture?.previewUrl) URL.revokeObjectURL(photoCapture.previewUrl)
+    setPhotoCapture(null)
+    releaseCamera()
+  }, [photoCapture, releaseCamera])
 
   const toVerifiedEmployee = useCallback((result: TimeClockEmployeeVerification): VerifiedEmployee => ({
     ...result.employee,
@@ -368,7 +454,7 @@ export function TimeClockKiosk() {
           })
           .catch((error: Error) => {
             if (cancelled) return
-            setStatus("error")
+            setStatus("idle")
             setStatusMessage(error.message || "No se pudo preparar la cámara.")
           })
       })
@@ -445,10 +531,7 @@ export function TimeClockKiosk() {
         return
       }
 
-      setStatus("capturing_photo")
-      setStatusMessage(`Tomando foto para ${employee.fullName}...`)
-
-      const photo = await capturePhotoOnce()
+      const photo = await capturePhotoOnce(employee.fullName)
 
       setStatus("registering")
       setStatusMessage("Guardando registro de asistencia...")
@@ -472,13 +555,10 @@ export function TimeClockKiosk() {
         time: timeStr
       })
       playSuccess()
-
-      setEmployeeCode("")
-      setVerifiedEmployee(null)
+      finishSuccessfulAction(successMsg)
       setExitApprovalOpen(false)
       setExitApproverCode("")
 
-      scheduleStatusReset(6000)
       scheduleLastSuccessClear(10000)
 
     } catch (error: any) {
@@ -501,10 +581,7 @@ export function TimeClockKiosk() {
         throw new Error("La bebida requiere una jornada activa.")
       }
 
-      setStatus("capturing_photo")
-      setStatusMessage(`Tomando foto para ${employee.fullName}...`)
-
-      const photo = await capturePhotoOnce()
+      const photo = await capturePhotoOnce(employee.fullName)
 
       setStatus("registering")
       setStatusMessage("Guardando bebida...")
@@ -528,10 +605,8 @@ export function TimeClockKiosk() {
         time: timeStr
       })
       playSuccess()
-      setEmployeeCode("")
-      setVerifiedEmployee(null)
+      finishSuccessfulAction(`Bebida registrada - ${formattedAmount}`)
 
-      scheduleStatusReset(6000)
       scheduleLastSuccessClear(10000)
     } catch (error: any) {
       releaseCamera()
@@ -581,9 +656,7 @@ export function TimeClockKiosk() {
       setApproverCode("")
       setActiveAdvanceField("amount")
       playSuccess()
-      setEmployeeCode("")
-      setVerifiedEmployee(null)
-      scheduleStatusReset(6000)
+      finishSuccessfulAction(`Adelanto registrado - ${money.format(registeredAmount)}`)
       scheduleLastSuccessClear(10000)
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "No se pudo registrar el adelanto"
@@ -595,7 +668,7 @@ export function TimeClockKiosk() {
     } finally {
       salaryAdvanceSubmittingRef.current = false
     }
-  }, [advanceAmount, approverCode, employeeCode, markSessionActivity, playClick, playError, playSuccess, scheduleLastSuccessClear, scheduleStatusReset, verifiedEmployee])
+  }, [advanceAmount, approverCode, employeeCode, finishSuccessfulAction, markSessionActivity, playClick, playError, playSuccess, scheduleLastSuccessClear, scheduleStatusReset, verifiedEmployee])
 
   useEffect(() => {
     if (!advanceOpen || activeAdvanceField !== "code" || isProcessing || approverCode.length !== KIOSK_PIN_LENGTH) return
@@ -695,6 +768,12 @@ export function TimeClockKiosk() {
         </header>
 
         {device.error && <div className="timeclock-alert">{device.error.message}</div>}
+        {toastMessage && (
+          <div className="timeclock-toast" role="status" aria-live="polite">
+            <CheckCircle2 />
+            <span>{toastMessage}</span>
+          </div>
+        )}
 
         {!verifiedEmployee ? (
           <div className="timeclock-access-view">
@@ -798,6 +877,53 @@ export function TimeClockKiosk() {
 
                 <FinancialMovementHistory movements={verifiedEmployee.recentMovements} />
               </aside>
+            </div>
+          </div>
+        )}
+
+        {photoCapture && (
+          <div className="timeclock-photo-overlay" role="dialog" aria-modal="true" aria-labelledby="photo-capture-title">
+            <div className="timeclock-photo-modal">
+              <div className="timeclock-photo-heading">
+                <h2 id="photo-capture-title">{photoCapture.previewUrl ? "Revisa la foto" : "Centra tu rostro"}</h2>
+                <p>
+                  {photoCapture.previewUrl
+                    ? "Confirma que el rostro salga claro y centrado."
+                    : "Coloca tu rostro dentro del óvalo antes de tomar la foto."}
+                </p>
+              </div>
+              <div className="timeclock-photo-frame">
+                {photoCapture.previewUrl ? (
+                  <img src={photoCapture.previewUrl} alt="Vista previa de evidencia" />
+                ) : (
+                  <>
+                    <video ref={cameraPreviewRef} autoPlay muted playsInline />
+                    <div className="timeclock-face-oval" aria-hidden="true" />
+                  </>
+                )}
+              </div>
+              {photoCapture.error && <div className="timeclock-modal-error shake-animation">{photoCapture.error}</div>}
+              <div className="timeclock-photo-actions">
+                {photoCapture.previewUrl ? (
+                  <>
+                    <button className="timeclock-photo-secondary" type="button" onClick={repeatPreviewPhoto}>
+                      Repetir
+                    </button>
+                    <button className="timeclock-photo-primary" type="button" onClick={confirmPreviewPhoto}>
+                      Confirmar foto
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="timeclock-photo-secondary" type="button" onClick={cancelPreviewPhoto}>
+                      Cancelar
+                    </button>
+                    <button className="timeclock-photo-primary" type="button" onClick={takePreviewPhoto}>
+                      Tomar foto
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}

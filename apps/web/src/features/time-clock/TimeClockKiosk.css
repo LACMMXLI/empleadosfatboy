@@ -518,6 +518,137 @@
 .timeclock-financial-empty strong { color: #cbd5e1; font-size: 12px; }
 .timeclock-financial-empty span { font-size: 10px; }
 
+.timeclock-toast {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  z-index: 90;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: min(92vw, 34rem);
+  border: 1px solid rgba(34, 197, 94, 0.42);
+  border-radius: 0.75rem;
+  background: rgba(5, 46, 22, 0.94);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+  color: #dcfce7;
+  padding: 0.8rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 850;
+  transform: translateX(-50%);
+}
+
+.timeclock-toast svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+}
+
+.timeclock-photo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  background: rgba(2, 8, 18, 0.74);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 1rem;
+}
+
+.timeclock-photo-modal {
+  width: min(96vw, 46rem);
+  display: grid;
+  gap: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.97);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.52);
+  padding: 1rem;
+}
+
+.timeclock-photo-heading {
+  display: grid;
+  gap: 0.2rem;
+  text-align: center;
+}
+
+.timeclock-photo-heading h2 {
+  color: #f8fafc;
+  font-size: 1.35rem;
+  font-weight: 950;
+  margin: 0;
+}
+
+.timeclock-photo-heading p {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.timeclock-photo-frame {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 0.75rem;
+  background: #020617;
+}
+
+.timeclock-photo-frame video,
+.timeclock-photo-frame img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.timeclock-photo-frame video {
+  transform: scaleX(-1);
+}
+
+.timeclock-face-oval {
+  position: absolute;
+  top: 9%;
+  left: 50%;
+  width: min(48%, 18rem);
+  height: 72%;
+  border: 4px solid rgba(34, 197, 94, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 0 0 9999px rgba(2, 8, 18, 0.42), 0 0 28px rgba(34, 197, 94, 0.38);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.timeclock-photo-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.timeclock-photo-primary,
+.timeclock-photo-secondary {
+  min-height: 3.25rem;
+  border-radius: 0.65rem;
+  font-size: 0.92rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.timeclock-photo-primary {
+  border: 1px solid rgba(34, 197, 94, 0.42);
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #052e16;
+}
+
+.timeclock-photo-secondary {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+}
+
 .timeclock-advance-overlay {
   position: fixed;
   inset: 0;
