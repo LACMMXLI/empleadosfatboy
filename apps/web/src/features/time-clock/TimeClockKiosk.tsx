@@ -174,6 +174,22 @@ export function TimeClockKiosk() {
     }
   }, [])
 
+  const getCameraStream = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("Este equipo no permite abrir la cámara desde el navegador.")
+    }
+
+    const currentStream = streamRef.current
+    if (currentStream?.getVideoTracks().some((track) => track.readyState === "live")) {
+      return currentStream
+    }
+
+    releaseCamera(currentStream)
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+    streamRef.current = stream
+    return stream
+  }, [releaseCamera])
+
   const markSessionActivity = useCallback(() => {
     setSessionActivityAt(Date.now())
   }, [])
@@ -188,7 +204,8 @@ export function TimeClockKiosk() {
     setApproverCode("")
     setExitApprovalOpen(false)
     setExitApproverCode("")
-  }, [])
+    releaseCamera()
+  }, [releaseCamera])
 
   useEffect(() => {
     return () => {
@@ -256,22 +273,19 @@ export function TimeClockKiosk() {
   }, [clearEmployeeSession, isProcessing, sessionActivityAt, verifiedEmployee])
 
   async function capturePhotoOnce() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("Este equipo no permite abrir la cámara desde el navegador.")
-    }
-
     let stream: MediaStream | null = null
     const video = document.createElement("video")
     const canvas = document.createElement("canvas")
 
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
-      streamRef.current = stream
+      stream = await getCameraStream()
       video.muted = true
       video.playsInline = true
       video.srcObject = stream
       await video.play()
-      await new Promise((resolve) => window.setTimeout(resolve, 250))
+      if (video.readyState < 2) {
+        await new Promise((resolve) => window.setTimeout(resolve, 120))
+      }
 
       if (video.readyState < 2) {
         throw new Error("La cámara no está lista para capturar evidencia.")
@@ -344,6 +358,19 @@ export function TimeClockKiosk() {
         setStatus("idle")
         setStatusMessage(`PIN confirmado: ${employee.fullName}`)
         playSuccess()
+        void getCameraStream()
+          .then(() => {
+            if (cancelled) {
+              releaseCamera()
+              return
+            }
+            setStatusMessage(`PIN confirmado: ${employee.fullName}. Cámara lista.`)
+          })
+          .catch((error: Error) => {
+            if (cancelled) return
+            setStatus("error")
+            setStatusMessage(error.message || "No se pudo preparar la cámara.")
+          })
       })
       .catch((error: Error) => {
         if (cancelled) return
@@ -358,8 +385,9 @@ export function TimeClockKiosk() {
 
     return () => {
       cancelled = true
+      releaseCamera()
     }
-  }, [employeeCode, needsAuthorization, playError, playSuccess, releaseCamera, scheduleStatusReset, toVerifiedEmployee])
+  }, [employeeCode, getCameraStream, needsAuthorization, playError, playSuccess, releaseCamera, scheduleStatusReset, toVerifiedEmployee])
 
   const handleKeyPress = useCallback((key: string) => {
     if (isProcessing) return
@@ -403,10 +431,9 @@ export function TimeClockKiosk() {
   const handleRegister = async (type: TimeClockEventType, managerCode?: string) => {
     playClick()
     markSessionActivity()
-    releaseCamera()
 
     try {
-      const employee = await validateEmployeeCode()
+      const employee = verifiedEmployee ?? await validateEmployeeCode()
       if (!employee.attendance.allowedActions.includes(type)) {
         throw new Error(actionUnavailableMessage(type, employee))
       }
@@ -419,7 +446,7 @@ export function TimeClockKiosk() {
       }
 
       setStatus("capturing_photo")
-      setStatusMessage(`Abriendo cámara para ${employee.fullName}...`)
+      setStatusMessage(`Tomando foto para ${employee.fullName}...`)
 
       const photo = await capturePhotoOnce()
 
@@ -467,16 +494,15 @@ export function TimeClockKiosk() {
   const handleRegisterDrink = async () => {
     playClick()
     markSessionActivity()
-    releaseCamera()
 
     try {
-      const employee = await validateEmployeeCode()
+      const employee = verifiedEmployee ?? await validateEmployeeCode()
       if (!employee.attendance.activeSession) {
         throw new Error("La bebida requiere una jornada activa.")
       }
 
       setStatus("capturing_photo")
-      setStatusMessage(`Abriendo cámara para ${employee.fullName}...`)
+      setStatusMessage(`Tomando foto para ${employee.fullName}...`)
 
       const photo = await capturePhotoOnce()
 
