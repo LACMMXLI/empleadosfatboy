@@ -25,12 +25,6 @@ type LastKioskSuccess = {
   time: string
   amount?: number
 }
-type PhotoCaptureState = {
-  employeeName: string
-  blob: Blob | null
-  previewUrl: string | null
-  error: string | null
-}
 
 type BrowserAudioContext = typeof AudioContext
 
@@ -98,8 +92,6 @@ export function TimeClockKiosk() {
   const setupToken = useMemo(() => new URLSearchParams(window.location.search).get("token"), [])
   const streamRef = useRef<MediaStream | null>(null)
   const cameraPreviewRef = useRef<HTMLVideoElement | null>(null)
-  const photoResolveRef = useRef<((blob: Blob) => void) | null>(null)
-  const photoRejectRef = useRef<((error: Error) => void) | null>(null)
   const statusResetTimeoutRef = useRef<number | null>(null)
   const lastSuccessTimeoutRef = useRef<number | null>(null)
   const messageTimeoutRef = useRef<number | null>(null)
@@ -124,7 +116,6 @@ export function TimeClockKiosk() {
   const [statusMessage, setStatusMessage] = useState<string>("Ingresa tu PIN para comenzar")
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [lastSuccess, setLastSuccess] = useState<LastKioskSuccess | null>(null)
-  const [photoCapture, setPhotoCapture] = useState<PhotoCaptureState | null>(null)
   const [verifiedEmployee, setVerifiedEmployee] = useState<VerifiedEmployee | null>(null)
   const [sessionActivityAt, setSessionActivityAt] = useState<number>(0)
   const [advanceOpen, setAdvanceOpen] = useState(false)
@@ -239,7 +230,6 @@ export function TimeClockKiosk() {
       clearTimeoutRef(lastSuccessTimeoutRef)
       clearTimeoutRef(messageTimeoutRef)
       clearTimeoutRef(toastTimeoutRef)
-      photoRejectRef.current?.(new Error("Captura cancelada."))
       releaseCamera()
     }
   }, [clearTimeoutRef, releaseCamera])
@@ -300,52 +290,55 @@ export function TimeClockKiosk() {
     return () => window.clearTimeout(timeout)
   }, [clearEmployeeSession, isProcessing, sessionActivityAt, verifiedEmployee])
 
-  function capturePhotoOnce(employeeName: string) {
-    setStatus("capturing_photo")
-    setStatusMessage(`Centra tu rostro en el óvalo para ${employeeName}.`)
-    return new Promise<Blob>((resolve, reject) => {
-      photoResolveRef.current = resolve
-      photoRejectRef.current = reject
-      setPhotoCapture({ employeeName, blob: null, previewUrl: null, error: null })
-    })
-  }
-
   useEffect(() => {
-    if (!photoCapture || photoCapture.previewUrl) return
+    if (!verifiedEmployee) return
 
     let cancelled = false
-    const video = cameraPreviewRef.current
 
     getCameraStream()
       .then(async (stream) => {
-        if (cancelled || !cameraPreviewRef.current) return
-        cameraPreviewRef.current.srcObject = stream
-        cameraPreviewRef.current.muted = true
-        cameraPreviewRef.current.playsInline = true
-        await cameraPreviewRef.current.play()
+        const video = cameraPreviewRef.current
+        if (cancelled || !video) return
+        video.srcObject = stream
+        video.muted = true
+        video.playsInline = true
+        await video.play()
       })
       .catch((error: Error) => {
         if (cancelled) return
-        photoRejectRef.current?.(error)
-        photoResolveRef.current = null
-        photoRejectRef.current = null
-        setPhotoCapture(null)
+        setStatusMessage(error.message || "No se pudo preparar la cámara.")
       })
 
     return () => {
       cancelled = true
+      const video = cameraPreviewRef.current
       if (video) {
         video.pause()
         video.srcObject = null
       }
     }
-  }, [getCameraStream, photoCapture?.employeeName, photoCapture?.previewUrl])
+  }, [getCameraStream, verifiedEmployee?.id])
 
-  const takePreviewPhoto = useCallback(async () => {
+  async function capturePhotoOnce(employeeName: string) {
+    setStatus("capturing_photo")
+    setStatusMessage(`Tomando foto para ${employeeName}...`)
+    const stream = await getCameraStream()
     const video = cameraPreviewRef.current
-    if (!video || video.readyState < 2) {
-      setPhotoCapture((current) => current ? { ...current, error: "La cámara aún no está lista." } : current)
-      return
+    if (!video) {
+      throw new Error("La vista de cámara no está lista.")
+    }
+
+    if (video.srcObject !== stream) {
+      video.srcObject = stream
+      video.muted = true
+      video.playsInline = true
+      await video.play()
+    }
+    if (video.readyState < 2) {
+      await new Promise((resolve) => window.setTimeout(resolve, 180))
+    }
+    if (video.readyState < 2) {
+      throw new Error("La cámara no está lista para capturar evidencia.")
     }
 
     const canvas = document.createElement("canvas")
@@ -353,44 +346,9 @@ export function TimeClockKiosk() {
     canvas.height = video.videoHeight || 480
     canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height)
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82))
-    if (!blob) {
-      setPhotoCapture((current) => current ? { ...current, error: "No se pudo procesar la fotografía." } : current)
-      return
-    }
-
-    const previewUrl = URL.createObjectURL(blob)
-    setPhotoCapture((current) => {
-      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
-      return current ? { ...current, blob, previewUrl, error: null } : current
-    })
-    releaseCamera()
-  }, [releaseCamera])
-
-  const repeatPreviewPhoto = useCallback(() => {
-    setPhotoCapture((current) => {
-      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl)
-      return current ? { ...current, blob: null, previewUrl: null, error: null } : current
-    })
-    setStatusMessage(photoCapture ? `Centra tu rostro en el óvalo para ${photoCapture.employeeName}.` : "Centra tu rostro en el óvalo.")
-  }, [photoCapture])
-
-  const confirmPreviewPhoto = useCallback(() => {
-    if (!photoCapture?.blob) return
-    photoResolveRef.current?.(photoCapture.blob)
-    photoResolveRef.current = null
-    photoRejectRef.current = null
-    if (photoCapture.previewUrl) URL.revokeObjectURL(photoCapture.previewUrl)
-    setPhotoCapture(null)
-  }, [photoCapture])
-
-  const cancelPreviewPhoto = useCallback(() => {
-    photoRejectRef.current?.(new Error("Captura cancelada."))
-    photoResolveRef.current = null
-    photoRejectRef.current = null
-    if (photoCapture?.previewUrl) URL.revokeObjectURL(photoCapture.previewUrl)
-    setPhotoCapture(null)
-    releaseCamera()
-  }, [photoCapture, releaseCamera])
+    if (!blob) throw new Error("No se pudo procesar la fotografía de evidencia.")
+    return blob
+  }
 
   const toVerifiedEmployee = useCallback((result: TimeClockEmployeeVerification): VerifiedEmployee => ({
     ...result.employee,
@@ -769,9 +727,12 @@ export function TimeClockKiosk() {
 
         {device.error && <div className="timeclock-alert">{device.error.message}</div>}
         {toastMessage && (
-          <div className="timeclock-toast" role="status" aria-live="polite">
-            <CheckCircle2 />
-            <span>{toastMessage}</span>
+          <div className="timeclock-success-overlay" role="status" aria-live="polite">
+            <div className="timeclock-success-modal">
+              <CheckCircle2 />
+              <strong>Listo</strong>
+              <span>{toastMessage}</span>
+            </div>
           </div>
         )}
 
@@ -828,6 +789,17 @@ export function TimeClockKiosk() {
                 </div>
                 <ShiftSequence attendance={verifiedEmployee.attendance} />
 
+                <div className="timeclock-live-camera">
+                  <div className="timeclock-live-frame">
+                    <video ref={cameraPreviewRef} autoPlay muted playsInline />
+                    <div className="timeclock-face-oval" aria-hidden="true" />
+                  </div>
+                  <div className="timeclock-live-caption">
+                    <ShieldCheck />
+                    <span>Centra tu rostro dentro del óvalo antes de tocar una acción.</span>
+                  </div>
+                </div>
+
                 <div className="timeclock-primary-zone">
                   {!verifiedEmployee.attendance.activeSession && (
                     <PrimaryShiftAction icon={<LogIn />} title="Registrar entrada" detail="Inicia tu jornada laboral" tone="entry" disabled={!canRegisterEntry} onClick={() => handleRegister("ENTRY")} />
@@ -877,53 +849,6 @@ export function TimeClockKiosk() {
 
                 <FinancialMovementHistory movements={verifiedEmployee.recentMovements} />
               </aside>
-            </div>
-          </div>
-        )}
-
-        {photoCapture && (
-          <div className="timeclock-photo-overlay" role="dialog" aria-modal="true" aria-labelledby="photo-capture-title">
-            <div className="timeclock-photo-modal">
-              <div className="timeclock-photo-heading">
-                <h2 id="photo-capture-title">{photoCapture.previewUrl ? "Revisa la foto" : "Centra tu rostro"}</h2>
-                <p>
-                  {photoCapture.previewUrl
-                    ? "Confirma que el rostro salga claro y centrado."
-                    : "Coloca tu rostro dentro del óvalo antes de tomar la foto."}
-                </p>
-              </div>
-              <div className="timeclock-photo-frame">
-                {photoCapture.previewUrl ? (
-                  <img src={photoCapture.previewUrl} alt="Vista previa de evidencia" />
-                ) : (
-                  <>
-                    <video ref={cameraPreviewRef} autoPlay muted playsInline />
-                    <div className="timeclock-face-oval" aria-hidden="true" />
-                  </>
-                )}
-              </div>
-              {photoCapture.error && <div className="timeclock-modal-error shake-animation">{photoCapture.error}</div>}
-              <div className="timeclock-photo-actions">
-                {photoCapture.previewUrl ? (
-                  <>
-                    <button className="timeclock-photo-secondary" type="button" onClick={repeatPreviewPhoto}>
-                      Repetir
-                    </button>
-                    <button className="timeclock-photo-primary" type="button" onClick={confirmPreviewPhoto}>
-                      Confirmar foto
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button className="timeclock-photo-secondary" type="button" onClick={cancelPreviewPhoto}>
-                      Cancelar
-                    </button>
-                    <button className="timeclock-photo-primary" type="button" onClick={takePreviewPhoto}>
-                      Tomar foto
-                    </button>
-                  </>
-                )}
-              </div>
             </div>
           </div>
         )}
