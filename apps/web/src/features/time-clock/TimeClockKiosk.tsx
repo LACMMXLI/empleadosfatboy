@@ -92,7 +92,6 @@ export function TimeClockKiosk() {
   const queryClient = useQueryClient()
   const setupToken = useMemo(() => new URLSearchParams(window.location.search).get("token"), [])
   const streamRef = useRef<MediaStream | null>(null)
-  const cameraPreviewRef = useRef<HTMLVideoElement | null>(null)
   const capturePreviewRef = useRef<HTMLVideoElement | null>(null)
   const statusResetTimeoutRef = useRef<number | null>(null)
   const lastSuccessTimeoutRef = useRef<number | null>(null)
@@ -300,14 +299,7 @@ export function TimeClockKiosk() {
     let cancelled = false
 
     getCameraStream()
-      .then(async (stream) => {
-        const video = cameraPreviewRef.current
-        if (cancelled || !video) return
-        video.srcObject = stream
-        video.muted = true
-        video.playsInline = true
-        await video.play()
-      })
+      .then(() => undefined)
       .catch((error: Error) => {
         if (cancelled) return
         setStatusMessage(error.message || "No se pudo preparar la cámara.")
@@ -315,11 +307,6 @@ export function TimeClockKiosk() {
 
     return () => {
       cancelled = true
-      const video = cameraPreviewRef.current
-      if (video) {
-        video.pause()
-        video.srcObject = null
-      }
     }
   }, [getCameraStream, verifiedEmployee?.id])
 
@@ -333,7 +320,7 @@ export function TimeClockKiosk() {
         await new Promise((resolve) => window.setTimeout(resolve, 30))
       }
 
-      const video = capturePreviewRef.current ?? cameraPreviewRef.current
+      const video = capturePreviewRef.current
       if (!video) throw new Error("La vista de cámara no está lista.")
 
       if (video.srcObject !== stream) {
@@ -841,23 +828,6 @@ export function TimeClockKiosk() {
                 </div>
 
                 <div className={`timeclock-kiosk-status-card ${status}`}><span className="timeclock-kiosk-status-text">{statusMessage}</span></div>
-              </section>
-
-              <section className="timeclock-camera-panel">
-                <div className="timeclock-section-heading">
-                  <span>Cámara</span>
-                  <strong>Foto automática</strong>
-                </div>
-                <div className="timeclock-live-camera">
-                  <div className="timeclock-live-frame">
-                    <video ref={cameraPreviewRef} autoPlay muted playsInline />
-                    <div className="timeclock-face-oval" aria-hidden="true" />
-                  </div>
-                  <div className="timeclock-live-caption">
-                    <ShieldCheck />
-                    <span>Centra tu rostro dentro del óvalo antes de tocar una acción.</span>
-                  </div>
-                </div>
               </section>
 
               <aside className="timeclock-financial-panel">
