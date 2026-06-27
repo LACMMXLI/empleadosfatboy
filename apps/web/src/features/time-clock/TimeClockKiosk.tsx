@@ -129,11 +129,18 @@ export function TimeClockKiosk() {
   const [exitApproverCode, setExitApproverCode] = useState("")
   const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
   const canUseActions = Boolean(verifiedEmployee) && !isProcessing
-  const allowedActions = verifiedEmployee?.attendance.allowedActions ?? (verifiedEmployee ? [verifiedEmployee.attendance.nextAction] : [])
-  const canRegisterEntry = Boolean(canUseActions && allowedActions.includes("ENTRY"))
-  const canRegisterExit = Boolean(canUseActions && allowedActions.includes("EXIT"))
-  const canStartBreak = Boolean(canUseActions && allowedActions.includes("BREAK_START"))
-  const canEndBreak = Boolean(canUseActions && allowedActions.includes("BREAK_END"))
+  const nextShiftAction = verifiedEmployee ? getShiftActionMeta(verifiedEmployee.attendance.nextAction) : null
+  const canUseNextShiftAction = Boolean(
+    canUseActions &&
+    nextShiftAction &&
+    verifiedEmployee?.attendance.allowedActions.includes(nextShiftAction.type)
+  )
+  const canApproveExitWithoutMeal = Boolean(
+    canUseActions &&
+    verifiedEmployee?.attendance.activeSession &&
+    verifiedEmployee.attendance.mealBreak.status === "NOT_STARTED" &&
+    verifiedEmployee.attendance.allowedActions.includes("EXIT")
+  )
   const canUseFinancialActions = Boolean(canUseActions && verifiedEmployee?.attendance.activeSession)
   const canRegisterDrink = canUseFinancialActions
   const canRequestAdvance = canUseFinancialActions
@@ -815,12 +822,11 @@ export function TimeClockKiosk() {
                 <ShiftSequence attendance={verifiedEmployee.attendance} />
 
                 <div className="timeclock-primary-zone">
-                  <PrimaryShiftAction icon={<LogIn />} title="Registrar entrada" detail="Inicia turno" tone="entry" disabled={!canRegisterEntry} onClick={() => handleRegister("ENTRY")} />
-                  <PrimaryShiftAction icon={<Utensils />} title="Salir a comida" detail="Pausa de comida" tone="meal-out" disabled={!canStartBreak} onClick={() => handleRegister("BREAK_START")} />
-                  <PrimaryShiftAction icon={<Utensils />} title="Regresar de comida" detail="Continúa turno" tone="meal-in" disabled={!canEndBreak} onClick={() => handleRegister("BREAK_END")} />
-                  <PrimaryShiftAction icon={<LogOut />} title="Checar salida" detail="Finaliza turno" tone="exit" disabled={!canRegisterExit} onClick={() => handleRegister("EXIT")} />
-                  {verifiedEmployee.attendance.activeSession && verifiedEmployee.attendance.mealBreak.status === "NOT_STARTED" && (
-                    <button className="timeclock-exception-exit" type="button" disabled={!canRegisterExit} onClick={() => { playClick(); markSessionActivity(); setExitApproverCode(""); setExitApprovalOpen(true) }}>
+                  {nextShiftAction && verifiedEmployee.attendance.allowedActions.includes(nextShiftAction.type) && (
+                    <PrimaryShiftAction {...nextShiftAction} disabled={!canUseNextShiftAction} onClick={() => handleRegister(nextShiftAction.type)} />
+                  )}
+                  {canApproveExitWithoutMeal && (
+                    <button className="timeclock-exception-exit" type="button" onClick={() => { playClick(); markSessionActivity(); setExitApproverCode(""); setExitApprovalOpen(true) }}>
                       <KeyRound />
                       <span><strong>Salida sin comida</strong><small>Requiere encargado</small></span>
                     </button>
@@ -1092,6 +1098,13 @@ const EmployeePinKeypad = memo(function EmployeePinKeypad({ valueLength, disable
     </div>
   )
 })
+
+function getShiftActionMeta(type: TimeClockEventType) {
+  if (type === "ENTRY") return { type, icon: <LogIn />, title: "Registrar entrada", detail: "Inicia turno", tone: "entry" }
+  if (type === "BREAK_START") return { type, icon: <Utensils />, title: "Salir a comida", detail: "Pausa de comida", tone: "meal-out" }
+  if (type === "BREAK_END") return { type, icon: <Utensils />, title: "Regresar de comida", detail: "Continúa turno", tone: "meal-in" }
+  return { type, icon: <LogOut />, title: "Cerrar turno", detail: "Finaliza turno", tone: "exit" }
+}
 
 function PrimaryShiftAction({ icon, title, detail, tone, disabled, onClick }: {
   icon: ReactNode
