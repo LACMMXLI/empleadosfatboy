@@ -12,6 +12,7 @@ const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replac
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
 const KIOSK_PIN_LENGTH = 6
 const KIOSK_SESSION_TIMEOUT_MS = 20_000
+const CAPTURE_COUNTDOWN_SECONDS = 3
 const PIN_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const
 
 type KioskStatus = "idle" | "validating_pin" | "capturing_photo" | "registering" | "success" | "error"
@@ -92,6 +93,7 @@ export function TimeClockKiosk() {
   const setupToken = useMemo(() => new URLSearchParams(window.location.search).get("token"), [])
   const streamRef = useRef<MediaStream | null>(null)
   const cameraPreviewRef = useRef<HTMLVideoElement | null>(null)
+  const capturePreviewRef = useRef<HTMLVideoElement | null>(null)
   const statusResetTimeoutRef = useRef<number | null>(null)
   const lastSuccessTimeoutRef = useRef<number | null>(null)
   const messageTimeoutRef = useRef<number | null>(null)
@@ -117,6 +119,8 @@ export function TimeClockKiosk() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [lastSuccess, setLastSuccess] = useState<LastKioskSuccess | null>(null)
   const [verifiedEmployee, setVerifiedEmployee] = useState<VerifiedEmployee | null>(null)
+  const [captureCountdown, setCaptureCountdown] = useState<number | null>(null)
+  const [captureSubject, setCaptureSubject] = useState<string | null>(null)
   const [sessionActivityAt, setSessionActivityAt] = useState<number>(0)
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [advanceAmount, setAdvanceAmount] = useState("")
@@ -321,33 +325,54 @@ export function TimeClockKiosk() {
 
   async function capturePhotoOnce(employeeName: string) {
     setStatus("capturing_photo")
-    setStatusMessage(`Tomando foto para ${employeeName}...`)
-    const stream = await getCameraStream()
-    const video = cameraPreviewRef.current
-    if (!video) {
-      throw new Error("La vista de cámara no está lista.")
-    }
+    setCaptureSubject(employeeName)
+    setStatusMessage(`Prepara tu rostro para la foto, ${employeeName}.`)
+    try {
+      const stream = await getCameraStream()
+      for (let i = 0; i < 8 && !capturePreviewRef.current; i += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 30))
+      }
 
-    if (video.srcObject !== stream) {
-      video.srcObject = stream
-      video.muted = true
-      video.playsInline = true
+      const video = capturePreviewRef.current ?? cameraPreviewRef.current
+      if (!video) throw new Error("La vista de cámara no está lista.")
+
+      if (video.srcObject !== stream) {
+        video.srcObject = stream
+        video.muted = true
+        video.playsInline = true
+      }
       await video.play()
-    }
-    if (video.readyState < 2) {
-      await new Promise((resolve) => window.setTimeout(resolve, 180))
-    }
-    if (video.readyState < 2) {
-      throw new Error("La cámara no está lista para capturar evidencia.")
-    }
 
-    const canvas = document.createElement("canvas")
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height)
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82))
-    if (!blob) throw new Error("No se pudo procesar la fotografía de evidencia.")
-    return blob
+      for (let count = CAPTURE_COUNTDOWN_SECONDS; count > 0; count -= 1) {
+        setCaptureCountdown(count)
+        setStatusMessage(`Foto en ${count}...`)
+        await new Promise((resolve) => window.setTimeout(resolve, 1000))
+      }
+      setCaptureCountdown(0)
+
+      if (video.readyState < 2) {
+        await new Promise((resolve) => window.setTimeout(resolve, 180))
+      }
+      if (video.readyState < 2) {
+        throw new Error("La cámara no está lista para capturar evidencia.")
+      }
+
+      const canvas = document.createElement("canvas")
+      canvas.width = video.videoWidth || 640
+      canvas.height = video.videoHeight || 480
+      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82))
+      if (!blob) throw new Error("No se pudo procesar la fotografía de evidencia.")
+      return blob
+    } finally {
+      setCaptureSubject(null)
+      setCaptureCountdown(null)
+      const preview = capturePreviewRef.current
+      if (preview) {
+        preview.pause()
+        preview.srcObject = null
+      }
+    }
   }
 
   const toVerifiedEmployee = useCallback((result: TimeClockEmployeeVerification): VerifiedEmployee => ({
@@ -732,6 +757,19 @@ export function TimeClockKiosk() {
               <CheckCircle2 />
               <strong>Listo</strong>
               <span>{toastMessage}</span>
+            </div>
+          </div>
+        )}
+        {captureSubject && (
+          <div className="timeclock-capture-overlay" role="dialog" aria-modal="true" aria-label="Captura de foto">
+            <div className="timeclock-capture-modal">
+              <div className="timeclock-live-frame timeclock-capture-frame">
+                <video ref={capturePreviewRef} autoPlay muted playsInline />
+                <div className="timeclock-face-oval" aria-hidden="true" />
+                <div className="timeclock-capture-count">{captureCountdown ?? CAPTURE_COUNTDOWN_SECONDS}</div>
+              </div>
+              <strong>{captureSubject}</strong>
+              <span>Centra el rostro. La foto se toma automática.</span>
             </div>
           </div>
         )}
