@@ -718,15 +718,12 @@ export class TimeClockService {
             entity: "TimeClockEntry",
             entityId: entry.id,
             affectedEmployeeId: employee.id,
-              userId: undefined,
-              newValue: this.toJson({
-                entryId: entry.id,
-                sessionId: session.id,
-                type: input.type,
-                deviceId: device.id,
-                approvedById: undefined,
-                approvalReason: undefined
-              }),
+            newValue: this.toJson({
+              entryId: entry.id,
+              sessionId: session.id,
+              type: input.type,
+              deviceId: device.id
+            }),
             ipAddress: metadata.ipAddress
           }
         })
