@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, Banknote, CheckCircle2, Clock3, Coffee, Copy, KeyRound, LogIn, LogOut, Maximize, Minimize, RefreshCw, ShieldAlert, ShieldCheck, Utensils, UserRound, X } from "lucide-react"
+import { ArrowLeft, Banknote, CheckCircle2, Clock3, Coffee, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, ShieldAlert, ShieldCheck, Utensils, UserRound, X } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
 import { movementLabels, statusLabels } from "@/lib/ledger-ui"
 import type { TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
@@ -125,8 +125,6 @@ export function TimeClockKiosk() {
   const [advanceAmount, setAdvanceAmount] = useState("")
   const [approverCode, setApproverCode] = useState("")
   const [activeAdvanceField, setActiveAdvanceField] = useState<"amount" | "code">("amount")
-  const [exitApprovalOpen, setExitApprovalOpen] = useState(false)
-  const [exitApproverCode, setExitApproverCode] = useState("")
   const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
   const canUseActions = Boolean(verifiedEmployee) && !isProcessing
   const nextShiftAction = verifiedEmployee ? getShiftActionMeta(verifiedEmployee.attendance.nextAction) : null
@@ -135,7 +133,7 @@ export function TimeClockKiosk() {
     nextShiftAction &&
     verifiedEmployee?.attendance.allowedActions.includes(nextShiftAction.type)
   )
-  const canApproveExitWithoutMeal = Boolean(
+  const canCloseShiftWithoutMeal = Boolean(
     canUseActions &&
     verifiedEmployee?.attendance.activeSession &&
     verifiedEmployee.attendance.mealBreak.status === "NOT_STARTED" &&
@@ -224,8 +222,6 @@ export function TimeClockKiosk() {
     setAdvanceOpen(false)
     setAdvanceAmount("")
     setApproverCode("")
-    setExitApprovalOpen(false)
-    setExitApproverCode("")
     releaseCamera()
   }, [releaseCamera])
 
@@ -491,7 +487,7 @@ export function TimeClockKiosk() {
     }
   }
 
-  const handleRegister = async (type: TimeClockEventType, managerCode?: string) => {
+  const handleRegister = async (type: TimeClockEventType) => {
     playClick()
     markSessionActivity()
 
@@ -500,20 +496,12 @@ export function TimeClockKiosk() {
       if (!employee.attendance.allowedActions.includes(type)) {
         throw new Error(actionUnavailableMessage(type, employee))
       }
-      if (type === "EXIT" && employee.attendance.exitRequiresApproval && !managerCode) {
-        setExitApproverCode("")
-        setExitApprovalOpen(true)
-        setStatus("idle")
-        setStatusMessage("Ingresa el código del encargado para autorizar la salida.")
-        return
-      }
-
       const photo = await capturePhotoOnce(employee.fullName)
 
       setStatus("registering")
       setStatusMessage("Guardando registro de asistencia...")
 
-      await api.timeClock.registerEntry({ employeeCode, type, photo, approverCode: managerCode })
+      await api.timeClock.registerEntry({ employeeCode, type, photo })
 
       setStatus("success")
       const successMsg = `${entryTypeLabel(type)} registrada - ${employee.fullName}`
@@ -533,9 +521,6 @@ export function TimeClockKiosk() {
       })
       playSuccess()
       finishSuccessfulAction(successMsg)
-      setExitApprovalOpen(false)
-      setExitApproverCode("")
-
       scheduleLastSuccessClear(10000)
 
     } catch (error: any) {
@@ -543,7 +528,6 @@ export function TimeClockKiosk() {
       setStatus("error")
       setStatusMessage(error.message || "Error al registrar asistencia")
       playError()
-      setExitApproverCode("")
       scheduleStatusReset(5000)
     }
   }
@@ -825,11 +809,8 @@ export function TimeClockKiosk() {
                   {nextShiftAction && verifiedEmployee.attendance.allowedActions.includes(nextShiftAction.type) && (
                     <PrimaryShiftAction {...nextShiftAction} disabled={!canUseNextShiftAction} onClick={() => handleRegister(nextShiftAction.type)} />
                   )}
-                  {canApproveExitWithoutMeal && (
-                    <button className="timeclock-exception-exit" type="button" onClick={() => { playClick(); markSessionActivity(); setExitApproverCode(""); setExitApprovalOpen(true) }}>
-                      <KeyRound />
-                      <span><strong>Salida sin comida</strong><small>Requiere encargado</small></span>
-                    </button>
+                  {canCloseShiftWithoutMeal && (
+                    <PrimaryShiftAction {...getShiftActionMeta("EXIT")} disabled={!canUseActions} onClick={() => handleRegister("EXIT")} />
                   )}
                 </div>
 
@@ -860,47 +841,6 @@ export function TimeClockKiosk() {
 
                 <FinancialMovementHistory movements={verifiedEmployee.recentMovements} />
               </aside>
-            </div>
-          </div>
-        )}
-
-        {exitApprovalOpen && verifiedEmployee && (
-          <div className="timeclock-advance-overlay" role="dialog" aria-modal="true" aria-labelledby="exit-approval-title">
-            <div className="timeclock-advance-modal timeclock-exit-approval-modal">
-              <button className="timeclock-advance-close" type="button" onClick={() => { setExitApprovalOpen(false); setExitApproverCode("") }} disabled={isProcessing} aria-label="Cerrar"><X /></button>
-              <div className="timeclock-advance-icon"><KeyRound /></div>
-              <div className="timeclock-advance-heading">
-                <h2 id="exit-approval-title">Autorizar salida sin comida</h2>
-                <p>{verifiedEmployee.fullName} no completó la secuencia de comida.</p>
-              </div>
-              <div className="timeclock-approval-layout">
-                <div className="timeclock-approval-form">
-                  <label>
-                    <span>Código del encargado de sucursal</span>
-                    <input
-                      className={`timeclock-advance-code ${status === "error" ? "border-red-500 text-red-400" : ""}`}
-                      type="password"
-                      inputMode="numeric"
-                      maxLength={6}
-                      placeholder="••••••"
-                      value={exitApproverCode}
-                      onChange={(event) => { setExitApproverCode(event.target.value.replace(/\D/g, "").slice(0, 6)); markSessionActivity() }}
-                    />
-                  </label>
-                  <div className="timeclock-advance-note"><ShieldCheck /><span>Esta excepción quedará registrada con el encargado responsable.</span></div>
-                  {status === "error" && <div className="timeclock-modal-error shake-animation">{statusMessage}</div>}
-                  <button className="timeclock-advance-submit" type="button" disabled={isProcessing || exitApproverCode.length !== 6} onClick={() => handleRegister("EXIT", exitApproverCode)}>
-                    {isProcessing ? "Registrando..." : "Autorizar y finalizar turno"}
-                  </button>
-                </div>
-                <div className={status === "error" ? "shake-animation" : ""}>
-                  <ApprovalCodeKeypad
-                    value={exitApproverCode}
-                    disabled={isProcessing}
-                    onKeyPress={(key) => handleApprovalCodeKeyPress(key, setExitApproverCode)}
-                  />
-                </div>
-              </div>
             </div>
           </div>
         )}

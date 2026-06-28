@@ -35,7 +35,7 @@ async function validatesShiftSequence() {
   const noMealRule = await (noMealService as unknown as {
     assertEntryAllowed: (employeeId: string, type: TimeClockEventType) => Promise<{ requiresManagerApproval: boolean }>
   }).assertEntryAllowed("employee-1", TimeClockEventType.EXIT)
-  assert.equal(noMealRule.requiresManagerApproval, true)
+  assert.equal(noMealRule.requiresManagerApproval, false)
 
   const onBreakService = createService([entry(TimeClockEventType.BREAK_START, 1)])
   await assert.rejects(

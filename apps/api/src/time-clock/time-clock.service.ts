@@ -559,7 +559,7 @@ export class TimeClockService {
         statusLabel: isOnBreak ? "En horario de comida" : activeSession ? "Jornada activa" : lastEntry?.type === TimeClockEventType.EXIT ? "Salida registrada" : "Sin entrada activa",
         nextAction: allowedActions[0],
         allowedActions,
-        exitRequiresApproval: Boolean(activeSession && mealBreak.status !== "COMPLETED"),
+        exitRequiresApproval: false,
         mealBreak,
         activeSession: activeSession
           ? {
@@ -647,17 +647,7 @@ export class TimeClockService {
     const now = new Date()
     const local = this.localParts(now)
 
-    const entryRule = await this.assertEntryAllowed(employee.id, input.type)
-    const approvedBy = entryRule.requiresManagerApproval
-      ? await this.verifyBranchManagerApprovalCode(
-          device,
-          employee,
-          input.approverCode,
-          metadata,
-          "time-clock-exit-without-meal",
-          "TimeClockEntry"
-        )
-      : null
+    await this.assertEntryAllowed(employee.id, input.type)
     await this.assertMinimumGap(employee.id, now)
     const evidence = await this.files.uploadTimeClockEvidence(photo, employee.branchId, metadata.ipAddress)
 
@@ -728,15 +718,15 @@ export class TimeClockService {
             entity: "TimeClockEntry",
             entityId: entry.id,
             affectedEmployeeId: employee.id,
-            userId: approvedBy?.id,
-            newValue: this.toJson({
-              entryId: entry.id,
-              sessionId: session.id,
-              type: input.type,
-              deviceId: device.id,
-              approvedById: approvedBy?.id,
-              approvalReason: approvedBy ? "EXIT_WITHOUT_COMPLETED_MEAL_BREAK" : undefined
-            }),
+              userId: undefined,
+              newValue: this.toJson({
+                entryId: entry.id,
+                sessionId: session.id,
+                type: input.type,
+                deviceId: device.id,
+                approvedById: undefined,
+                approvalReason: undefined
+              }),
             ipAddress: metadata.ipAddress
           }
         })
@@ -1376,9 +1366,7 @@ export class TimeClockService {
       throw new BadRequestException("No existe una salida de comida pendiente")
     }
 
-    return {
-      requiresManagerApproval: type === TimeClockEventType.EXIT && mealBreak.status !== "COMPLETED"
-    }
+    return { requiresManagerApproval: false }
   }
 
   private async mealBreakState(employeeId: string, sessionStartedAt: Date) {
