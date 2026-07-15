@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { AlertTriangle, Banknote, Building2, CheckCircle2, ClipboardList, KeyRound, LayoutDashboard, LogOut, Phone, Sparkles, UserRound, WalletCards, X } from "lucide-react"
+import { AlertTriangle, Banknote, Building2, CheckCircle2, ClipboardList, KeyRound, LayoutDashboard, LogOut, MapPin, Sparkles, TimerReset, UserRound, WalletCards, X } from "lucide-react"
 import { api, employeeSession } from "@/lib/api"
-import type { Movement, MovementKind, MovementSettlementTicket } from "@/types/domain"
+import type { Movement, MovementKind, MovementSettlementTicket, TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
 import { useScrollDirection } from "@/hooks/useScrollDirection"
 import { StatusEmpty } from "@/components/common/Status"
 import { DetailLine } from "@/components/common/AdminPrimitives"
@@ -22,15 +22,33 @@ import {
 } from "@/lib/ledger-ui"
 import fatboyLogo from "@/assets/logo.png"
 
+type EmployeeTab = "home" | "attendance" | "request" | "history"
+
+type MobileLocation = {
+  latitude: number
+  longitude: number
+  accuracy: number
+}
+
+const attendanceActionLabels: Record<TimeClockEventType, string> = {
+  ENTRY: "Registrar entrada",
+  BREAK_START: "Salir a comida",
+  BREAK_END: "Regresar de comida",
+  EXIT: "Cerrar turno"
+}
+
 export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const queryClient = useQueryClient()
-  const [activeTab, setActiveTab] = useState<"home" | "request" | "history">("home")
+  const [activeTab, setActiveTab] = useState<EmployeeTab>("home")
   const [historyTab, setHistoryTab] = useState<"current" | "settled">("current")
   const [accountOpen, setAccountOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [requestError, setRequestError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [codeMessage, setCodeMessage] = useState<string | null>(null)
+  const [attendancePin, setAttendancePin] = useState("")
+  const [attendanceMessage, setAttendanceMessage] = useState<string | null>(null)
+  const [attendancePreview, setAttendancePreview] = useState<TimeClockEmployeeVerification | null>(null)
   const [reasonType, setReasonType] = useState<(typeof quickRequestReasons)[number]>("Personal")
   const [customReason, setCustomReason] = useState("")
   const me = useQuery({ queryKey: ["employeePortal", "me"], queryFn: api.employeePortal.me })
@@ -147,6 +165,37 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
       codeForm.reset({ currentCode: "", newCode: "" })
     },
     onError: (err: Error) => setCodeMessage(err.message)
+  })
+  const registerAttendance = useMutation({
+    mutationFn: async (pin: string) => {
+      if (!/^\d{6}$/.test(pin)) throw new Error("Ingresa tu PIN de 6 dígitos.")
+
+      setAttendanceMessage("Validando PIN...")
+      const verification = await api.timeClock.verifyMobileEmployeeCode(pin)
+      const type = verification.attendance.nextAction
+      if (!verification.attendance.allowedActions.includes(type)) {
+        throw new Error("No hay una acción de asistencia disponible.")
+      }
+      setAttendancePreview(verification)
+
+      setAttendanceMessage("Obteniendo ubicación GPS...")
+      const location = await getCurrentMobileLocation()
+
+      setAttendanceMessage("Tomando evidencia...")
+      const photo = await captureAttendancePhoto()
+
+      setAttendanceMessage("Guardando asistencia...")
+      const result = await api.timeClock.registerMobileEntry({ employeeCode: pin, type, photo, ...location })
+      return { result, type, verification }
+    },
+    onSuccess: async ({ result, type, verification }) => {
+      const distance = Math.round(result.location.distanceFromBranch)
+      setAttendancePin("")
+      setAttendancePreview(null)
+      setAttendanceMessage(`${attendanceActionLabels[type]} listo para ${verification.employee.fullName}. Distancia: ${distance}m.`)
+      await queryClient.invalidateQueries({ queryKey: ["employeePortal"] })
+    },
+    onError: (err: Error) => setAttendanceMessage(err.message)
   })
   const currentMovements = (movements.data ?? []).filter((movement) => movement.status !== "DISCOUNTED")
   const recentMovements = currentMovements.slice(0, 3)
@@ -429,6 +478,66 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
+        {activeTab === "attendance" && (
+          <section className="employee-request-panel">
+            <div className="employee-request-hero">
+              <div className="employee-request-kicker">
+                <MapPin style={{ width: 14, height: 14 }} />
+                Asistencia GPS
+              </div>
+              <h2>Registrar asistencia</h2>
+              <p>Confirma tu PIN para registrar la siguiente acción disponible con ubicación y evidencia.</p>
+            </div>
+
+            <div className="employee-request-form">
+              <div className="employee-request-section">
+                <div className="employee-request-section-head">
+                  <span>Validación</span>
+                  <strong>PIN privado</strong>
+                </div>
+                <input
+                  className="form-input h-12 rounded-xl text-center font-mono text-lg tracking-[0.3em]"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="••••••"
+                  type="password"
+                  value={attendancePin}
+                  onChange={(event) => {
+                    setAttendancePin(event.target.value.replace(/\D/g, "").slice(0, 6))
+                    setAttendanceMessage(null)
+                    setAttendancePreview(null)
+                  }}
+                />
+              </div>
+
+              {attendancePreview && (
+                <div className="employee-request-readonly">
+                  <span>{attendancePreview.attendance.statusLabel}</span>
+                  <strong>{attendanceActionLabels[attendancePreview.attendance.nextAction]}</strong>
+                </div>
+              )}
+
+              {attendanceMessage && (
+                <div className={registerAttendance.isError ? "employee-request-error" : "employee-request-message"}>
+                  {attendanceMessage}
+                </div>
+              )}
+
+              <button
+                className="employee-request-submit"
+                disabled={registerAttendance.isPending}
+                type="button"
+                onClick={() => registerAttendance.mutate(attendancePin)}
+              >
+                {registerAttendance.isPending ? "Registrando..." : "Registrar asistencia"}
+              </button>
+              <p className="employee-request-footnote">
+                *El navegador pedirá permiso de ubicación y cámara para guardar la asistencia.
+              </p>
+            </div>
+          </section>
+        )}
+
         {activeTab === "history" && (
           <EmployeeHistoryTabs
             activeTab={historyTab}
@@ -454,12 +563,13 @@ function EmployeeBottomNav({
   onTabChange,
   style
 }: {
-  activeTab: "home" | "request" | "history"
-  onTabChange: (tab: "home" | "request" | "history") => void
+  activeTab: EmployeeTab
+  onTabChange: (tab: EmployeeTab) => void
   style?: React.CSSProperties
 }) {
   const items = [
     { id: "home" as const, label: "Inicio", icon: LayoutDashboard },
+    { id: "attendance" as const, label: "Asistencia", icon: TimerReset },
     { id: "request" as const, label: "Solicitar", icon: Banknote },
     { id: "history" as const, label: "Historial", icon: ClipboardList }
   ]
@@ -623,6 +733,58 @@ function formatTicketDate(value?: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
+}
+
+function getCurrentMobileLocation() {
+  if (!navigator.geolocation) {
+    return Promise.reject(new Error("Este dispositivo no permite obtener ubicación GPS."))
+  }
+
+  return new Promise<MobileLocation>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        })
+      },
+      (error) => {
+        reject(new Error(error.code === error.PERMISSION_DENIED
+          ? "Activa el permiso de ubicación para registrar asistencia."
+          : "No se pudo obtener ubicación GPS. Intenta de nuevo."))
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+    )
+  })
+}
+
+async function captureAttendancePhoto() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Este dispositivo no permite abrir la cámara desde el navegador.")
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+  const video = document.createElement("video")
+  try {
+    video.srcObject = stream
+    video.muted = true
+    video.playsInline = true
+    await video.play()
+    if (video.readyState < 2) await new Promise((resolve) => window.setTimeout(resolve, 250))
+    if (video.readyState < 2) throw new Error("La cámara no está lista para capturar evidencia.")
+
+    const canvas = document.createElement("canvas")
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82))
+    if (!blob) throw new Error("No se pudo procesar la fotografía de evidencia.")
+    return blob
+  } finally {
+    stream.getTracks().forEach((track) => track.stop())
+    video.srcObject = null
+  }
 }
 
 function PortalMovementList({
