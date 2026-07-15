@@ -12,8 +12,18 @@ async function main() {
 
   const branchVenecia = await prisma.branch.upsert({
     where: { code: "VENECIA" },
-    update: {},
-    create: { code: "VENECIA", name: "Sucursal Venecia" }
+    update: {
+      latitude: 32.59556653476791,
+      longitude: -115.47062926924932,
+      geofenceRadiusMeters: 100
+    },
+    create: {
+      code: "VENECIA",
+      name: "Sucursal Venecia",
+      latitude: 32.59556653476791,
+      longitude: -115.47062926924932,
+      geofenceRadiusMeters: 100
+    }
   })
 
   const branchSanMarcos = await prisma.branch.upsert({
