@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { AlertTriangle, Banknote, Building2, CheckCircle2, ClipboardList, KeyRound, LayoutDashboard, LogOut, MapPin, Sparkles, TimerReset, UserRound, WalletCards, X } from "lucide-react"
+import { AlertTriangle, Banknote, Building2, CheckCircle2, ClipboardList, KeyRound, LayoutDashboard, LogOut, MapPin, Sparkles, UserRound, WalletCards, X } from "lucide-react"
 import { api, employeeSession } from "@/lib/api"
 import type { Movement, MovementKind, MovementSettlementTicket, TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
 import { useScrollDirection } from "@/hooks/useScrollDirection"
@@ -22,7 +22,7 @@ import {
 } from "@/lib/ledger-ui"
 import fatboyLogo from "@/assets/logo.png"
 
-type EmployeeTab = "home" | "attendance" | "request" | "history"
+type EmployeeTab = "home" | "request" | "history"
 
 type MobileLocation = {
   latitude: number
@@ -308,6 +308,20 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
               </div>
             </section>
 
+            <EmployeeAttendanceCard
+              attendanceMessage={attendanceMessage}
+              attendancePin={attendancePin}
+              attendancePreview={attendancePreview}
+              isError={registerAttendance.isError}
+              isPending={registerAttendance.isPending}
+              onPinChange={(value) => {
+                setAttendancePin(value.replace(/\D/g, "").slice(0, 6))
+                setAttendanceMessage(null)
+                setAttendancePreview(null)
+              }}
+              onSubmit={() => registerAttendance.mutate(attendancePin)}
+            />
+
             <PortalMovementList compact title="Últimos Movimientos" movements={recentMovements} />
           </>
         )}
@@ -478,66 +492,6 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
-        {activeTab === "attendance" && (
-          <section className="employee-request-panel">
-            <div className="employee-request-hero">
-              <div className="employee-request-kicker">
-                <MapPin style={{ width: 14, height: 14 }} />
-                Asistencia GPS
-              </div>
-              <h2>Registrar asistencia</h2>
-              <p>Confirma tu PIN para registrar la siguiente acción disponible con ubicación y evidencia.</p>
-            </div>
-
-            <div className="employee-request-form">
-              <div className="employee-request-section">
-                <div className="employee-request-section-head">
-                  <span>Validación</span>
-                  <strong>PIN privado</strong>
-                </div>
-                <input
-                  className="form-input h-12 rounded-xl text-center font-mono text-lg tracking-[0.3em]"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="••••••"
-                  type="password"
-                  value={attendancePin}
-                  onChange={(event) => {
-                    setAttendancePin(event.target.value.replace(/\D/g, "").slice(0, 6))
-                    setAttendanceMessage(null)
-                    setAttendancePreview(null)
-                  }}
-                />
-              </div>
-
-              {attendancePreview && (
-                <div className="employee-request-readonly">
-                  <span>{attendancePreview.attendance.statusLabel}</span>
-                  <strong>{attendanceActionLabels[attendancePreview.attendance.nextAction]}</strong>
-                </div>
-              )}
-
-              {attendanceMessage && (
-                <div className={registerAttendance.isError ? "employee-request-error" : "employee-request-message"}>
-                  {attendanceMessage}
-                </div>
-              )}
-
-              <button
-                className="employee-request-submit"
-                disabled={registerAttendance.isPending}
-                type="button"
-                onClick={() => registerAttendance.mutate(attendancePin)}
-              >
-                {registerAttendance.isPending ? "Registrando..." : "Registrar asistencia"}
-              </button>
-              <p className="employee-request-footnote">
-                *El navegador pedirá permiso de ubicación y cámara para guardar la asistencia.
-              </p>
-            </div>
-          </section>
-        )}
-
         {activeTab === "history" && (
           <EmployeeHistoryTabs
             activeTab={historyTab}
@@ -569,7 +523,6 @@ function EmployeeBottomNav({
 }) {
   const items = [
     { id: "home" as const, label: "Inicio", icon: LayoutDashboard },
-    { id: "attendance" as const, label: "Asistencia", icon: TimerReset },
     { id: "request" as const, label: "Solicitar", icon: Banknote },
     { id: "history" as const, label: "Historial", icon: ClipboardList }
   ]
@@ -593,6 +546,80 @@ function EmployeeBottomNav({
         })}
       </div>
     </nav>
+  )
+}
+
+function EmployeeAttendanceCard({
+  attendanceMessage,
+  attendancePin,
+  attendancePreview,
+  isError,
+  isPending,
+  onPinChange,
+  onSubmit
+}: {
+  attendanceMessage: string | null
+  attendancePin: string
+  attendancePreview: TimeClockEmployeeVerification | null
+  isError: boolean
+  isPending: boolean
+  onPinChange: (value: string) => void
+  onSubmit: () => void
+}) {
+  return (
+    <section className="employee-request-panel">
+      <div className="employee-request-hero">
+        <div className="employee-request-kicker">
+          <MapPin style={{ width: 14, height: 14 }} />
+          Asistencia GPS
+        </div>
+        <h2>Registrar asistencia</h2>
+        <p>Confirma tu PIN para registrar la siguiente acción disponible con ubicación y evidencia.</p>
+      </div>
+
+      <div className="employee-request-form">
+        <div className="employee-request-section">
+          <div className="employee-request-section-head">
+            <span>Validación</span>
+            <strong>PIN privado</strong>
+          </div>
+          <input
+            className="form-input h-12 rounded-xl text-center font-mono text-lg tracking-[0.3em]"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="••••••"
+            type="password"
+            value={attendancePin}
+            onChange={(event) => onPinChange(event.target.value)}
+          />
+        </div>
+
+        {attendancePreview && (
+          <div className="employee-request-readonly">
+            <span>{attendancePreview.attendance.statusLabel}</span>
+            <strong>{attendanceActionLabels[attendancePreview.attendance.nextAction]}</strong>
+          </div>
+        )}
+
+        {attendanceMessage && (
+          <div className={isError ? "employee-request-error" : "employee-request-message"}>
+            {attendanceMessage}
+          </div>
+        )}
+
+        <button
+          className="employee-request-submit"
+          disabled={isPending}
+          type="button"
+          onClick={onSubmit}
+        >
+          {isPending ? "Registrando..." : "Registrar asistencia"}
+        </button>
+        <p className="employee-request-footnote">
+          *El navegador pedirá permiso de ubicación y cámara para guardar la asistencia.
+        </p>
+      </div>
+    </section>
   )
 }
 
