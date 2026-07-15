@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common"
 import { PrismaService } from "../prisma/prisma.service"
 
-type LoginThrottleScope = "admin" | "employee" | "time-clock" | "time-clock-advance-approver"
+type LoginThrottleScope = "admin" | "employee" | "time-clock" | "time-clock-mobile" | "time-clock-advance-approver"
 
 type LoginThrottleMetadata = {
   ipAddress?: string

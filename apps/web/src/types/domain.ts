@@ -48,6 +48,9 @@ export type Branch = {
   name: string
   code: string
   active: boolean
+  latitude?: number | null
+  longitude?: number | null
+  geofenceRadiusMeters?: number
 }
 
 export type Employee = {
@@ -278,12 +281,18 @@ export type TimeClockEntry = {
   employeeId: string
   branchId: string
   deviceId?: string | null
+  deviceType?: "FIXED" | "MOBILE"
   type: TimeClockEventType
   occurredAt: string
   localDate: string
   localTime: string
   timeZone: string
   evidenceFileId?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  accuracy?: number | null
+  isWithinRadius?: boolean | null
+  distanceFromBranch?: number | null
   status: TimeClockEntryStatus
   notes?: string | null
   requestIp?: string | null
@@ -298,7 +307,7 @@ export type TimeClockEntry = {
 
 export type TimeClockEmployeeVerification = {
   employee: Pick<Employee, "id" | "fullName" | "position"> & {
-    branch: Pick<Branch, "id" | "name" | "code">
+    branch: Pick<Branch, "id" | "name" | "code" | "latitude" | "longitude" | "geofenceRadiusMeters">
   }
   attendance: {
     state: "IN_SHIFT" | "ON_BREAK" | "EXITED" | "NO_RECORD"

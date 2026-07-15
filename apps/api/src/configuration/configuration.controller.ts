@@ -44,6 +44,19 @@ class CreateBranchDto {
 
   @IsString()
   code!: string
+
+  @IsOptional()
+  @IsNumber()
+  latitude?: number
+
+  @IsOptional()
+  @IsNumber()
+  longitude?: number
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  geofenceRadiusMeters?: number
 }
 
 class UpdateBranchDto {
@@ -57,6 +70,19 @@ class UpdateBranchDto {
 
   @IsOptional()
   active?: boolean
+
+  @IsOptional()
+  @IsNumber()
+  latitude?: number
+
+  @IsOptional()
+  @IsNumber()
+  longitude?: number
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  geofenceRadiusMeters?: number
 }
 
 class UpdateRuleDto {

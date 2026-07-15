@@ -18,7 +18,7 @@ import {
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
 import { Type } from "class-transformer"
-import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Matches, Max, Min, MinLength, ValidateNested } from "class-validator"
+import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Matches, Max, Min, MinLength, ValidateNested } from "class-validator"
 import { memoryStorage } from "multer"
 import type { Response } from "express"
 import { OvertimeAuthorizationStatus, Role, TimeClockEventType } from "@prisma/client"
@@ -80,6 +80,44 @@ class RegisterEntryDto {
   @IsOptional()
   @IsString()
   approverCode?: string
+}
+
+class MobileLocationDto {
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude!: number
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude!: number
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  accuracy!: number
+}
+
+class RegisterMobileEntryDto extends RegisterEntryDto {
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude!: number
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude!: number
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  accuracy!: number
 }
 
 class RegisterDrinkDto {
@@ -211,6 +249,22 @@ export class TimeClockPublicController {
     })
   }
 
+  @Post("mobile/employee-code")
+  mobileEmployeeCode(@Body() dto: VerifyEmployeeCodeDto, @Req() request: RequestWithUser) {
+    return this.timeClock.verifyMobileEmployeeCode(dto, {
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] as string | undefined
+    })
+  }
+
+  @Post("mobile/location-check")
+  mobileLocationCheck(@Body() dto: MobileLocationDto & { employeeCode?: string }, @Req() request: RequestWithUser) {
+    return this.timeClock.previewMobileLocation(dto, {
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] as string | undefined
+    })
+  }
+
   @Post("device-requests")
   deviceRequest(@Body() dto: CreateDeviceRegistrationDto, @Req() request: RequestWithUser) {
     return this.timeClock.createDeviceRegistration(dto, {
@@ -240,6 +294,31 @@ export class TimeClockPublicController {
     @Req() request: RequestWithUser
   ) {
     return this.timeClock.registerEntry(token, dto, photo, {
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"] as string | undefined
+    })
+  }
+
+  @Post("mobile/entries")
+  @UseInterceptors(
+    FileInterceptor("photo", {
+      storage: memoryStorage(),
+      limits: { fileSize: maxImageUploadBytes },
+      fileFilter: (_request, file, callback) => {
+        if (!allowedImageMimeTypes.includes(file.mimetype as (typeof allowedImageMimeTypes)[number])) {
+          callback(new BadRequestException("Solo se permiten imagenes JPEG, PNG o WEBP"), false)
+          return
+        }
+        callback(null, true)
+      }
+    })
+  )
+  mobileEntry(
+    @UploadedFile() photo: Express.Multer.File | undefined,
+    @Body() dto: RegisterMobileEntryDto,
+    @Req() request: RequestWithUser
+  ) {
+    return this.timeClock.registerMobileEntry(dto, photo, {
       ipAddress: request.ip,
       userAgent: request.headers["user-agent"] as string | undefined
     })

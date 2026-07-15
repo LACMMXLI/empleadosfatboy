@@ -9,6 +9,7 @@ import {
   Prisma,
   Role,
   TimeClockDeviceRequestStatus,
+  TimeClockDeviceType,
   TimeClockEntryStatus,
   TimeClockEventType,
   WorkSessionStatus
@@ -52,6 +53,12 @@ type RegisterEntryInput = {
   employeeCode: string
   type: TimeClockEventType
   approverCode?: string
+}
+
+type RegisterMobileEntryInput = RegisterEntryInput & {
+  latitude: number
+  longitude: number
+  accuracy: number
 }
 
 type RegisterDrinkInput = {
@@ -98,6 +105,7 @@ const timeZone = "America/Tijuana"
 const deviceRequestMinutes = 30
 const minimumTimeClockGapMs = 2 * 60 * 1000
 const minimumDrinkGapMs = 2 * 60 * 1000
+const defaultMaxGpsAccuracyMeters = 100
 const movementKindsThatRequireActiveShift = new Set<MovementKind>([
   MovementKind.SALARY_ADVANCE,
   MovementKind.ADMIN_SALARY_ADVANCE,
@@ -473,121 +481,32 @@ export class TimeClockService {
     }
 
     await this.loginThrottle.recordSuccess("time-clock", throttleId)
-    const [activeSession, lastEntry, recentMovements] = await Promise.all([
-      this.prisma.workSession.findFirst({
-        where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
-        include: {
-          startEntry: {
-            select: {
-              occurredAt: true,
-              localDate: true,
-              localTime: true,
-              type: true
-            }
-          }
-        },
-        orderBy: { startedAt: "desc" }
-      }),
-      this.prisma.timeClockEntry.findFirst({
-        where: {
-          employeeId: employee.id,
-          status: { in: [TimeClockEntryStatus.VALID, TimeClockEntryStatus.MANUAL] }
-        },
-        orderBy: { occurredAt: "desc" },
-        select: {
-          occurredAt: true,
-          localDate: true,
-          localTime: true,
-          type: true
-        }
-      }),
-      this.prisma.movement.findMany({
-        where: {
-          employeeId: employee.id,
-          kind: {
-            in: [
-              MovementKind.SALARY_ADVANCE,
-              MovementKind.ADMIN_SALARY_ADVANCE,
-              MovementKind.LOAN,
-              MovementKind.ADMIN_LOAN,
-              MovementKind.INTERNAL_CONSUMPTION,
-              MovementKind.DRINK,
-              MovementKind.FOOD
-            ]
-          }
-        },
-        orderBy: { createdAt: "desc" },
-        take: 25,
-        select: {
-          id: true,
-          folio: true,
-          kind: true,
-          amount: true,
-          reason: true,
-          status: true,
-          productName: true,
-          createdAt: true
-        }
-      })
-    ])
-    const mealBreak = activeSession
-      ? await this.mealBreakState(employee.id, activeSession.startedAt)
-      : { status: "NOT_STARTED" as const, startedAt: null, endedAt: null }
-    const isOnBreak = mealBreak.status === "ON_BREAK"
-    const attendanceState = isOnBreak ? "ON_BREAK" : activeSession ? "IN_SHIFT" : lastEntry?.type === TimeClockEventType.EXIT ? "EXITED" : "NO_RECORD"
-    const allowedActions = !activeSession
-      ? [TimeClockEventType.ENTRY]
-      : isOnBreak
-        ? [TimeClockEventType.BREAK_END]
-        : mealBreak.status === "COMPLETED"
-          ? [TimeClockEventType.EXIT]
-          : [TimeClockEventType.BREAK_START, TimeClockEventType.EXIT]
+    return this.employeeVerificationPayload(employee)
+  }
 
-    return {
-      employee: {
-        id: employee.id,
-        fullName: employee.fullName,
-        position: employee.position,
-        branch: {
-          id: employee.branch.id,
-          name: employee.branch.name,
-          code: employee.branch.code
-        }
-      },
-      attendance: {
-        state: attendanceState,
-        statusLabel: isOnBreak ? "En horario de comida" : activeSession ? "Jornada activa" : lastEntry?.type === TimeClockEventType.EXIT ? "Salida registrada" : "Sin entrada activa",
-        nextAction: allowedActions[0],
-        allowedActions,
-        exitRequiresApproval: false,
-        mealBreak,
-        activeSession: activeSession
-          ? {
-              startedAt: activeSession.startedAt,
-              localDate: activeSession.localDate,
-              localTime: activeSession.startEntry.localTime
-            }
-          : null,
-        lastEntry: lastEntry
-          ? {
-              type: lastEntry.type,
-              occurredAt: lastEntry.occurredAt,
-              localDate: lastEntry.localDate,
-              localTime: lastEntry.localTime
-            }
-          : null
-      },
-      recentMovements: recentMovements.map((movement) => ({
-        id: movement.id,
-        folio: movement.folio,
-        kind: movement.kind,
-        amount: Number(movement.amount),
-        reason: movement.reason,
-        status: movement.status,
-        productName: movement.productName,
-        createdAt: movement.createdAt
-      }))
+  async verifyMobileEmployeeCode(input: VerifyEmployeeCodeInput, metadata: RequestMetadata) {
+    const employeeCode = this.normalizeEmployeeCode(input.employeeCode)
+    if (!employeeCode) throw new BadRequestException("Codigo de empleado requerido")
+
+    const throttleId = this.mobileThrottleIdentifier(employeeCode, metadata.ipAddress)
+    await this.loginThrottle.assertCanAttempt("time-clock-mobile", throttleId)
+
+    const employee = await this.findEmployeeByCodeGlobally(employeeCode)
+    if (!employee) {
+      await this.loginThrottle.recordFailure("time-clock-mobile", throttleId, metadata)
+      throw new BadRequestException("Codigo de empleado invalido")
     }
+
+    await this.loginThrottle.recordSuccess("time-clock-mobile", throttleId)
+    return this.employeeVerificationPayload(employee)
+  }
+
+  async previewMobileLocation(input: { employeeCode?: string; latitude: number; longitude: number; accuracy: number }, metadata: RequestMetadata) {
+    const employeeCode = this.normalizeEmployeeCode(input.employeeCode ?? "")
+    if (!employeeCode) throw new BadRequestException("Codigo de empleado requerido")
+    const employee = await this.findEmployeeByCodeGlobally(employeeCode)
+    if (!employee) throw new BadRequestException("Codigo de empleado invalido")
+    return this.validateMobileLocation(employee, input, metadata, false)
   }
 
   async authorizeSalaryAdvanceRequest(
@@ -736,6 +655,133 @@ export class TimeClockService {
         message: this.timeClockEventLabel(input.type),
         entry: result.entry,
         session: result.session
+      }
+    } catch (error) {
+      await this.files.deleteStoredObject(evidence.key)
+      throw error
+    }
+  }
+
+  async registerMobileEntry(
+    input: RegisterMobileEntryInput,
+    photo: Express.Multer.File | undefined,
+    metadata: RequestMetadata
+  ) {
+    if (!photo) throw new BadRequestException("La foto es obligatoria")
+
+    const employeeCode = this.normalizeEmployeeCode(input.employeeCode)
+    if (!employeeCode) throw new BadRequestException("Codigo de empleado requerido")
+
+    const throttleId = this.mobileThrottleIdentifier(employeeCode, metadata.ipAddress)
+    await this.loginThrottle.assertCanAttempt("time-clock-mobile", throttleId)
+
+    const employee = await this.findEmployeeByCodeGlobally(employeeCode)
+    if (!employee) {
+      await this.loginThrottle.recordFailure("time-clock-mobile", throttleId, metadata)
+      throw new BadRequestException("Codigo de empleado invalido")
+    }
+
+    await this.loginThrottle.recordSuccess("time-clock-mobile", throttleId)
+    const location = this.validateMobileLocation(employee, input, metadata, true)
+    const now = new Date()
+    const local = this.localParts(now)
+
+    await this.assertEntryAllowed(employee.id, input.type)
+    await this.assertMinimumGap(employee.id, now)
+    const evidence = await this.files.uploadTimeClockEvidence(photo, employee.branchId, metadata.ipAddress)
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const entry = await tx.timeClockEntry.create({
+          data: {
+            employeeId: employee.id,
+            branchId: employee.branchId,
+            deviceType: TimeClockDeviceType.MOBILE,
+            type: input.type,
+            occurredAt: now,
+            localDate: local.localDate,
+            localTime: local.localTime,
+            timeZone,
+            evidenceFileId: evidence.id,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            accuracy: location.accuracy,
+            isWithinRadius: location.isWithinRadius,
+            distanceFromBranch: location.distanceFromBranch,
+            status: TimeClockEntryStatus.VALID,
+            requestIp: metadata.ipAddress,
+            requestUserAgent: metadata.userAgent
+          },
+          include: this.entryInclude()
+        })
+
+        await tx.fileAsset.update({
+          where: { id: evidence.id },
+          data: { entityId: entry.id }
+        })
+
+        let session
+        if (input.type === TimeClockEventType.ENTRY) {
+          session = await tx.workSession.create({
+            data: {
+              employeeId: employee.id,
+              branchId: employee.branchId,
+              startEntryId: entry.id,
+              startedAt: now,
+              localDate: local.localDate,
+              timeZone,
+              status: WorkSessionStatus.ACTIVE
+            }
+          })
+        } else if (input.type === TimeClockEventType.EXIT) {
+          const activeSession = await tx.workSession.findFirst({
+            where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
+            orderBy: { startedAt: "desc" }
+          })
+          if (!activeSession) throw new BadRequestException("No existe entrada activa para registrar salida")
+          session = await tx.workSession.update({
+            where: { id: activeSession.id },
+            data: {
+              endEntryId: entry.id,
+              endedAt: now,
+              status: WorkSessionStatus.CLOSED,
+              totalMinutes: this.minutesBetween(activeSession.startedAt, now)
+            }
+          })
+        } else {
+          session = await tx.workSession.findFirstOrThrow({
+            where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
+            orderBy: { startedAt: "desc" }
+          })
+        }
+
+        await tx.auditLog.create({
+          data: {
+            action: AuditAction.CREATE,
+            entity: "TimeClockEntry",
+            entityId: entry.id,
+            affectedEmployeeId: employee.id,
+            newValue: this.toJson({
+              entryId: entry.id,
+              sessionId: session.id,
+              type: input.type,
+              deviceType: TimeClockDeviceType.MOBILE,
+              distanceFromBranch: location.distanceFromBranch,
+              accuracy: location.accuracy
+            }),
+            ipAddress: metadata.ipAddress
+          }
+        })
+
+        return { entry, session }
+      })
+
+      return {
+        ok: true,
+        message: this.timeClockEventLabel(input.type),
+        entry: result.entry,
+        session: result.session,
+        location
       }
     } catch (error) {
       await this.files.deleteStoredObject(evidence.key)
@@ -1522,6 +1568,219 @@ export class TimeClockService {
     return null
   }
 
+  private async findEmployeeByCodeGlobally(employeeCode: string) {
+    const employees = await this.prisma.employee.findMany({
+      where: { active: true },
+      include: { branch: true },
+      orderBy: { fullName: "asc" }
+    })
+
+    const matches = []
+    for (const employee of employees) {
+      if (await bcrypt.compare(employeeCode, employee.pinHash)) matches.push(employee)
+    }
+    if (matches.length > 1) {
+      throw new BadRequestException("El PIN coincide con mas de un empleado. Usa una tablet autorizada o asigna un PIN unico.")
+    }
+    return matches[0] ?? null
+  }
+
+  private async employeeVerificationPayload(employee: Prisma.EmployeeGetPayload<{ include: { branch: true } }>) {
+    const [activeSession, lastEntry, recentMovements] = await Promise.all([
+      this.prisma.workSession.findFirst({
+        where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
+        include: {
+          startEntry: {
+            select: {
+              occurredAt: true,
+              localDate: true,
+              localTime: true,
+              type: true
+            }
+          }
+        },
+        orderBy: { startedAt: "desc" }
+      }),
+      this.prisma.timeClockEntry.findFirst({
+        where: {
+          employeeId: employee.id,
+          status: { in: [TimeClockEntryStatus.VALID, TimeClockEntryStatus.MANUAL] }
+        },
+        orderBy: { occurredAt: "desc" },
+        select: {
+          occurredAt: true,
+          localDate: true,
+          localTime: true,
+          type: true
+        }
+      }),
+      this.prisma.movement.findMany({
+        where: {
+          employeeId: employee.id,
+          kind: {
+            in: [
+              MovementKind.SALARY_ADVANCE,
+              MovementKind.ADMIN_SALARY_ADVANCE,
+              MovementKind.LOAN,
+              MovementKind.ADMIN_LOAN,
+              MovementKind.INTERNAL_CONSUMPTION,
+              MovementKind.DRINK,
+              MovementKind.FOOD
+            ]
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 25,
+        select: {
+          id: true,
+          folio: true,
+          kind: true,
+          amount: true,
+          reason: true,
+          status: true,
+          productName: true,
+          createdAt: true
+        }
+      })
+    ])
+    const mealBreak = activeSession
+      ? await this.mealBreakState(employee.id, activeSession.startedAt)
+      : { status: "NOT_STARTED" as const, startedAt: null, endedAt: null }
+    const isOnBreak = mealBreak.status === "ON_BREAK"
+    const attendanceState = isOnBreak ? "ON_BREAK" : activeSession ? "IN_SHIFT" : lastEntry?.type === TimeClockEventType.EXIT ? "EXITED" : "NO_RECORD"
+    const allowedActions = !activeSession
+      ? [TimeClockEventType.ENTRY]
+      : isOnBreak
+        ? [TimeClockEventType.BREAK_END]
+        : mealBreak.status === "COMPLETED"
+          ? [TimeClockEventType.EXIT]
+          : [TimeClockEventType.BREAK_START, TimeClockEventType.EXIT]
+
+    return {
+      employee: {
+        id: employee.id,
+        fullName: employee.fullName,
+        position: employee.position,
+        branch: {
+          id: employee.branch.id,
+          name: employee.branch.name,
+          code: employee.branch.code,
+          latitude: employee.branch.latitude,
+          longitude: employee.branch.longitude,
+          geofenceRadiusMeters: employee.branch.geofenceRadiusMeters
+        }
+      },
+      attendance: {
+        state: attendanceState,
+        statusLabel: isOnBreak ? "En horario de comida" : activeSession ? "Jornada activa" : lastEntry?.type === TimeClockEventType.EXIT ? "Salida registrada" : "Sin entrada activa",
+        nextAction: allowedActions[0],
+        allowedActions,
+        exitRequiresApproval: false,
+        mealBreak,
+        activeSession: activeSession
+          ? {
+              startedAt: activeSession.startedAt,
+              localDate: activeSession.localDate,
+              localTime: activeSession.startEntry.localTime
+            }
+          : null,
+        lastEntry: lastEntry
+          ? {
+              type: lastEntry.type,
+              occurredAt: lastEntry.occurredAt,
+              localDate: lastEntry.localDate,
+              localTime: lastEntry.localTime
+            }
+          : null
+      },
+      recentMovements: recentMovements.map((movement) => ({
+        id: movement.id,
+        folio: movement.folio,
+        kind: movement.kind,
+        amount: Number(movement.amount),
+        reason: movement.reason,
+        status: movement.status,
+        productName: movement.productName,
+        createdAt: movement.createdAt
+      }))
+    }
+  }
+
+  private validateMobileLocation(
+    employee: Prisma.EmployeeGetPayload<{ include: { branch: true } }>,
+    input: { latitude: number; longitude: number; accuracy: number },
+    metadata: RequestMetadata,
+    strict: boolean
+  ) {
+    const latitude = Number(input.latitude)
+    const longitude = Number(input.longitude)
+    const accuracy = Number(input.accuracy)
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) throw new BadRequestException("Latitud invalida")
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new BadRequestException("Longitud invalida")
+    if (!Number.isFinite(accuracy) || accuracy < 0) throw new BadRequestException("Precision GPS invalida")
+
+    const maxAccuracy = this.maxGpsAccuracyMeters()
+    if (accuracy > maxAccuracy) {
+      throw new BadRequestException(`Precision GPS insuficiente (${Math.round(accuracy)}m). Intenta de nuevo al aire libre.`)
+    }
+
+    const branchLatitude = employee.branch.latitude
+    const branchLongitude = employee.branch.longitude
+    if (!Number.isFinite(branchLatitude) || !Number.isFinite(branchLongitude)) {
+      throw new BadRequestException("La sucursal del empleado no tiene geolocalizacion configurada")
+    }
+
+    const radius = employee.branch.geofenceRadiusMeters || 100
+    const distanceFromBranch = this.distanceMeters(latitude, longitude, branchLatitude as number, branchLongitude as number)
+    const isWithinRadius = distanceFromBranch <= radius
+    const location = {
+      latitude,
+      longitude,
+      accuracy,
+      branchLatitude,
+      branchLongitude,
+      radius,
+      distanceFromBranch: Math.round(distanceFromBranch),
+      isWithinRadius
+    }
+
+    if (strict && !isWithinRadius) {
+      void this.audit.log({
+        action: AuditAction.BLOCKED,
+        entity: "TimeClockEntry",
+        affectedEmployeeId: employee.id,
+        newValue: this.toJson({
+          reason: "OUT_OF_BRANCH_RADIUS",
+          branchId: employee.branchId,
+          distanceFromBranch: location.distanceFromBranch,
+          radius,
+          accuracy,
+          userAgent: metadata.userAgent
+        }),
+        ipAddress: metadata.ipAddress
+      })
+      throw new BadRequestException(`Estas fuera de zona. Distancia aprox: ${location.distanceFromBranch}m de ${employee.branch.name}.`)
+    }
+
+    return location
+  }
+
+  private maxGpsAccuracyMeters() {
+    return this.config.get<number>("TIME_CLOCK_MAX_GPS_ACCURACY_METERS") ?? defaultMaxGpsAccuracyMeters
+  }
+
+  private distanceMeters(fromLatitude: number, fromLongitude: number, toLatitude: number, toLongitude: number) {
+    const radiusMeters = 6_371_000
+    const toRadians = (value: number) => value * Math.PI / 180
+    const deltaLatitude = toRadians(toLatitude - fromLatitude)
+    const deltaLongitude = toRadians(toLongitude - fromLongitude)
+    const a =
+      Math.sin(deltaLatitude / 2) ** 2 +
+      Math.cos(toRadians(fromLatitude)) * Math.cos(toRadians(toLatitude)) *
+      Math.sin(deltaLongitude / 2) ** 2
+    return radiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
   private normalizeEmployeeCode(value: string) {
     return value.trim().replace(/\D/g, "").slice(0, 12)
   }
@@ -1529,6 +1788,11 @@ export class TimeClockService {
   private timeClockThrottleIdentifier(deviceId: string, employeeCode: string, ipAddress?: string) {
     const ip = ipAddress?.trim() || "unknown-ip"
     return `${deviceId}:${employeeCode}:${ip}`
+  }
+
+  private mobileThrottleIdentifier(employeeCode: string, ipAddress?: string) {
+    const ip = ipAddress?.trim() || "unknown-ip"
+    return `mobile:${employeeCode}:${ip}`
   }
 
   private async findVisibleDevice(id: string, user: AuthUser) {

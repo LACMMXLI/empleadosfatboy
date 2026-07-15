@@ -214,7 +214,10 @@ export const administrativeMovementKinds: MovementKind[] = [
 
 export const branchSchema = z.object({
   name: z.string().min(2, "Nombre requerido"),
-  code: z.string().min(2, "Código de sucursal requerido").toUpperCase()
+  code: z.string().min(2, "Código de sucursal requerido").toUpperCase(),
+  latitude: z.preprocess((value) => value === "" ? undefined : value, z.coerce.number().min(-90).max(90).optional()),
+  longitude: z.preprocess((value) => value === "" ? undefined : value, z.coerce.number().min(-180).max(180).optional()),
+  geofenceRadiusMeters: z.preprocess((value) => value === "" ? undefined : value, z.coerce.number().int().min(1).optional())
 })
 export type BranchFormInput = z.input<typeof branchSchema>
 export type BranchFormOutput = z.output<typeof branchSchema>

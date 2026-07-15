@@ -28,6 +28,8 @@ JWT_SECRET=usa-un-secreto-largo-y-unico
 VITE_API_URL=/api
 WEB_PORT=80
 WEB_ORIGIN=
+COOLIFY_DB_WAIT_TIMEOUT=60000
+TIME_CLOCK_MAX_GPS_ACCURACY_METERS=100
 S3_ENDPOINT=http://minio:9000
 S3_ACCESS_KEY=ACCESS_KEY_DE_MINIO
 S3_SECRET_KEY=SECRET_KEY_DE_MINIO
@@ -84,6 +86,24 @@ prisma migrate deploy
 
 antes de iniciar NestJS.
 
+La migracion de geolocalizacion del checador esta incluida en:
+
+```text
+apps/api/prisma/migrations/20260715120000_add_time_clock_geolocation/migration.sql
+```
+
+Esa migracion crea:
+
+- `Branch.latitude`
+- `Branch.longitude`
+- `Branch.geofenceRadiusMeters`
+- `TimeClockEntry.deviceType`
+- `TimeClockEntry.latitude`
+- `TimeClockEntry.longitude`
+- `TimeClockEntry.accuracy`
+- `TimeClockEntry.isWithinRadius`
+- `TimeClockEntry.distanceFromBranch`
+
 La migracion de nomina esta incluida en:
 
 ```text
@@ -125,6 +145,34 @@ Variable opcional:
 ```env
 COOLIFY_DB_WAIT_TIMEOUT=60000
 ```
+
+Variable opcional para checador movil:
+
+```env
+TIME_CLOCK_MAX_GPS_ACCURACY_METERS=100
+```
+
+Si el GPS del telefono llega con una precision mayor a ese valor, el backend rechaza la checada. El valor recomendado inicial es `100`.
+
+## Checador movil con GPS
+
+El mismo PWA del checador funciona en dos modos:
+
+- Tablet fija: `/checador`, con dispositivo autorizado.
+- Movil con GPS: `/checador?mode=mobile`, sin token de tablet, pero con ubicacion obligatoria.
+
+Requisitos para que funcione en Coolify:
+
+1. El servicio `web` debe estar publicado con HTTPS. Los navegadores no entregan geolocalizacion confiable ni PWA instalable en HTTP publico.
+2. Agrega `TIME_CLOCK_MAX_GPS_ACCURACY_METERS=100` en variables de Coolify o deja el default del compose.
+3. Configura cada sucursal en Admin -> Configuracion -> Sucursales:
+   - Latitud GPS.
+   - Longitud GPS.
+   - Radio permitido en metros.
+4. Redeploya el stack.
+5. En logs del servicio `api`, confirma que `prisma migrate deploy` termine antes de `API listening`.
+
+Si una sucursal no tiene latitud/longitud, el modo movil rechazara la checada con el mensaje de sucursal sin geolocalizacion configurada. El modo tablet fija sigue funcionando sin GPS.
 
 ## Diagnostico rapido de 502 en `/api/auth/login`
 

@@ -116,11 +116,19 @@ enum TimeClockDeviceRequestStatus {
   EXPIRED
 }
 
+enum TimeClockDeviceType {
+  FIXED
+  MOBILE
+}
+
 model Branch {
   id        String     @id @default(cuid())
   name      String
   code      String     @unique
   active    Boolean    @default(true)
+  latitude  Float?
+  longitude Float?
+  geofenceRadiusMeters Int @default(100)
   users     User[]
   employees Employee[]
   movements Movement[]
@@ -453,12 +461,18 @@ model TimeClockEntry {
   employeeId       String
   branchId         String
   deviceId         String?
+  deviceType       TimeClockDeviceType  @default(FIXED)
   type             TimeClockEventType
   occurredAt       DateTime
   localDate        String
   localTime        String
   timeZone         String               @default("America/Tijuana")
   evidenceFileId   String?
+  latitude         Float?
+  longitude        Float?
+  accuracy         Float?
+  isWithinRadius   Boolean?
+  distanceFromBranch Float?
   status           TimeClockEntryStatus @default(VALID)
   notes            String?
   requestIp        String?

@@ -230,6 +230,21 @@ export function Shell({
   )
 }
 
+function normalizeBranchPayload(values: Record<string, unknown>) {
+  const payload: Record<string, unknown> = { ...values }
+  for (const key of ["latitude", "longitude", "geofenceRadiusMeters"]) {
+    const value = payload[key]
+    if (value === "" || value === null || value === undefined) {
+      delete payload[key]
+      continue
+    }
+    const numericValue = Number(value)
+    if (Number.isFinite(numericValue)) payload[key] = numericValue
+    else delete payload[key]
+  }
+  return payload
+}
+
 function useTouchOptimizedLayout() {
   const [enabled, setEnabled] = useState(false)
 
@@ -2318,12 +2333,12 @@ function Configuration() {
 
   const branchForm = useForm<BranchFormInput, unknown, BranchFormOutput>({
     resolver: zodResolver(branchSchema),
-    defaultValues: { name: "", code: "" }
+    defaultValues: { name: "", code: "", latitude: undefined, longitude: undefined, geofenceRadiusMeters: 100 }
   })
 
   const selectedBranchForEdit = branches.data?.find((b) => b.id === editBranchId)
-  const branchEditForm = useForm<{ name: string; code: string; active: boolean }>({
-    defaultValues: { name: "", code: "", active: true }
+  const branchEditForm = useForm<{ name: string; code: string; active: boolean; latitude?: number | string; longitude?: number | string; geofenceRadiusMeters?: number | string }>({
+    defaultValues: { name: "", code: "", active: true, latitude: "", longitude: "", geofenceRadiusMeters: 100 }
   })
 
   useEffect(() => {
@@ -2331,7 +2346,10 @@ function Configuration() {
       branchEditForm.reset({
         name: selectedBranchForEdit.name,
         code: selectedBranchForEdit.code,
-        active: selectedBranchForEdit.active
+        active: selectedBranchForEdit.active,
+        latitude: selectedBranchForEdit.latitude ?? "",
+        longitude: selectedBranchForEdit.longitude ?? "",
+        geofenceRadiusMeters: selectedBranchForEdit.geofenceRadiusMeters ?? 100
       })
     }
   }, [selectedBranchForEdit, branchEditForm])
@@ -2399,17 +2417,17 @@ function Configuration() {
   })
 
   const createBranch = useMutation({
-    mutationFn: (values: BranchFormOutput) => api.createBranch(values),
+    mutationFn: (values: BranchFormOutput) => api.createBranch(normalizeBranchPayload(values)),
     onSuccess: () => {
-      branchForm.reset({ name: "", code: "" })
+      branchForm.reset({ name: "", code: "", latitude: undefined, longitude: undefined, geofenceRadiusMeters: 100 })
       queryClient.invalidateQueries({ queryKey: ["branches-admin-all"] })
       queryClient.invalidateQueries({ queryKey: ["branches"] })
     }
   })
 
   const updateBranch = useMutation({
-    mutationFn: ({ id, values }: { id: string; values: { name?: string; code?: string; active?: boolean } }) =>
-      api.updateBranch(id, values),
+    mutationFn: ({ id, values }: { id: string; values: Record<string, unknown> }) =>
+      api.updateBranch(id, normalizeBranchPayload(values)),
     onSuccess: () => {
       setEditBranchId("")
       queryClient.invalidateQueries({ queryKey: ["branches-admin-all"] })
@@ -2545,6 +2563,9 @@ function Configuration() {
                 <form className="settings-form" onSubmit={branchForm.handleSubmit((values) => createBranch.mutate(values))}>
                   <input className="form-input" placeholder="Nombre de sucursal" {...branchForm.register("name")} />
                   <input className="form-input" placeholder="Código único (ej. NORTE)" {...branchForm.register("code")} />
+                  <input className="form-input" type="number" step="0.000001" placeholder="Latitud GPS" {...branchForm.register("latitude")} />
+                  <input className="form-input" type="number" step="0.000001" placeholder="Longitud GPS" {...branchForm.register("longitude")} />
+                  <input className="form-input" type="number" min="1" step="1" placeholder="Radio permitido (m)" {...branchForm.register("geofenceRadiusMeters")} />
                   <button className="btn-primary modal-submit" disabled={createBranch.isPending} type="submit">Crear sucursal</button>
                   {createBranch.error && <div className="status-empty compact-error">{createBranch.error.message}</div>}
                 </form>
@@ -2825,6 +2846,20 @@ function Configuration() {
             <div className="form-field">
               <label className="form-label">Código (Único)</label>
               <input className="form-input" placeholder="Ej. MATRIZ" {...branchEditForm.register("code")} />
+            </div>
+            <div className="admin-form-row">
+              <div className="form-field">
+                <label className="form-label">Latitud GPS</label>
+                <input className="form-input" type="number" step="0.000001" placeholder="Ej. 32.624538" {...branchEditForm.register("latitude")} />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Longitud GPS</label>
+                <input className="form-input" type="number" step="0.000001" placeholder="Ej. -115.452262" {...branchEditForm.register("longitude")} />
+              </div>
+            </div>
+            <div className="form-field">
+              <label className="form-label">Radio permitido (metros)</label>
+              <input className="form-input" type="number" min="1" step="1" placeholder="100" {...branchEditForm.register("geofenceRadiusMeters")} />
             </div>
             <div className="flex items-center gap-2 mt-4">
               <input

@@ -160,6 +160,20 @@ async function timeClockFormRequest<T>(path: string, formData: FormData): Promis
   return response.json() as Promise<T>
 }
 
+async function publicFormRequest<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    body: formData
+  })
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null
+    throw new Error(body?.message ?? "No se pudo completar la operacion")
+  }
+
+  return response.json() as Promise<T>
+}
+
 export const api = {
   login(email: string, password: string) {
     return request<LoginResponse>("/auth/login", {
@@ -360,6 +374,12 @@ export const api = {
         body: JSON.stringify({ employeeCode })
       })
     },
+    verifyMobileEmployeeCode(employeeCode: string) {
+      return request<TimeClockEmployeeVerification>("/time-clock/public/mobile/employee-code", {
+        method: "POST",
+        body: JSON.stringify({ employeeCode })
+      })
+    },
     registerEntry(payload: { employeeCode: string; type: TimeClockEventType; photo: Blob; approverCode?: string }) {
       const formData = new FormData()
       formData.append("employeeCode", payload.employeeCode)
@@ -367,6 +387,25 @@ export const api = {
       if (payload.approverCode) formData.append("approverCode", payload.approverCode)
       formData.append("photo", payload.photo, "checador.jpg")
       return timeClockFormRequest<{ ok: boolean; message: string; entry: TimeClockEntry }>("/time-clock/public/entries", formData)
+    },
+    registerMobileEntry(payload: {
+      employeeCode: string
+      type: TimeClockEventType
+      photo: Blob
+      latitude: number
+      longitude: number
+      accuracy: number
+      approverCode?: string
+    }) {
+      const formData = new FormData()
+      formData.append("employeeCode", payload.employeeCode)
+      formData.append("type", payload.type)
+      formData.append("latitude", String(payload.latitude))
+      formData.append("longitude", String(payload.longitude))
+      formData.append("accuracy", String(payload.accuracy))
+      if (payload.approverCode) formData.append("approverCode", payload.approverCode)
+      formData.append("photo", payload.photo, "checador-gps.jpg")
+      return publicFormRequest<{ ok: boolean; message: string; entry: TimeClockEntry; location: { distanceFromBranch: number; isWithinRadius: boolean } }>("/time-clock/public/mobile/entries", formData)
     },
     registerDrink(payload: { employeeCode: string; photo: Blob }) {
       const formData = new FormData()

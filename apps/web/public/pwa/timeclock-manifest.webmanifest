@@ -2,7 +2,7 @@
   "id": "/checador",
   "name": "Fatboy Checador",
   "short_name": "Checador",
-  "description": "Reloj checador Fatboy para tablets autorizadas de sucursal.",
+  "description": "Reloj checador Fatboy para tablets autorizadas y uso movil con GPS.",
   "lang": "es-MX",
   "start_url": "/checador",
   "scope": "/checador",

@@ -83,11 +83,18 @@ export class ConfigurationService {
     })
   }
 
-  async createBranch(dto: { name: string; code: string }, userId: string, ipAddress?: string) {
+  async createBranch(
+    dto: { name: string; code: string; latitude?: number; longitude?: number; geofenceRadiusMeters?: number },
+    userId: string,
+    ipAddress?: string
+  ) {
     const branch = await this.prisma.branch.create({
       data: {
         name: dto.name,
-        code: dto.code
+        code: dto.code,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        geofenceRadiusMeters: dto.geofenceRadiusMeters
       }
     })
     await this.audit.log({
@@ -101,7 +108,12 @@ export class ConfigurationService {
     return branch
   }
 
-  async updateBranch(id: string, dto: { name?: string; code?: string; active?: boolean }, userId: string, ipAddress?: string) {
+  async updateBranch(
+    id: string,
+    dto: { name?: string; code?: string; active?: boolean; latitude?: number; longitude?: number; geofenceRadiusMeters?: number },
+    userId: string,
+    ipAddress?: string
+  ) {
     const before = await this.prisma.branch.findUnique({ where: { id } })
     const branch = await this.prisma.branch.update({
       where: { id },

@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, Banknote, CheckCircle2, Clock3, Coffee, Copy, LogIn, LogOut, Maximize, Minimize, RefreshCw, ShieldAlert, ShieldCheck, Utensils, UserRound, X } from "lucide-react"
+import { ArrowLeft, Banknote, CheckCircle2, Clock3, Coffee, Copy, LogIn, LogOut, MapPin, Maximize, Minimize, RefreshCw, ShieldAlert, ShieldCheck, Utensils, UserRound, X } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
 import { movementLabels, statusLabels } from "@/lib/ledger-ui"
 import type { TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
@@ -25,6 +25,11 @@ type LastKioskSuccess = {
   type: TimeClockEventType | "DRINK" | "ADVANCE"
   time: string
   amount?: number
+}
+type MobileLocation = {
+  latitude: number
+  longitude: number
+  accuracy: number
 }
 
 type BrowserAudioContext = typeof AudioContext
@@ -91,6 +96,10 @@ function useKioskSounds() {
 export function TimeClockKiosk() {
   const queryClient = useQueryClient()
   const setupToken = useMemo(() => new URLSearchParams(window.location.search).get("token"), [])
+  const startsInMobileMode = useMemo(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get("mode") === "mobile" || params.get("mobile") === "1"
+  }, [])
   const streamRef = useRef<MediaStream | null>(null)
   const capturePreviewRef = useRef<HTMLVideoElement | null>(null)
   const statusResetTimeoutRef = useRef<number | null>(null)
@@ -125,6 +134,7 @@ export function TimeClockKiosk() {
   const [advanceAmount, setAdvanceAmount] = useState("")
   const [approverCode, setApproverCode] = useState("")
   const [activeAdvanceField, setActiveAdvanceField] = useState<"amount" | "code">("amount")
+  const [useMobileGeolocation, setUseMobileGeolocation] = useState(startsInMobileMode)
   const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
   const canUseActions = Boolean(verifiedEmployee) && !isProcessing
   const nextShiftAction = verifiedEmployee ? getShiftActionMeta(verifiedEmployee.attendance.nextAction) : null
@@ -139,7 +149,7 @@ export function TimeClockKiosk() {
     verifiedEmployee.attendance.mealBreak.status === "NOT_STARTED" &&
     verifiedEmployee.attendance.allowedActions.includes("EXIT")
   )
-  const canUseFinancialActions = Boolean(canUseActions && verifiedEmployee?.attendance.activeSession)
+  const canUseFinancialActions = Boolean(canUseActions && verifiedEmployee?.attendance.activeSession && !useMobileGeolocation)
   const canRegisterDrink = canUseFinancialActions
   const canRequestAdvance = canUseFinancialActions
   const { playClick, playError, playSuccess } = useKioskSounds()
@@ -210,6 +220,32 @@ export function TimeClockKiosk() {
     return stream
   }, [releaseCamera])
 
+  const getMobileLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      return Promise.reject(new Error("Este dispositivo no permite obtener ubicación GPS."))
+    }
+
+    return new Promise<MobileLocation>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          })
+        },
+        (error) => {
+          if (error.code === error.PERMISSION_DENIED) {
+            reject(new Error("Activa el permiso de ubicación para registrar asistencia."))
+            return
+          }
+          reject(new Error("No se pudo obtener ubicación GPS. Intenta de nuevo."))
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+      )
+    })
+  }, [])
+
   const markSessionActivity = useCallback(() => {
     setSessionActivityAt(Date.now())
   }, [])
@@ -267,8 +303,8 @@ export function TimeClockKiosk() {
   }, [setupToken])
 
   const hasToken = Boolean(deviceToken)
-  const device = useQuery({ queryKey: ["timeClock", "device", deviceToken], queryFn: api.timeClock.device, enabled: hasToken, retry: false })
-  const needsAuthorization = !hasToken || Boolean(device.error)
+  const device = useQuery({ queryKey: ["timeClock", "device", deviceToken], queryFn: api.timeClock.device, enabled: hasToken && !useMobileGeolocation, retry: false })
+  const needsAuthorization = !useMobileGeolocation && (!hasToken || Boolean(device.error))
 
   const deviceRequest = useQuery({
     queryKey: ["timeClock", "device-request", requestToken],
@@ -388,12 +424,14 @@ export function TimeClockKiosk() {
 
     setStatus("validating_pin")
     setStatusMessage("Validando PIN...")
-    const result = await api.timeClock.verifyEmployeeCode(employeeCode)
+    const result = useMobileGeolocation
+      ? await api.timeClock.verifyMobileEmployeeCode(employeeCode)
+      : await api.timeClock.verifyEmployeeCode(employeeCode)
     const employee = toVerifiedEmployee(result)
     setVerifiedEmployee(employee)
     setSessionActivityAt(Date.now())
     return employee
-  }, [employeeCode, needsAuthorization, toVerifiedEmployee])
+  }, [employeeCode, needsAuthorization, toVerifiedEmployee, useMobileGeolocation])
 
   useEffect(() => {
     if (needsAuthorization) return
@@ -408,7 +446,11 @@ export function TimeClockKiosk() {
     setStatus("validating_pin")
     setStatusMessage("Validando PIN...")
 
-    api.timeClock.verifyEmployeeCode(employeeCode)
+    const verification = useMobileGeolocation
+      ? api.timeClock.verifyMobileEmployeeCode(employeeCode)
+      : api.timeClock.verifyEmployeeCode(employeeCode)
+
+    verification
       .then((result) => {
         if (cancelled) return
         const employee = toVerifiedEmployee(result)
@@ -446,7 +488,7 @@ export function TimeClockKiosk() {
       cancelled = true
       releaseCamera()
     }
-  }, [employeeCode, getCameraStream, needsAuthorization, playError, playSuccess, releaseCamera, scheduleStatusReset, toVerifiedEmployee])
+  }, [employeeCode, getCameraStream, needsAuthorization, playError, playSuccess, releaseCamera, scheduleStatusReset, toVerifiedEmployee, useMobileGeolocation])
 
   const handleKeyPress = useCallback((key: string) => {
     if (isProcessing) return
@@ -496,15 +538,29 @@ export function TimeClockKiosk() {
       if (!employee.attendance.allowedActions.includes(type)) {
         throw new Error(actionUnavailableMessage(type, employee))
       }
+      const location = useMobileGeolocation
+        ? await (async () => {
+            setStatus("registering")
+            setStatusMessage("Obteniendo ubicación GPS...")
+            const current = await getMobileLocation()
+            setStatusMessage(`Ubicación detectada · precisión ${Math.round(current.accuracy)}m`)
+            return current
+          })()
+        : null
       const photo = await capturePhotoOnce(employee.fullName)
 
       setStatus("registering")
-      setStatusMessage("Guardando registro de asistencia...")
+      setStatusMessage(useMobileGeolocation ? "Validando zona y guardando asistencia..." : "Guardando registro de asistencia...")
 
-      await api.timeClock.registerEntry({ employeeCode, type, photo })
+      const result = useMobileGeolocation && location
+        ? await api.timeClock.registerMobileEntry({ employeeCode, type, photo, ...location })
+        : await api.timeClock.registerEntry({ employeeCode, type, photo })
 
       setStatus("success")
-      const successMsg = `${entryTypeLabel(type)} registrada - ${employee.fullName}`
+      const distance = isMobileEntryResult(result)
+        ? ` · ${Math.round(result.location.distanceFromBranch)}m`
+        : ""
+      const successMsg = `${entryTypeLabel(type)} registrada - ${employee.fullName}${distance}`
       setStatusMessage(successMsg)
 
       const timeStr = new Intl.DateTimeFormat("es-MX", {
@@ -674,6 +730,20 @@ export function TimeClockKiosk() {
               <RefreshCw />
               Nuevo código
             </button>
+            <button
+              className="timeclock-secondary"
+              type="button"
+              onClick={() => {
+                playClick()
+                setUseMobileGeolocation(true)
+                window.history.replaceState({}, "", "/checador?mode=mobile")
+                setStatus("idle")
+                setStatusMessage("Modo móvil GPS activo. Ingresa tu PIN.")
+              }}
+            >
+              <MapPin />
+              Usar con GPS
+            </button>
           </div>
           <div className="timeclock-selected">
             {deviceRequest.data?.status === "AUTHORIZED" ? "Dispositivo autorizado. Cargando..." : "Esperando autorización del administrador"}
@@ -700,7 +770,7 @@ export function TimeClockKiosk() {
             </div>
             <div>
               <h1>Reloj Checador</h1>
-              <span>{device.data?.branch.name ?? "Sucursal"}</span>
+              <span>{verifiedEmployee?.branch.name ?? device.data?.branch.name ?? (useMobileGeolocation ? "Modo móvil GPS" : "Sucursal")}</span>
             </div>
           </div>
 
@@ -710,8 +780,8 @@ export function TimeClockKiosk() {
 
           <div className="timeclock-kiosk-device-block">
             <div className="timeclock-kiosk-authorized">
-              <CheckCircle2 />
-              <span>Dispositivo autorizado</span>
+              {useMobileGeolocation ? <MapPin /> : <CheckCircle2 />}
+              <span>{useMobileGeolocation ? "Geolocalización requerida" : "Dispositivo autorizado"}</span>
             </div>
             <button
               type="button"
@@ -724,7 +794,7 @@ export function TimeClockKiosk() {
             >
               {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
             </button>
-            <div className="timeclock-kiosk-device-name">Dispositivo: {device.data?.name ?? "Tablet"}</div>
+            <div className="timeclock-kiosk-device-name">{useMobileGeolocation ? "Modo: móvil con GPS" : `Dispositivo: ${device.data?.name ?? "Tablet"}`}</div>
           </div>
         </header>
 
@@ -758,7 +828,7 @@ export function TimeClockKiosk() {
               <img className="timeclock-access-logo" src={fatboyLogo} alt="Fatboy" />
               <span className="timeclock-access-eyebrow">Control de asistencia</span>
               <KioskClockBlock variant="access" />
-              <p>Ingresa tu código personal para ver tus opciones.</p>
+              <p>{useMobileGeolocation ? "Ingresa tu código. Se pedirá ubicación al registrar asistencia." : "Ingresa tu código personal para ver tus opciones."}</p>
             </section>
 
             <section className={`timeclock-access-card ${status === "error" ? "shake-animation" : ""}`}>
@@ -791,6 +861,11 @@ export function TimeClockKiosk() {
                 <div className={`timeclock-employee-state ${verifiedEmployee.attendance.state.toLowerCase()}`}>
                   <span />{verifiedEmployee.attendance.statusLabel}
                 </div>
+                {useMobileGeolocation && (
+                  <div className="timeclock-employee-state">
+                    <MapPin size={16} /> GPS móvil
+                  </div>
+                )}
                 <button type="button" className="timeclock-employee-back" onClick={() => { playClick(); clearEmployeeSession() }}>
                   <ArrowLeft /> Salir
                 </button>
@@ -1173,6 +1248,15 @@ function entryTypeLabel(type: TimeClockEventType) {
     BREAK_END: "Entrada de comida"
   }
   return labels[type]
+}
+
+function isMobileEntryResult(value: unknown): value is { location: { distanceFromBranch: number } } {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    "location" in value &&
+    typeof (value as { location?: { distanceFromBranch?: unknown } }).location?.distanceFromBranch === "number"
+  )
 }
 
 function createLocalDeviceRequestToken() {
