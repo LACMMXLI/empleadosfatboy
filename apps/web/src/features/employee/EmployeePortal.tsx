@@ -208,10 +208,10 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
         style={{ transform: showNav ? "translateY(0)" : "translateY(-100%)" }}
       >
         <div className="flex items-center h-full">
-          <img src={fatboyLogo} alt="Fatboy" style={{ height: '95%', maxHeight: '49px', objectFit: 'contain' }} className="w-auto opacity-95 filter drop-shadow-[0_0_8px_rgba(0,229,255,0.3)]" />
+          <img src={fatboyLogo} alt="Fatboy" style={{ height: '90%', maxHeight: '44px', objectFit: 'contain' }} className="w-auto opacity-95 filter drop-shadow-[0_0_10px_rgba(0,229,255,0.25)]" />
         </div>
         <button
-          className="btn-icon rounded-full border border-border bg-secondary/50 text-foreground hover:bg-secondary w-10 h-10 flex items-center justify-center cursor-pointer"
+          className="rounded-full border border-white/10 bg-white/5 text-foreground hover:bg-white/10 hover:border-white/20 w-10 h-10 flex items-center justify-center cursor-pointer transition-all duration-200 backdrop-blur-sm"
           onClick={() => {
             setCodeMessage(null)
             setAccountOpen(true)
@@ -225,52 +225,64 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
 
       {/* Account Settings Modal */}
       {accountOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" onClick={() => setAccountOpen(false)}>
-          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-5 shadow-2xl shadow-black/40" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <UserRound className="h-6 w-6" />
+        <div className="employee-confirm-backdrop sm:items-center" role="dialog" aria-modal="true" onClick={() => setAccountOpen(false)}>
+          <div className="employee-confirm-modal" style={{ maxWidth: '26rem' }} onClick={(event) => event.stopPropagation()}>
+            {/* Profile Header */}
+            <div style={{ padding: '1.25rem', borderBottom: '1px solid rgb(var(--surface-line) / 0.2)', background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.06), rgba(168, 85, 247, 0.05))' }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex items-center gap-3">
+                  <div className="employee-avatar-ring" style={{ width: '3.25rem', height: '3.25rem', fontSize: '1.1rem' }}>
+                    {me.data?.fullName ? getInitials(me.data.fullName) : "E"}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-base font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'hsl(var(--foreground))' }}>{me.data?.fullName ?? "Empleado"}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                      <UserRound style={{ width: 11, height: 11, opacity: 0.7 }} />
+                      {me.data?.position ?? "Puesto"}
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-3 truncate text-lg font-semibold">{me.data?.fullName ?? "Empleado"}</div>
-                <div className="text-xs text-muted-foreground mt-1">{me.data?.position ?? "Puesto"}</div>
+                <button className="h-9 w-9 rounded-full hover:bg-white/10 flex items-center justify-center border-none bg-transparent cursor-pointer text-muted-foreground transition-colors" onClick={() => setAccountOpen(false)} aria-label="Cerrar">
+                  <X className="h-4.5 w-4.5" />
+                </button>
               </div>
-              <button className="h-10 w-10 rounded-full hover:bg-white/10 flex items-center justify-center border-none bg-transparent cursor-pointer text-muted-foreground" onClick={() => setAccountOpen(false)} aria-label="Cerrar">
-                <X className="h-5 w-5" />
-              </button>
             </div>
 
-            <form className="mt-5 space-y-3 rounded-2xl border border-border bg-secondary/40 p-4" onSubmit={codeForm.handleSubmit((values) => changeCode.mutate(values))}>
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <KeyRound className="h-4 w-4 text-primary" />
+            {/* Change PIN Form */}
+            <form className="p-4 space-y-3" onSubmit={codeForm.handleSubmit((values) => changeCode.mutate(values))}>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={{ color: 'rgba(0, 229, 255, 0.8)', letterSpacing: '0.08em' }}>
+                <KeyRound className="h-3.5 w-3.5" />
                 Cambiar PIN privado
               </div>
               <input className="form-input h-12 rounded-xl" placeholder="Código PIN actual" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("currentCode")} />
               <input className="form-input h-12 rounded-xl" placeholder="Nuevo código PIN" type="password" inputMode="numeric" maxLength={6} {...codeForm.register("newCode")} />
-              <button className="btn-primary h-12 w-full rounded-xl" disabled={changeCode.isPending} type="submit">
+              <button className="employee-request-submit w-full" disabled={changeCode.isPending} type="submit">
                 {changeCode.isPending ? "Actualizando PIN..." : "Actualizar PIN"}
               </button>
-              {codeMessage && <div className="text-xs text-muted-foreground text-center mt-1">{codeMessage}</div>}
+              {codeMessage && <div className="text-xs text-center mt-1" style={{ color: codeMessage === 'Código actualizado' ? '#86efac' : '#fca5a5' }}>{codeMessage}</div>}
             </form>
 
-            <button
-              className="mt-4 h-12 w-full rounded-2xl hover:bg-white/5 border border-white/10 bg-transparent text-muted-foreground hover:text-foreground transition flex items-center justify-center gap-2 cursor-pointer font-semibold"
-              onClick={() => {
-                employeeSession.token = null
-                setAccountOpen(false)
-                onLogout()
-              }}
-              type="button"
-            >
-              <LogOut className="h-4 w-4" />
-              Cerrar sesión
-            </button>
+            {/* Logout Button */}
+            <div style={{ padding: '0 1rem 1.125rem' }}>
+              <button
+                className="h-12 w-full rounded-xl hover:bg-red-500/8 border border-red-500/20 bg-transparent text-red-400/80 hover:text-red-400 transition-all flex items-center justify-center gap-2 cursor-pointer font-bold text-sm"
+                onClick={() => {
+                  employeeSession.token = null
+                  setAccountOpen(false)
+                  onLogout()
+                }}
+                type="button"
+              >
+                <LogOut className="h-4 w-4" />
+                Cerrar sesión
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Main Page Area */}
-      <div className="mx-auto max-w-md space-y-5 p-4 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+      <div className="mx-auto max-w-md space-y-4 p-4 pt-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
         {activeTab === "home" && (
           <>
             {/* Profile Banner */}

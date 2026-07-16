@@ -239,21 +239,21 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
 
   return (
     <LoginFrame variant="employee">
-      <Card className="login-card w-full max-w-sm text-[#f7efe3]">
-        <CardHeader className="space-y-4 p-5 pb-3">
+      <Card className="login-card w-full max-w-sm text-[#e2e8f0]">
+        <CardHeader className="space-y-4 p-6 pb-3">
           <LoginLogo />
-          <div>
-            <CardTitle className="text-xl text-center">Portal Empleado</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground text-center">Ingresa con tu teléfono y código PIN</p>
+          <div className="text-center">
+            <CardTitle className="text-xl" style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, letterSpacing: '-0.01em' }}>Portal Empleado</CardTitle>
+            <p className="mt-1.5 text-sm text-muted-foreground">Ingresa con tu teléfono y código PIN</p>
           </div>
         </CardHeader>
-        <CardContent className="p-5 pt-2">
+        <CardContent className="p-6 pt-2">
           <form className="space-y-5" onSubmit={employeeForm.handleSubmit((values) => employeeLogin.mutate(values))}>
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               <div className="relative">
-                <Phone className="absolute left-4 top-3.5 h-5 w-5 text-blue-500" />
+                <Phone className="absolute left-4 top-3.5 h-5 w-5" style={{ color: 'rgba(0, 229, 255, 0.6)' }} />
                 <input 
-                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" 
+                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40" 
                   placeholder="Teléfono" 
                   inputMode="tel" 
                   aria-invalid={!!employeeError}
@@ -261,9 +261,9 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
                 />
               </div>
               <div className="relative">
-                <KeyRound className="absolute left-4 top-3.5 h-5 w-5 text-blue-500" />
+                <KeyRound className="absolute left-4 top-3.5 h-5 w-5" style={{ color: 'rgba(0, 229, 255, 0.6)' }} />
                 <input 
-                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" 
+                  className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40" 
                   placeholder="PIN de 6 dígitos" 
                   type="password" 
                   inputMode="numeric" 
@@ -273,13 +273,13 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
                 />
               </div>
               {employeeError && (
-                <div role="alert" className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 text-sm text-center text-destructive-foreground animate-in fade-in slide-in-from-top-1">
+                <div role="alert" className="rounded-xl border border-red-500/25 bg-red-500/8 p-3 text-sm text-center text-red-300 animate-in fade-in slide-in-from-top-1">
                   {employeeError}
                 </div>
               )}
             </div>
             <button 
-              className="login-primary h-12 w-full text-base font-semibold rounded-xl transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background" 
+              className="employee-request-submit h-12 w-full text-base rounded-xl" 
               disabled={employeeLogin.isPending} 
               type="submit"
             >
@@ -288,7 +288,12 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
 
             {!isInstalled && (
               <button
-                className="w-full mt-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 border border-blue-500/30 rounded-xl h-12 flex items-center justify-center gap-2 font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="w-full mt-1 rounded-xl h-11 flex items-center justify-center gap-2 font-bold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background border cursor-pointer"
+                style={{ 
+                  background: 'rgba(0, 229, 255, 0.06)', 
+                  borderColor: 'rgba(0, 229, 255, 0.2)', 
+                  color: 'rgba(0, 229, 255, 0.8)' 
+                }}
                 onClick={install}
                 type="button"
               >
@@ -298,14 +303,15 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
             )}
 
             {showIOSInstructions && (
-              <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 text-xs text-blue-400 mt-2 space-y-2 text-left animate-in fade-in slide-in-from-top-2">
-                <p className="font-semibold text-sm text-blue-500">Instrucciones para iOS:</p>
+              <div className="rounded-xl p-4 text-xs mt-1 space-y-2 text-left animate-in fade-in slide-in-from-top-2" style={{ borderColor: 'rgba(0, 229, 255, 0.2)', border: '1px solid rgba(0, 229, 255, 0.2)', background: 'rgba(0, 229, 255, 0.04)', color: 'rgba(0, 229, 255, 0.7)' }}>
+                <p className="font-bold text-sm" style={{ color: 'rgba(0, 229, 255, 0.85)' }}>Instrucciones para iOS:</p>
                 <ol className="list-decimal pl-4 space-y-1">
                   <li>Pulsa el botón <strong>Compartir</strong> en Safari (abajo en el centro).</li>
                   <li>Selecciona <strong>Agregar a inicio</strong> en la lista de opciones.</li>
                 </ol>
                 <button 
-                  className="text-blue-500 font-bold block pt-2 hover:underline text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded px-1 -mx-1" 
+                  className="font-bold block pt-2 hover:underline text-left focus-visible:outline-none focus-visible:ring-2 rounded px-1 -mx-1 cursor-pointer border-none bg-transparent" 
+                  style={{ color: 'rgba(0, 229, 255, 0.85)' }}
                   onClick={() => setShowIOSInstructions(false)} 
                   type="button"
                 >
