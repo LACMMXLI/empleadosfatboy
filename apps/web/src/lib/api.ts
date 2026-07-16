@@ -524,6 +524,9 @@ export const api = {
         byKind: Array<{ kind: string; amount: number }>
       }>("/employee-portal/balance")
     },
+    schedule() {
+      return employeeRequest<Omit<EmployeeWorkSchedule, "employee">>("/employee-portal/schedule")
+    },
     movements() {
       return employeeRequest<Movement[]>("/employee-portal/movements")
     },

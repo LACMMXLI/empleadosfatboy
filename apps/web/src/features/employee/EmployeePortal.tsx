@@ -2,9 +2,9 @@ import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { AlertTriangle, Banknote, Building2, CheckCircle2, ClipboardList, KeyRound, LayoutDashboard, LogOut, MapPin, Sparkles, UserRound, WalletCards, X } from "lucide-react"
+import { AlertTriangle, Banknote, Building2, CalendarDays, CheckCircle2, ClipboardList, KeyRound, LayoutDashboard, LogOut, MapPin, Sparkles, UserRound, WalletCards, X } from "lucide-react"
 import { api, employeeSession } from "@/lib/api"
-import type { Movement, MovementKind, MovementSettlementTicket, TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
+import type { EmployeeWorkSchedule, Movement, MovementKind, MovementSettlementTicket, TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
 import { useScrollDirection } from "@/hooks/useScrollDirection"
 import { StatusEmpty } from "@/components/common/Status"
 import { DetailLine } from "@/components/common/AdminPrimitives"
@@ -56,6 +56,7 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const movements = useQuery({ queryKey: ["employeePortal", "movements"], queryFn: api.employeePortal.movements })
   const settlementTickets = useQuery({ queryKey: ["employeePortal", "settlementTickets"], queryFn: api.employeePortal.settlementTickets })
   const options = useQuery({ queryKey: ["employeePortal", "options"], queryFn: api.employeePortal.options })
+  const schedule = useQuery({ queryKey: ["employeePortal", "schedule"], queryFn: api.employeePortal.schedule })
   const form = useForm<EmployeeRequestFormInput, unknown, EmployeeRequestFormOutput>({
     resolver: zodResolver(employeeRequestSchema),
     defaultValues: { kind: "SALARY_ADVANCE", amount: 0, reason: "Personal" }
@@ -320,6 +321,8 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
               </div>
             </section>
 
+            <EmployeeScheduleCard schedule={schedule.data} />
+
             <PortalMovementList compact title="Últimos Movimientos" movements={recentMovements} />
           </>
         )}
@@ -561,6 +564,69 @@ function EmployeeBottomNav({
         })}
       </div>
     </nav>
+  )
+}
+
+const dayLabels: Record<number, string> = {
+  1: "Lunes",
+  2: "Martes",
+  3: "Miércoles",
+  4: "Jueves",
+  5: "Viernes",
+  6: "Sábado",
+  0: "Domingo"
+}
+
+function EmployeeScheduleCard({ schedule }: { schedule: Omit<EmployeeWorkSchedule, "employee"> | undefined }) {
+  if (!schedule) return null
+
+  const sortedDays = [...(schedule.days ?? [])].sort((a, b) => {
+    const valA = a.dayOfWeek === 0 ? 7 : a.dayOfWeek
+    const valB = b.dayOfWeek === 0 ? 7 : b.dayOfWeek
+    return valA - valB
+  })
+
+  return (
+    <section className="employee-request-panel animate-in fade-in slide-in-from-bottom-3 duration-300">
+      <div className="employee-request-hero">
+        <div className="employee-request-kicker">
+          <CalendarDays style={{ width: 14, height: 14 }} />
+          Horario de Trabajo
+        </div>
+        <h2>Mi Horario Semanal</h2>
+        <p>Consulta tus turnos asignados y días de descanso programados por administración.</p>
+      </div>
+
+      <div className="p-4 space-y-2">
+        <div className="rounded-2xl border border-white/5 bg-white/[0.02] overflow-hidden">
+          <div className="divide-y divide-white/5">
+            {sortedDays.map((day) => (
+              <div key={day.dayOfWeek} className="flex items-center justify-between px-4 py-3 text-sm">
+                <span className="font-bold text-[#e2e8f0]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
+                  {dayLabels[day.dayOfWeek]}
+                </span>
+                {day.enabled ? (
+                  <span className="font-mono font-semibold text-[#00e5ff] bg-[#00e5ff]/5 border border-[#00e5ff]/20 px-3 py-1 rounded-lg text-xs">
+                    {day.start} - {day.end}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-xs font-semibold">
+                    Descanso
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {schedule.lateGraceMinutes > 0 && (
+          <div className="flex items-center gap-2 mt-2 px-1 text-[11px] text-muted-foreground">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00e5ff]" />
+            <span>Tolerancia de entrada: <strong>{schedule.lateGraceMinutes} minutos</strong>.</span>
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
 

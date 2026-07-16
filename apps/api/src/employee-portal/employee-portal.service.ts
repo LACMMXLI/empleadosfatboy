@@ -166,6 +166,42 @@ export class EmployeePortalService {
     }
   }
 
+  async schedule(authorization?: string) {
+    const employee = await this.currentEmployee(authorization)
+    const schedule = await this.prisma.employeeWorkSchedule.findUnique({
+      where: { employeeId: employee.id }
+    })
+
+    const defaults = {
+      sundayEnabled: false, sundayStart: "09:00", sundayEnd: "17:00",
+      mondayEnabled: true, mondayStart: "09:00", mondayEnd: "17:00",
+      tuesdayEnabled: true, tuesdayStart: "09:00", tuesdayEnd: "17:00",
+      wednesdayEnabled: true, wednesdayStart: "09:00", wednesdayEnd: "17:00",
+      thursdayEnabled: true, thursdayStart: "09:00", thursdayEnd: "17:00",
+      fridayEnabled: true, fridayStart: "09:00", fridayEnd: "17:00",
+      saturdayEnabled: false, saturdayStart: "09:00", saturdayEnd: "17:00",
+      lateGraceMinutes: 5,
+      overtimeThresholdMinutes: 15
+    }
+    const value = (schedule ?? defaults) as Record<string, any>
+    const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+
+    return {
+      configured: Boolean(schedule),
+      lateGraceMinutes: value.lateGraceMinutes,
+      overtimeThresholdMinutes: value.overtimeThresholdMinutes,
+      days: [1, 2, 3, 4, 5, 6, 0].map((dayOfWeek) => {
+        const name = dayNames[dayOfWeek]
+        return {
+          dayOfWeek,
+          enabled: value[`${name}Enabled`],
+          start: value[`${name}Start`],
+          end: value[`${name}End`]
+        }
+      })
+    }
+  }
+
   async movements(authorization?: string) {
     const employee = await this.currentEmployee(authorization)
     return this.prisma.movement.findMany({

@@ -83,6 +83,11 @@ export class EmployeePortalController {
     return this.portal.balance(authorization)
   }
 
+  @Get("schedule")
+  schedule(@Headers("authorization") authorization?: string) {
+    return this.portal.schedule(authorization)
+  }
+
   @Get("movements")
   movements(@Headers("authorization") authorization?: string) {
     return this.portal.movements(authorization)
