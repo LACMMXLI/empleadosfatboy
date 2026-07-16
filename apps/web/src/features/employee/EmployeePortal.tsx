@@ -22,7 +22,7 @@ import {
 } from "@/lib/ledger-ui"
 import fatboyLogo from "@/assets/logo.png"
 
-type EmployeeTab = "home" | "request" | "history"
+type EmployeeTab = "home" | "attendance" | "request" | "history"
 
 type MobileLocation = {
   latitude: number
@@ -294,11 +294,11 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                 <div className="employee-meta-name">{me.data?.fullName ?? "Empleado"}</div>
                 <div className="employee-meta-details">
                   <div className="employee-meta-item">
-                    <UserRound style={{ color: 'hsl(var(--primary))' }} />
+                    <UserRound style={{ color: '#00e5ff' }} />
                     <span>{me.data?.position ?? "Puesto"}</span>
                   </div>
                   <div className="employee-meta-item">
-                    <Building2 style={{ color: 'hsl(var(--accent))' }} />
+                    <Building2 style={{ color: '#00e5ff' }} />
                     <span>{me.data?.branch?.name ?? "Sucursal"}</span>
                   </div>
                 </div>
@@ -320,22 +320,24 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
               </div>
             </section>
 
-            <EmployeeAttendanceCard
-              attendanceMessage={attendanceMessage}
-              attendancePin={attendancePin}
-              attendancePreview={attendancePreview}
-              isError={registerAttendance.isError}
-              isPending={registerAttendance.isPending}
-              onPinChange={(value) => {
-                setAttendancePin(value.replace(/\D/g, "").slice(0, 6))
-                setAttendanceMessage(null)
-                setAttendancePreview(null)
-              }}
-              onSubmit={() => registerAttendance.mutate(attendancePin)}
-            />
-
             <PortalMovementList compact title="Últimos Movimientos" movements={recentMovements} />
           </>
+        )}
+
+        {activeTab === "attendance" && (
+          <EmployeeAttendanceCard
+            attendanceMessage={attendanceMessage}
+            attendancePin={attendancePin}
+            attendancePreview={attendancePreview}
+            isError={registerAttendance.isError}
+            isPending={registerAttendance.isPending}
+            onPinChange={(value) => {
+              setAttendancePin(value.replace(/\D/g, "").slice(0, 6))
+              setAttendanceMessage(null)
+              setAttendancePreview(null)
+            }}
+            onSubmit={() => registerAttendance.mutate(attendancePin)}
+          />
         )}
 
         {activeTab === "request" && (
@@ -535,6 +537,7 @@ function EmployeeBottomNav({
 }) {
   const items = [
     { id: "home" as const, label: "Inicio", icon: LayoutDashboard },
+    { id: "attendance" as const, label: "Asistencia", icon: MapPin },
     { id: "request" as const, label: "Solicitar", icon: Banknote },
     { id: "history" as const, label: "Historial", icon: ClipboardList }
   ]
@@ -697,7 +700,7 @@ function PortalSettlementTicketList({ tickets }: { tickets: MovementSettlementTi
             <div className="employee-ticket-header">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-accent">Recibo Digital</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#00e5ff]">Recibo Digital</div>
                   <div className="mt-1 font-mono text-xs font-semibold text-foreground">{ticket.ticketNumber}</div>
                 </div>
                 <span className="badge-status badge-authorized" style={{ fontSize: '0.625rem' }}>Liquidado</span>
