@@ -43,7 +43,8 @@ export default {
           control: "rgb(var(--surface-control))",
           "control-strong": "rgb(var(--surface-control-strong))",
           line: "rgb(var(--surface-line))"
-        }
+        },
+        portal: "rgb(var(--portal-accent) / <alpha-value>)"
       },
       borderRadius: {
         lg: "var(--radius)",

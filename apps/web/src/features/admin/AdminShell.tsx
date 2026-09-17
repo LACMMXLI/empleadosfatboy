@@ -34,6 +34,7 @@ import { api, session } from "@/lib/api"
 import type { Employee, FileAsset, Incident, IncidentStatus, Movement, MovementKind, MovementStatus, Payroll, PayrollItem, Role, User } from "@/types/domain"
 import { useScrollDirection } from "@/hooks/useScrollDirection"
 import { StatusEmpty, StatusText } from "@/components/common/Status"
+import { toast } from "@/components/common/toast"
 import { AdminModal, DetailLine, ExecutiveConfirmDialog, ExecutiveDatePicker, GuidedBlock } from "@/components/common/AdminPrimitives"
 import { AttendanceAdmin } from "@/features/admin/AttendanceAdmin"
 import {
@@ -505,8 +506,6 @@ function Metric({ label, value, tone = "neutral" }: { label: string; value: stri
 
 function AdministrativeMovements({ user }: { user?: User }) {
   const queryClient = useQueryClient()
-  const [message, setMessage] = useState<string | null>(null)
-  const [settlementMessage, setSettlementMessage] = useState<string | null>(null)
   const [settlementEmployeeId, setSettlementEmployeeId] = useState("")
   const [settlementFrom, setSettlementFrom] = useState("")
   const [settlementTo, setSettlementTo] = useState("")
@@ -534,11 +533,10 @@ function AdministrativeMovements({ user }: { user?: User }) {
   const mutation = useMutation({
     mutationFn: (payload: AdminMovementFormOutput) => api.createAdministrativeMovement(payload),
     onSuccess: async (movement) => {
-      setMessage(`Movimiento administrativo ${movement.folio} registrado`)
+      toast.success(`Movimiento administrativo ${movement.folio} registrado`)
       form.reset({ kind: "ADMIN_ADJUSTMENT", amount: 0, reason: "" })
       await queryClient.invalidateQueries()
-    },
-    onError: (err: Error) => setMessage(err.message)
+    }
   })
   const settle = useMutation({
     mutationFn: () =>
@@ -548,13 +546,12 @@ function AdministrativeMovements({ user }: { user?: User }) {
         to: settlementTo
       }),
     onSuccess: async (result) => {
-      setSettlementMessage(`${result.ticketNumber ?? "Ticket"} · ${result.count} movimiento(s) liquidados por ${money.format(result.total)}`)
+      toast.success(`${result.ticketNumber ?? "Ticket"} · ${result.count} movimiento(s) liquidados por ${money.format(result.total)}`)
       await queryClient.invalidateQueries({ queryKey: ["movements"] })
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       await queryClient.invalidateQueries({ queryKey: ["movement-settlement-summary"] })
       await queryClient.invalidateQueries({ queryKey: ["employeePortal"] })
-    },
-    onError: (err: Error) => setSettlementMessage(err.message)
+    }
   })
   const canSettle = Boolean(
     settlementEmployeeId &&
@@ -619,7 +616,6 @@ function AdministrativeMovements({ user }: { user?: User }) {
             <button className="btn-primary" style={{ width: '100%', height: '2.75rem', fontSize: '0.9rem' }} disabled={mutation.isPending} type="submit">
               Registrar movimiento
             </button>
-            {message && <div className="status-empty">{message}</div>}
           </form>
         </div>
       </div>
@@ -637,7 +633,7 @@ function AdministrativeMovements({ user }: { user?: User }) {
               <select
                 className="form-select"
                 value={settlementEmployeeId}
-                onChange={(event) => { setSettlementEmployeeId(event.target.value); setSettlementMessage(null) }}
+                onChange={(event) => setSettlementEmployeeId(event.target.value)}
               >
                 <option value="">Seleccionar empleado</option>
                 {employees.data?.map((employee) => (
@@ -648,11 +644,11 @@ function AdministrativeMovements({ user }: { user?: User }) {
             <div className="admin-form-row">
               <div className="form-field">
                 <label className="form-label">Desde</label>
-                <ExecutiveDatePicker value={settlementFrom} title="Desde" onChange={(value) => { setSettlementFrom(value); setSettlementMessage(null) }} />
+                <ExecutiveDatePicker value={settlementFrom} title="Desde" onChange={setSettlementFrom} />
               </div>
               <div className="form-field">
                 <label className="form-label">Hasta</label>
-                <ExecutiveDatePicker value={settlementTo} title="Hasta" onChange={(value) => { setSettlementTo(value); setSettlementMessage(null) }} />
+                <ExecutiveDatePicker value={settlementTo} title="Hasta" onChange={setSettlementTo} />
               </div>
             </div>
           </div>
@@ -697,7 +693,6 @@ function AdministrativeMovements({ user }: { user?: User }) {
             <CheckCircle2 style={{ width: 14, height: 14 }} />
             Marcar rango como liquidado
           </button>
-          {settlementMessage && <div className="status-empty">{settlementMessage}</div>}
           <div className="admin-inline-note">
             Responsable: <span style={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}>{user?.fullName}</span>
           </div>
@@ -1180,7 +1175,7 @@ function IncidentsAdmin({ user }: { user?: User }) {
     <div className="space-y-4">
       <div className="section-header">
         <div className="section-title">
-          <MessageSquareText style={{ width: 16, height: 16, color: "#00e5ff" }} />
+          <MessageSquareText style={{ width: 16, height: 16, color: 'rgb(var(--portal-accent))' }} />
           Incidencias
         </div>
         <div className="section-actions">

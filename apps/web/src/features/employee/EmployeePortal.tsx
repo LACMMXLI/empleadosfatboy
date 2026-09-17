@@ -6,7 +6,8 @@ import { AlertTriangle, Banknote, Building2, CalendarDays, CheckCircle2, Clipboa
 import { api, employeeSession } from "@/lib/api"
 import type { EmployeeWorkSchedule, Movement, MovementKind, MovementSettlementTicket, TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
 import { useScrollDirection } from "@/hooks/useScrollDirection"
-import { StatusEmpty } from "@/components/common/Status"
+import { StatusEmpty, StatusLoading } from "@/components/common/Status"
+import { toast } from "@/components/common/toast"
 import { DetailLine } from "@/components/common/AdminPrimitives"
 import {
   employeeRequestKinds,
@@ -44,8 +45,6 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
   const [accountOpen, setAccountOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [requestError, setRequestError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [codeMessage, setCodeMessage] = useState<string | null>(null)
   const [attendancePin, setAttendancePin] = useState("")
   const [attendanceMessage, setAttendanceMessage] = useState<string | null>(null)
   const [attendancePreview, setAttendancePreview] = useState<TimeClockEmployeeVerification | null>(null)
@@ -108,7 +107,6 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
     if (payload.kind !== "DRINK") {
       form.setValue("reason", resolveRequestReason(), { shouldDirty: true, shouldValidate: true })
     }
-    setMessage(null)
     setRequestError(null)
     setConfirming(true)
   }
@@ -145,7 +143,7 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
           : payload
       ),
     onSuccess: async (movement) => {
-      setMessage(`Solicitud ${movement.folio} enviada`)
+      toast.success(`Solicitud ${movement.folio} enviada`)
       setConfirming(false)
       setRequestError(null)
       setReasonType("Personal")
@@ -153,19 +151,15 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
       form.reset({ kind: "SALARY_ADVANCE", amount: 0, reason: "Personal" })
       await queryClient.invalidateQueries({ queryKey: ["employeePortal"] })
     },
-    onError: (err: Error) => {
-      setConfirming(false)
-      setMessage(err.message)
-    }
+    onError: () => setConfirming(false)
   })
   const changeCode = useMutation({
     mutationFn: ({ currentCode, newCode }: { currentCode: string; newCode: string }) =>
       api.employeePortal.changeCode(currentCode, newCode),
     onSuccess: async () => {
-      setCodeMessage("Código actualizado")
+      toast.success("Código actualizado")
       codeForm.reset({ currentCode: "", newCode: "" })
-    },
-    onError: (err: Error) => setCodeMessage(err.message)
+    }
   })
   const registerAttendance = useMutation({
     mutationFn: async (pin: string) => {
@@ -209,14 +203,11 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
         style={{ transform: showNav ? "translateY(0)" : "translateY(-100%)" }}
       >
         <div className="flex items-center h-full">
-          <img src={fatboyLogo} alt="Fatboy" style={{ height: '90%', maxHeight: '44px', objectFit: 'contain' }} className="w-auto opacity-95 filter drop-shadow-[0_0_10px_rgba(0,229,255,0.25)]" />
+          <img src={fatboyLogo} alt="Fatboy" style={{ height: '90%', maxHeight: '44px', objectFit: 'contain' }} className="w-auto opacity-95 filter drop-shadow-[0_0_10px_rgb(var(--portal-accent)/0.25)]" />
         </div>
         <button
           className="rounded-full border border-white/10 bg-white/5 text-foreground hover:bg-white/10 hover:border-white/20 w-10 h-10 flex items-center justify-center cursor-pointer transition-all duration-200 backdrop-blur-sm"
-          onClick={() => {
-            setCodeMessage(null)
-            setAccountOpen(true)
-          }}
+          onClick={() => setAccountOpen(true)}
           aria-label="Abrir cuenta"
           type="button"
         >
@@ -229,7 +220,7 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
         <div className="employee-confirm-backdrop sm:items-center" role="dialog" aria-modal="true" onClick={() => setAccountOpen(false)}>
           <div className="employee-confirm-modal" style={{ maxWidth: '26rem' }} onClick={(event) => event.stopPropagation()}>
             {/* Profile Header */}
-            <div style={{ padding: '1.25rem', borderBottom: '1px solid rgb(var(--surface-line) / 0.2)', background: 'linear-gradient(135deg, rgba(0, 229, 255, 0.06), rgba(168, 85, 247, 0.05))' }}>
+            <div style={{ padding: '1.25rem', borderBottom: '1px solid rgb(var(--surface-line) / 0.2)', background: 'linear-gradient(135deg, rgb(var(--portal-accent) / 0.06), rgba(168, 85, 247, 0.05))' }}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex items-center gap-3">
                   <div className="employee-avatar-ring" style={{ width: '3.25rem', height: '3.25rem', fontSize: '1.1rem' }}>
@@ -251,7 +242,7 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
 
             {/* Change PIN Form */}
             <form className="p-4 space-y-3" onSubmit={codeForm.handleSubmit((values) => changeCode.mutate(values))}>
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={{ color: 'rgba(0, 229, 255, 0.8)', letterSpacing: '0.08em' }}>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider" style={{ color: 'rgb(var(--portal-accent) / 0.8)', letterSpacing: '0.08em' }}>
                 <KeyRound className="h-3.5 w-3.5" />
                 Cambiar PIN privado
               </div>
@@ -260,7 +251,6 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
               <button className="employee-request-submit w-full" disabled={changeCode.isPending} type="submit">
                 {changeCode.isPending ? "Actualizando PIN..." : "Actualizar PIN"}
               </button>
-              {codeMessage && <div className="text-xs text-center mt-1" style={{ color: codeMessage === 'Código actualizado' ? '#86efac' : '#fca5a5' }}>{codeMessage}</div>}
             </form>
 
             {/* Logout Button */}
@@ -284,7 +274,11 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
 
       {/* Main Page Area */}
       <div className="mx-auto max-w-md space-y-4 p-4 pt-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))]">
-        {activeTab === "home" && (
+        {activeTab === "home" && (me.isLoading || balance.isLoading) && (
+          <StatusLoading text="Cargando tu información..." rows={3} />
+        )}
+
+        {activeTab === "home" && !me.isLoading && !balance.isLoading && (
           <>
             {/* Profile Banner */}
             <section className="employee-profile-banner">
@@ -295,11 +289,11 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                 <div className="employee-meta-name">{me.data?.fullName ?? "Empleado"}</div>
                 <div className="employee-meta-details">
                   <div className="employee-meta-item">
-                    <UserRound style={{ color: '#00e5ff' }} />
+                    <UserRound style={{ color: 'rgb(var(--portal-accent))' }} />
                     <span>{me.data?.position ?? "Puesto"}</span>
                   </div>
                   <div className="employee-meta-item">
-                    <Building2 style={{ color: '#00e5ff' }} />
+                    <Building2 style={{ color: 'rgb(var(--portal-accent))' }} />
                     <span>{me.data?.branch?.name ?? "Sucursal"}</span>
                   </div>
                 </div>
@@ -459,11 +453,6 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
                 <p className="employee-request-footnote">
                   *Las solicitudes se envían al panel de administración para su aprobación y posterior deducción de nómina.
                 </p>
-                {message && (
-                  <div className="employee-request-message">
-                    {message}
-                  </div>
-                )}
               </form>
           </section>
         )}
@@ -509,7 +498,11 @@ export function EmployeePortal({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
-        {activeTab === "history" && (
+        {activeTab === "history" && (movements.isLoading || settlementTickets.isLoading) && (
+          <StatusLoading text="Cargando historial..." rows={4} />
+        )}
+
+        {activeTab === "history" && !movements.isLoading && !settlementTickets.isLoading && (
           <EmployeeHistoryTabs
             activeTab={historyTab}
             movements={currentMovements}
@@ -578,7 +571,7 @@ const dayLabels: Record<number, string> = {
 }
 
 function EmployeeScheduleCard({ schedule }: { schedule: Omit<EmployeeWorkSchedule, "employee"> | undefined }) {
-  if (!schedule) return null
+  if (!schedule) return <StatusEmpty text="Administración aún no asignó tu horario semanal." />
 
   const sortedDays = [...(schedule.days ?? [])].sort((a, b) => {
     const valA = a.dayOfWeek === 0 ? 7 : a.dayOfWeek
@@ -606,7 +599,7 @@ function EmployeeScheduleCard({ schedule }: { schedule: Omit<EmployeeWorkSchedul
                   {dayLabels[day.dayOfWeek]}
                 </span>
                 {day.enabled ? (
-                  <span className="font-mono font-semibold text-[#00e5ff] bg-[#00e5ff]/5 border border-[#00e5ff]/20 px-3 py-1 rounded-lg text-xs">
+                  <span className="font-mono font-semibold text-portal bg-portal/5 border border-portal/20 px-3 py-1 rounded-lg text-xs">
                     {day.start} - {day.end}
                   </span>
                 ) : (
@@ -621,7 +614,7 @@ function EmployeeScheduleCard({ schedule }: { schedule: Omit<EmployeeWorkSchedul
 
         {schedule.lateGraceMinutes > 0 && (
           <div className="flex items-center gap-2 mt-2 px-1 text-[11px] text-muted-foreground">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00e5ff]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-portal" />
             <span>Tolerancia de entrada: <strong>{schedule.lateGraceMinutes} minutos</strong>.</span>
           </div>
         )}
@@ -756,7 +749,7 @@ function PortalSettlementTicketList({ tickets }: { tickets: MovementSettlementTi
   return (
     <div className="space-y-4">
       <div className="section-title text-[0.875rem] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-        <ClipboardList style={{ width: 14, height: 14, color: '#00e5ff' }} />
+        <ClipboardList style={{ width: 14, height: 14, color: 'rgb(var(--portal-accent))' }} />
         Historial de Periodos Liquidados
       </div>
       {!tickets.length && <StatusEmpty text="No hay periodos liquidados registrados aún." />}
@@ -766,7 +759,7 @@ function PortalSettlementTicketList({ tickets }: { tickets: MovementSettlementTi
             <div className="employee-ticket-header">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#00e5ff]">Recibo Digital</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-portal">Recibo Digital</div>
                   <div className="mt-1 font-mono text-xs font-semibold text-foreground">{ticket.ticketNumber}</div>
                 </div>
                 <span className="badge-status badge-authorized" style={{ fontSize: '0.625rem' }}>Liquidado</span>
@@ -909,7 +902,7 @@ function PortalMovementList({
   return (
     <div className="space-y-3">
       <div className="section-title text-[0.875rem] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-        <ClipboardList style={{ width: 14, height: 14, color: '#00e5ff' }} />
+        <ClipboardList style={{ width: 14, height: 14, color: 'rgb(var(--portal-accent))' }} />
         {title}
       </div>
       {!movements.length && <StatusEmpty text="Sin movimientos en el periodo actual." />}

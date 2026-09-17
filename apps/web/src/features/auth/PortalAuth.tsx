@@ -99,12 +99,12 @@ function InstallInstructionsPanel({ title, children, onDismiss }: { title: strin
 
 function EmployeeInstallInstructionsPanel({ title, children, onDismiss }: { title: string; children: ReactNode; onDismiss: () => void }) {
   return (
-    <div className="rounded-xl p-4 text-xs mt-1 space-y-2 text-left animate-in fade-in slide-in-from-top-2" style={{ borderColor: 'rgba(0, 229, 255, 0.2)', border: '1px solid rgba(0, 229, 255, 0.2)', background: 'rgba(0, 229, 255, 0.04)', color: 'rgba(0, 229, 255, 0.7)' }}>
-      <p className="font-bold text-sm" style={{ color: 'rgba(0, 229, 255, 0.85)' }}>{title}</p>
+    <div className="rounded-xl p-4 text-xs mt-1 space-y-2 text-left animate-in fade-in slide-in-from-top-2" style={{ borderColor: 'rgb(var(--portal-accent) / 0.2)', border: '1px solid rgb(var(--portal-accent) / 0.2)', background: 'rgb(var(--portal-accent) / 0.04)', color: 'rgb(var(--portal-accent) / 0.7)' }}>
+      <p className="font-bold text-sm" style={{ color: 'rgb(var(--portal-accent) / 0.85)' }}>{title}</p>
       {children}
       <button
         className="font-bold block pt-2 hover:underline text-left focus-visible:outline-none focus-visible:ring-2 rounded px-1 -mx-1 cursor-pointer border-none bg-transparent"
-        style={{ color: 'rgba(0, 229, 255, 0.85)' }}
+        style={{ color: 'rgb(var(--portal-accent) / 0.85)' }}
         onClick={onDismiss}
         type="button"
       >
@@ -285,7 +285,7 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
           <form className="space-y-5" onSubmit={employeeForm.handleSubmit((values) => employeeLogin.mutate(values))}>
             <div className="space-y-3.5">
               <div className="relative">
-                <Phone className="absolute left-4 top-3.5 h-5 w-5" style={{ color: 'rgba(0, 229, 255, 0.6)' }} />
+                <Phone className="absolute left-4 top-3.5 h-5 w-5" style={{ color: 'rgb(var(--portal-accent) / 0.6)' }} />
                 <input 
                   className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40" 
                   placeholder="Teléfono" 
@@ -295,7 +295,7 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
                 />
               </div>
               <div className="relative">
-                <KeyRound className="absolute left-4 top-3.5 h-5 w-5" style={{ color: 'rgba(0, 229, 255, 0.6)' }} />
+                <KeyRound className="absolute left-4 top-3.5 h-5 w-5" style={{ color: 'rgb(var(--portal-accent) / 0.6)' }} />
                 <input 
                   className="form-input login-input h-12 pl-12 w-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40" 
                   placeholder="PIN de 6 dígitos" 
@@ -324,9 +324,9 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
               <button
                 className="w-full mt-1 rounded-xl h-11 flex items-center justify-center gap-2 font-bold text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background border cursor-pointer"
                 style={{ 
-                  background: 'rgba(0, 229, 255, 0.06)', 
-                  borderColor: 'rgba(0, 229, 255, 0.2)', 
-                  color: 'rgba(0, 229, 255, 0.8)' 
+                  background: 'rgb(var(--portal-accent) / 0.06)', 
+                  borderColor: 'rgb(var(--portal-accent) / 0.2)', 
+                  color: 'rgb(var(--portal-accent) / 0.8)' 
                 }}
                 onClick={install}
                 type="button"

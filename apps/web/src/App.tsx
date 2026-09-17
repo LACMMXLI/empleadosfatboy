@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { CheckCircle2, X } from "lucide-react"
 import { api, employeeSession, session } from "@/lib/api"
+import { Toaster } from "@/components/common/toast"
 import { clearPwa, PWA_UPDATE_EVENT, syncAdminPwa, syncEmployeePwa, syncTimeClockPwa, type PwaUpdateDetail } from "@/pwa/employeePwa"
 import { AdminLogin, EmployeeLogin, PortalSelector } from "@/features/auth/PortalAuth"
 import { Shell } from "@/features/admin/AdminShell"
@@ -129,6 +130,7 @@ function App() {
     <>
       {content}
       <PwaUpdateNotice update={update} onDismiss={dismissUpdate} />
+      <Toaster />
     </>
   )
 }

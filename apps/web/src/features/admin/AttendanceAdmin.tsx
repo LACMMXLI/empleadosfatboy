@@ -205,7 +205,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
         <div className="attendance-dashboard-head">
           <div>
             <div className="admin-card-title">
-              <Clock3 style={{ width: 15, height: 15, color: "#00e5ff" }} />
+              <Clock3 style={{ width: 15, height: 15, color: 'rgb(var(--portal-accent))' }} />
               Dashboard de asistencia
             </div>
           </div>
@@ -248,7 +248,7 @@ export function AttendanceAdmin({ user }: { user?: User }) {
       <div className="admin-card">
         <div className="admin-card-header">
           <div className="admin-card-title">
-            <Clock3 style={{ width: 14, height: 14, color: "#00e5ff" }} />
+            <Clock3 style={{ width: 14, height: 14, color: 'rgb(var(--portal-accent))' }} />
             Asistencia del dia
           </div>
           <button className="btn-secondary" type="button" onClick={exportRows}>

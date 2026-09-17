@@ -43,6 +43,9 @@
     --surface-control: 20 20 20;    /* #141414 */
     --surface-control-strong: 30 30 30;/* #1e1e1e */
     --surface-line: 38 38 38;       /* #262626 */
+
+    /* Employee portal / kiosk brand cyan (distinct from --primary/--accent) */
+    --portal-accent: 0 229 255;     /* #00e5ff */
   }
 
   * {
@@ -424,7 +427,7 @@
   /* === Sidebar === */
   .admin-sidebar {
     background:
-      linear-gradient(180deg, rgba(0, 229, 255, 0.03) 0%, transparent 40%),
+      linear-gradient(180deg, rgb(var(--portal-accent) / 0.03) 0%, transparent 40%),
       rgb(var(--surface-control-strong) / 0.96);
     border-right: 1px solid rgb(var(--surface-line) / 0.34);
     backdrop-filter: blur(20px);
@@ -488,7 +491,7 @@
 
   .nav-item.active {
     color: hsl(var(--primary));
-    background: rgba(0, 229, 255, 0.08);
+    background: rgb(var(--portal-accent) / 0.08);
     font-weight: 600;
   }
 
@@ -721,8 +724,8 @@
   }
 
   .badge-partial {
-    background: rgba(0, 229, 255, 0.1);
-    border: 1px solid rgba(0, 229, 255, 0.25);
+    background: rgb(var(--portal-accent) / 0.1);
+    border: 1px solid rgb(var(--portal-accent) / 0.25);
     color: #67e8f9;
   }
 
@@ -752,7 +755,7 @@
     left: 0;
     right: 0;
     height: 2px;
-    background: linear-gradient(90deg, rgba(0,229,255,0), rgba(0,229,255,0.4), rgba(168,85,247,0.4), rgba(168,85,247,0));
+    background: linear-gradient(90deg, rgb(var(--portal-accent) / 0), rgb(var(--portal-accent) / 0.4), rgba(168,85,247,0.4), rgba(168,85,247,0));
     opacity: 0;
     transition: opacity 200ms ease;
   }
@@ -773,7 +776,7 @@
     font-family: 'Space Grotesk', sans-serif;
     font-size: 0.875rem;
     font-weight: 700;
-    color: #00e5ff;
+    color: rgb(var(--portal-accent));
     flex-shrink: 0;
   }
 
@@ -872,7 +875,7 @@
     position: absolute;
     inset: 0 0 auto;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.35), rgba(168, 85, 247, 0.22), transparent);
+    background: linear-gradient(90deg, transparent, rgb(var(--portal-accent) / 0.35), rgba(168, 85, 247, 0.22), transparent);
     pointer-events: none;
   }
 
@@ -912,12 +915,12 @@
 
   .bottom-nav-item.active {
     color: #ecfeff;
-    border-color: rgba(0, 229, 255, 0.34);
+    border-color: rgb(var(--portal-accent) / 0.34);
     background:
-      linear-gradient(135deg, rgba(0, 229, 255, 0.26), rgba(129, 140, 248, 0.22)),
+      linear-gradient(135deg, rgb(var(--portal-accent) / 0.26), rgba(129, 140, 248, 0.22)),
       rgb(var(--surface-panel-strong) / 0.74);
     box-shadow:
-      0 8px 22px rgba(0, 229, 255, 0.14),
+      0 8px 22px rgb(var(--portal-accent) / 0.14),
       0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   }
 
@@ -933,7 +936,7 @@
 
   .bottom-nav-item.active .bottom-nav-icon {
     color: #67e8f9;
-    filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.65));
+    filter: drop-shadow(0 0 6px rgb(var(--portal-accent) / 0.65));
   }
 
   .bottom-nav-item.active::after {
@@ -946,7 +949,7 @@
     height: 2px;
     border-radius: 99px;
     background: rgba(236, 254, 255, 0.9);
-    box-shadow: 0 0 10px rgba(0, 229, 255, 0.8);
+    box-shadow: 0 0 10px rgb(var(--portal-accent) / 0.8);
   }
 
   .bottom-nav-icon {
@@ -1018,7 +1021,7 @@
   .filter-bar select:focus,
   .filter-bar input[type="date"]:focus,
   .filter-bar input[type="text"]:focus {
-    border-color: rgba(0, 229, 255, 0.3);
+    border-color: rgb(var(--portal-accent) / 0.3);
   }
 
   /* === History Movement Row === */
@@ -1064,9 +1067,9 @@
     font-weight: 700;
     padding: 0.15rem 0.5rem;
     border-radius: 99px;
-    background: rgba(0, 229, 255, 0.1);
-    color: #00e5ff;
-    border: 1px solid rgba(0, 229, 255, 0.2);
+    background: rgb(var(--portal-accent) / 0.1);
+    color: rgb(var(--portal-accent));
+    border: 1px solid rgb(var(--portal-accent) / 0.2);
   }
 
   /* === Empty State === */
@@ -1124,8 +1127,8 @@
   }
 
   .form-input:focus {
-    border-color: rgba(0, 229, 255, 0.35);
-    box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.07);
+    border-color: rgb(var(--portal-accent) / 0.35);
+    box-shadow: 0 0 0 3px rgb(var(--portal-accent) / 0.07);
   }
 
   .form-input::placeholder {
@@ -1154,7 +1157,7 @@
   }
 
   .form-select:focus {
-    border-color: rgba(0, 229, 255, 0.35);
+    border-color: rgb(var(--portal-accent) / 0.35);
   }
 
   .form-select option {
@@ -1180,7 +1183,7 @@
   }
 
   .form-textarea:focus {
-    border-color: rgba(0, 229, 255, 0.35);
+    border-color: rgb(var(--portal-accent) / 0.35);
   }
 
   /* === Buttons === */
@@ -1344,7 +1347,7 @@
     display: grid;
     place-items: center;
     background:
-      radial-gradient(circle at top left, rgba(0, 229, 255, 0.14), transparent 34rem),
+      radial-gradient(circle at top left, rgb(var(--portal-accent) / 0.14), transparent 34rem),
       linear-gradient(135deg, #071018 0%, #101820 46%, #20150f 100%);
     color: #f8fafc;
   }
@@ -1704,8 +1707,8 @@
   }
 
   .attendance-tab.active {
-    border-color: rgba(0, 229, 255, 0.5);
-    background: rgba(0, 229, 255, 0.11);
+    border-color: rgb(var(--portal-accent) / 0.5);
+    background: rgb(var(--portal-accent) / 0.11);
     color: #67e8f9;
   }
 
@@ -2064,16 +2067,16 @@
   }
 
   .employee-card:hover {
-    border-color: rgba(0, 229, 255, 0.28);
+    border-color: rgb(var(--portal-accent) / 0.28);
     background: rgb(var(--surface-panel-strong) / 0.95);
     transform: translateY(-1px);
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
   }
 
   .employee-card.selected {
-    border-color: rgba(0, 229, 255, 0.55);
-    background: rgba(0, 229, 255, 0.06);
-    box-shadow: 0 0 12px rgba(0, 229, 255, 0.05);
+    border-color: rgb(var(--portal-accent) / 0.55);
+    background: rgb(var(--portal-accent) / 0.06);
+    box-shadow: 0 0 12px rgb(var(--portal-accent) / 0.05);
   }
 
   .employee-card-name {
@@ -2101,7 +2104,7 @@
     min-height: 100vh;
     overflow: hidden;
     background:
-      radial-gradient(ellipse 70% 50% at 20% 30%, rgba(0, 229, 255, 0.12) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 20% 30%, rgb(var(--portal-accent) / 0.12) 0%, transparent 55%),
       radial-gradient(ellipse 60% 40% at 80% 70%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
       linear-gradient(180deg, rgb(var(--surface-shell)) 0%, rgb(var(--surface-shell-soft)) 100%);
     isolation: isolate;
@@ -2113,7 +2116,7 @@
     inset: -20%;
     z-index: 0;
     background:
-      linear-gradient(105deg, transparent 0 24%, rgba(0, 229, 255, 0.08) 25%, transparent 36%),
+      linear-gradient(105deg, transparent 0 24%, rgb(var(--portal-accent) / 0.08) 25%, transparent 36%),
       linear-gradient(240deg, transparent 0 54%, rgba(168, 85, 247, 0.07) 55%, transparent 66%);
     filter: blur(12px);
     opacity: 0.8;
@@ -2125,8 +2128,8 @@
     inset: 0;
     z-index: 0;
     background-image:
-      linear-gradient(rgba(0, 229, 255, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0, 229, 255, 0.04) 1px, transparent 1px);
+      linear-gradient(rgb(var(--portal-accent) / 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--portal-accent) / 0.04) 1px, transparent 1px);
     background-size: 44px 44px;
     mask-image: linear-gradient(to bottom, transparent, black 18%, black 72%, transparent);
     opacity: 0.6;
@@ -2134,7 +2137,7 @@
 
   .login-scene-admin {
     background:
-      radial-gradient(ellipse 70% 50% at 20% 30%, rgba(0, 229, 255, 0.1) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 20% 30%, rgb(var(--portal-accent) / 0.1) 0%, transparent 55%),
       radial-gradient(ellipse 60% 40% at 80% 70%, rgba(168, 85, 247, 0.09) 0%, transparent 50%),
       linear-gradient(180deg, rgb(var(--surface-shell)) 0%, rgb(var(--surface-shell-soft)) 100%);
   }
@@ -2148,7 +2151,7 @@
     box-shadow:
       0 30px 80px rgba(0, 0, 0, 0.6),
       0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-      0 0 60px rgba(0, 229, 255, 0.05);
+      0 0 60px rgb(var(--portal-accent) / 0.05);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     animation: login-card-enter 500ms ease-out both;
@@ -2161,7 +2164,7 @@
     left: 10%;
     right: 10%;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.4), transparent);
+    background: linear-gradient(90deg, transparent, rgb(var(--portal-accent) / 0.4), transparent);
     z-index: 0;
   }
 
@@ -2179,7 +2182,7 @@
     position: absolute;
     inset: 20% 10% 10%;
     border-radius: 999px;
-    background: radial-gradient(ellipse, rgba(0, 229, 255, 0.3), rgba(168, 85, 247, 0.2), transparent 70%);
+    background: radial-gradient(ellipse, rgb(var(--portal-accent) / 0.3), rgba(168, 85, 247, 0.2), transparent 70%);
     filter: blur(20px);
     opacity: 0.7;
     animation: login-logo-glow 3s ease-in-out infinite alternate;
@@ -2243,9 +2246,9 @@
     font-size: 0.7rem;
     font-weight: 800;
     flex-shrink: 0;
-    background: rgba(0, 229, 255, 0.12);
-    border: 1px solid rgba(0, 229, 255, 0.25);
-    color: #00e5ff;
+    background: rgb(var(--portal-accent) / 0.12);
+    border: 1px solid rgb(var(--portal-accent) / 0.25);
+    color: rgb(var(--portal-accent));
     font-family: 'Space Grotesk', sans-serif;
   }
 
@@ -2256,7 +2259,7 @@
     font-size: 0.625rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
   }
   .badge-payroll-generated { 
-    background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.25); color: #67e8f9;
+    background: rgb(var(--portal-accent) / 0.1); border: 1px solid rgb(var(--portal-accent) / 0.25); color: #67e8f9;
     display: inline-flex; align-items: center; padding: 0.15rem 0.5rem; border-radius: 99px;
     font-size: 0.625rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
   }
@@ -2315,8 +2318,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 6px rgba(0,229,255,0.3); }
-  50% { box-shadow: 0 0 14px rgba(0,229,255,0.6); }
+  0%, 100% { box-shadow: 0 0 6px rgb(var(--portal-accent) / 0.3); }
+  50% { box-shadow: 0 0 14px rgb(var(--portal-accent) / 0.6); }
 }
 
 @keyframes spin-slow {
@@ -2373,7 +2376,7 @@
   .employee-shell {
     min-height: 100vh;
     background:
-      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0, 229, 255, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgb(var(--portal-accent) / 0.08) 0%, transparent 60%),
       #050811;
     color: #e2e8f0;
   }
@@ -2402,7 +2405,7 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent 5%, rgba(0, 229, 255, 0.22) 50%, transparent 95%);
+    background: linear-gradient(90deg, transparent 5%, rgb(var(--portal-accent) / 0.22) 50%, transparent 95%);
     pointer-events: none;
   }
 
@@ -2410,7 +2413,7 @@
     font-family: 'Space Grotesk', sans-serif;
     font-size: 0.825rem;
     font-weight: 700;
-    color: #00e5ff;
+    color: rgb(var(--portal-accent));
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
@@ -2429,7 +2432,7 @@
     padding: 1.125rem 1.125rem;
     border-radius: 1.35rem;
     background:
-      linear-gradient(145deg, rgba(0, 229, 255, 0.04) 0%, rgb(var(--surface-panel) / 0.98) 40%);
+      linear-gradient(145deg, rgb(var(--portal-accent) / 0.04) 0%, rgb(var(--surface-panel) / 0.98) 40%);
     border: 1px solid rgb(var(--surface-line) / 0.25);
     backdrop-filter: blur(12px);
     box-shadow:
@@ -2447,15 +2450,15 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.22), transparent);
+    background: linear-gradient(90deg, transparent, rgb(var(--portal-accent) / 0.22), transparent);
   }
 
   .employee-avatar-ring {
     width: 3rem;
     height: 3rem;
     border-radius: 50%;
-    background: rgba(0, 229, 255, 0.08);
-    border: 2px solid rgba(0, 229, 255, 0.45);
+    background: rgb(var(--portal-accent) / 0.08);
+    border: 2px solid rgb(var(--portal-accent) / 0.45);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2464,8 +2467,8 @@
     font-weight: 800;
     color: #67e8f9;
     box-shadow:
-      0 0 16px rgba(0, 229, 255, 0.18),
-      0 0 0 4px rgba(0, 229, 255, 0.04);
+      0 0 16px rgb(var(--portal-accent) / 0.18),
+      0 0 0 4px rgb(var(--portal-accent) / 0.04);
     flex-shrink: 0;
     animation: emp-avatar-pulse 4s ease-in-out infinite;
   }
@@ -2516,9 +2519,9 @@
     overflow: hidden;
     border-radius: 1.5rem;
     padding: 1.5rem 1.35rem;
-    border: 1px solid rgba(0, 229, 255, 0.22);
+    border: 1px solid rgb(var(--portal-accent) / 0.22);
     background:
-      linear-gradient(145deg, rgba(0, 229, 255, 0.08) 0%, rgba(0, 229, 255, 0.02) 35%, rgb(var(--surface-panel-strong) / 0.98) 65%);
+      linear-gradient(145deg, rgb(var(--portal-accent) / 0.08) 0%, rgb(var(--portal-accent) / 0.02) 35%, rgb(var(--surface-panel-strong) / 0.98) 65%);
     box-shadow:
       0 16px 40px rgba(0, 0, 0, 0.3),
       0 0 0 1px rgba(255, 255, 255, 0.04) inset;
@@ -2527,7 +2530,7 @@
   }
 
   .employee-balance-card:hover {
-    border-color: rgba(0, 229, 255, 0.45);
+    border-color: rgb(var(--portal-accent) / 0.45);
     transform: translateY(-2px);
   }
 
@@ -2538,7 +2541,7 @@
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.48), transparent);
+    background: linear-gradient(90deg, transparent, rgb(var(--portal-accent) / 0.48), transparent);
   }
 
   .employee-balance-card::after {
@@ -2548,7 +2551,7 @@
     z-index: 0;
     background:
       radial-gradient(circle at 85% 15%, rgba(168, 85, 247, 0.10) 0%, transparent 55%),
-      radial-gradient(circle at 10% 90%, rgba(0, 229, 255, 0.06) 0%, transparent 50%);
+      radial-gradient(circle at 10% 90%, rgb(var(--portal-accent) / 0.06) 0%, transparent 50%);
     pointer-events: none;
     animation: emp-balance-shimmer 8s ease-in-out infinite alternate;
   }
@@ -2558,7 +2561,7 @@
     font-weight: 800;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: rgba(0, 229, 255, 0.85);
+    color: rgb(var(--portal-accent) / 0.85);
     display: flex;
     align-items: center;
     gap: 7px;
@@ -2568,7 +2571,7 @@
 
   .employee-balance-label svg {
     opacity: 0.9;
-    filter: drop-shadow(0 0 3px rgba(0, 229, 255, 0.4));
+    filter: drop-shadow(0 0 3px rgb(var(--portal-accent) / 0.4));
   }
 
   .employee-balance-value {
@@ -2581,7 +2584,7 @@
     margin-top: 0.5rem;
     position: relative;
     z-index: 1;
-    text-shadow: 0 0 28px rgba(0, 229, 255, 0.25);
+    text-shadow: 0 0 28px rgb(var(--portal-accent) / 0.25);
   }
 
   .employee-balance-footer {
@@ -2628,13 +2631,13 @@
     inset: 0;
     border-radius: inherit;
     opacity: 0;
-    background: radial-gradient(circle at 50% 40%, rgba(0, 229, 255, 0.12), transparent 70%);
+    background: radial-gradient(circle at 50% 40%, rgb(var(--portal-accent) / 0.12), transparent 70%);
     transition: opacity 180ms ease;
   }
 
   .employee-action-btn:hover {
-    border-color: rgba(0, 229, 255, 0.3);
-    background: rgba(0, 229, 255, 0.04);
+    border-color: rgb(var(--portal-accent) / 0.3);
+    background: rgb(var(--portal-accent) / 0.04);
     color: hsl(var(--foreground));
     transform: translateY(-1px);
   }
@@ -2648,12 +2651,12 @@
   }
 
   .employee-action-btn.active {
-    border-color: rgba(0, 229, 255, 0.4);
-    background: rgba(0, 229, 255, 0.10);
+    border-color: rgb(var(--portal-accent) / 0.4);
+    background: rgb(var(--portal-accent) / 0.10);
     color: #67e8f9;
     box-shadow:
-      0 6px 20px rgba(0, 229, 255, 0.10),
-      0 0 0 1px rgba(0, 229, 255, 0.08) inset;
+      0 6px 20px rgb(var(--portal-accent) / 0.10),
+      0 0 0 1px rgb(var(--portal-accent) / 0.08) inset;
   }
 
   .employee-action-btn.active::before {
@@ -2669,7 +2672,7 @@
   }
 
   .employee-action-btn.active svg {
-    filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.7));
+    filter: drop-shadow(0 0 6px rgb(var(--portal-accent) / 0.7));
     transform: scale(1.08);
   }
 
@@ -2685,14 +2688,14 @@
     position: relative;
     overflow: hidden;
     border-radius: 1.5rem;
-    border: 1px solid rgba(0, 229, 255, 0.18);
+    border: 1px solid rgb(var(--portal-accent) / 0.18);
     background:
-      linear-gradient(160deg, rgba(0, 229, 255, 0.05) 0%, transparent 22%),
+      linear-gradient(160deg, rgb(var(--portal-accent) / 0.05) 0%, transparent 22%),
       linear-gradient(180deg, rgb(var(--surface-panel-strong) / 0.98), rgb(var(--surface-panel) / 0.96));
     box-shadow:
       0 22px 60px rgba(0, 0, 0, 0.35),
       0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-      0 0 40px rgba(0, 229, 255, 0.03);
+      0 0 40px rgb(var(--portal-accent) / 0.03);
     animation: emp-card-enter 0.45s ease both 0.1s;
   }
 
@@ -2701,14 +2704,14 @@
     position: absolute;
     inset: 0 0 auto;
     height: 1px;
-    background: linear-gradient(90deg, transparent 10%, rgba(0, 229, 255, 0.4) 50%, transparent 90%);
+    background: linear-gradient(90deg, transparent 10%, rgb(var(--portal-accent) / 0.4) 50%, transparent 90%);
   }
 
   .employee-request-hero {
     position: relative;
     padding: 1.25rem 1.125rem 1rem;
     border-bottom: 1px solid rgb(var(--surface-line) / 0.18);
-    background: linear-gradient(180deg, rgba(0, 229, 255, 0.02) 0%, transparent 100%);
+    background: linear-gradient(180deg, rgb(var(--portal-accent) / 0.02) 0%, transparent 100%);
   }
 
   .employee-request-kicker {
@@ -2719,11 +2722,11 @@
     font-weight: 900;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: rgba(0, 229, 255, 0.85);
+    color: rgb(var(--portal-accent) / 0.85);
     padding: 3px 10px 3px 7px;
     border-radius: 6px;
-    background: rgba(0, 229, 255, 0.06);
-    border: 1px solid rgba(0, 229, 255, 0.15);
+    background: rgb(var(--portal-accent) / 0.06);
+    border: 1px solid rgb(var(--portal-accent) / 0.15);
   }
 
   .employee-request-hero h2 {
@@ -2759,7 +2762,7 @@
   }
 
   .employee-request-section:focus-within {
-    border-color: rgba(0, 229, 255, 0.2);
+    border-color: rgb(var(--portal-accent) / 0.2);
   }
 
   .employee-request-section-head {
@@ -2803,7 +2806,7 @@
 
   .employee-action-btn.premium.active {
     background:
-      linear-gradient(160deg, rgba(0, 229, 255, 0.1) 0%, rgba(0, 229, 255, 0.02) 100%);
+      linear-gradient(160deg, rgb(var(--portal-accent) / 0.1) 0%, rgb(var(--portal-accent) / 0.02) 100%);
   }
 
   .employee-action-btn.premium .employee-action-label {
@@ -2819,23 +2822,23 @@
     gap: 0.5rem;
     min-height: 3.5rem;
     border-radius: 1.1rem;
-    border: 1px solid rgba(0, 229, 255, 0.18);
+    border: 1px solid rgb(var(--portal-accent) / 0.18);
     background:
-      linear-gradient(135deg, rgba(0, 229, 255, 0.02) 0%, rgb(var(--surface-control) / 0.85) 100%);
+      linear-gradient(135deg, rgb(var(--portal-accent) / 0.02) 0%, rgb(var(--surface-control) / 0.85) 100%);
     padding: 0 1rem;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   .employee-amount-input-wrap:focus-within {
-    border-color: rgba(0, 229, 255, 0.35);
-    box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.05);
+    border-color: rgb(var(--portal-accent) / 0.35);
+    box-shadow: 0 0 0 3px rgb(var(--portal-accent) / 0.05);
   }
 
   .employee-amount-input-wrap span {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 1.15rem;
     font-weight: 800;
-    color: rgba(0, 229, 255, 0.7);
+    color: rgb(var(--portal-accent) / 0.7);
   }
 
   .employee-amount-input {
@@ -2905,12 +2908,12 @@
   }
 
   .employee-reason-segment button.active {
-    border-color: rgba(0, 229, 255, 0.4);
-    background: rgba(0, 229, 255, 0.08);
+    border-color: rgb(var(--portal-accent) / 0.4);
+    background: rgb(var(--portal-accent) / 0.08);
     color: #67e8f9;
     box-shadow:
-      0 6px 18px rgba(0, 229, 255, 0.06),
-      0 0 0 1px rgba(0, 229, 255, 0.05) inset;
+      0 6px 18px rgb(var(--portal-accent) / 0.06),
+      0 0 0 1px rgb(var(--portal-accent) / 0.05) inset;
   }
 
   .employee-reason-textarea {
@@ -2929,8 +2932,8 @@
   }
 
   .employee-reason-textarea:focus {
-    border-color: rgba(0, 229, 255, 0.35);
-    box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.05);
+    border-color: rgb(var(--portal-accent) / 0.35);
+    box-shadow: 0 0 0 3px rgb(var(--portal-accent) / 0.05);
   }
 
   /* ── Submit Button ── */
@@ -2938,7 +2941,7 @@
     min-height: 3.35rem;
     border: 0;
     border-radius: 1.1rem;
-    background: #00e5ff;
+    background: rgb(var(--portal-accent));
     color: #020617;
     font-family: 'Space Grotesk', sans-serif;
     font-size: 0.92rem;
@@ -2946,7 +2949,7 @@
     letter-spacing: 0.01em;
     cursor: pointer;
     box-shadow:
-      0 8px 24px rgba(0, 229, 255, 0.25),
+      0 8px 24px rgb(var(--portal-accent) / 0.25),
       0 0 0 1px rgba(255, 255, 255, 0.15) inset;
     transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), filter 180ms ease, box-shadow 180ms ease;
     position: relative;
@@ -2966,7 +2969,7 @@
     background: #00f0ff;
     transform: translateY(-2px);
     box-shadow:
-      0 12px 32px rgba(0, 229, 255, 0.35),
+      0 12px 32px rgb(var(--portal-accent) / 0.35),
       0 0 0 1px rgba(255, 255, 255, 0.2) inset;
   }
 
@@ -3041,12 +3044,12 @@
     max-width: 28rem;
     overflow: hidden;
     border-radius: 1.5rem;
-    border: 1px solid rgba(0, 229, 255, 0.25);
+    border: 1px solid rgb(var(--portal-accent) / 0.25);
     background:
       linear-gradient(180deg, rgb(var(--surface-panel-strong) / 0.99), rgb(var(--surface-panel) / 0.97));
     box-shadow:
       0 32px 80px rgba(0, 0, 0, 0.60),
-      0 0 50px rgba(0, 229, 255, 0.06);
+      0 0 50px rgb(var(--portal-accent) / 0.06);
     animation: emp-modal-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
@@ -3057,7 +3060,7 @@
     padding: 1.125rem;
     border-bottom: 1px solid rgb(var(--surface-line) / 0.22);
     background:
-      linear-gradient(135deg, rgba(0, 229, 255, 0.06) 0%, rgba(0, 229, 255, 0.01) 100%);
+      linear-gradient(135deg, rgb(var(--portal-accent) / 0.06) 0%, rgb(var(--portal-accent) / 0.01) 100%);
   }
 
   .employee-confirm-icon {
@@ -3066,8 +3069,8 @@
     display: grid;
     place-items: center;
     border-radius: 999px;
-    border: 1px solid rgba(0, 229, 255, 0.35);
-    background: rgba(0, 229, 255, 0.12);
+    border: 1px solid rgb(var(--portal-accent) / 0.35);
+    background: rgb(var(--portal-accent) / 0.12);
     color: #67e8f9;
     animation: emp-avatar-pulse 3s ease-in-out infinite;
   }
@@ -3124,7 +3127,7 @@
 
   .employee-ticket-header {
     background:
-      linear-gradient(135deg, rgba(0, 229, 255, 0.06) 0%, rgb(var(--surface-panel-strong) / 0.97) 100%);
+      linear-gradient(135deg, rgb(var(--portal-accent) / 0.06) 0%, rgb(var(--surface-panel-strong) / 0.97) 100%);
     border-bottom: 1px dashed rgb(var(--surface-line) / 0.3);
     padding: 1.125rem;
     position: relative;
@@ -3219,7 +3222,7 @@
     inset: 0 0 auto;
     height: 1px;
     border-radius: 1.25rem 1.25rem 0 0;
-    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.22), transparent);
+    background: linear-gradient(90deg, transparent, rgb(var(--portal-accent) / 0.22), transparent);
     pointer-events: none;
   }
 
@@ -3259,11 +3262,11 @@
   }
 
   .employee-bottom-nav-btn.active {
-    color: #00e5ff;
-    border-color: rgba(0, 229, 255, 0.2);
-    background: rgba(0, 229, 255, 0.08);
+    color: rgb(var(--portal-accent));
+    border-color: rgb(var(--portal-accent) / 0.2);
+    background: rgb(var(--portal-accent) / 0.08);
     box-shadow:
-      0 4px 12px rgba(0, 229, 255, 0.08),
+      0 4px 12px rgb(var(--portal-accent) / 0.08),
       0 0 0 1px rgba(255, 255, 255, 0.03) inset;
   }
 
@@ -3273,7 +3276,7 @@
     inset: 0;
     z-index: -1;
     border-radius: inherit;
-    background: radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.1), transparent 55%);
+    background: radial-gradient(circle at 50% 0%, rgb(var(--portal-accent) / 0.1), transparent 55%);
     opacity: 0.9;
   }
 
@@ -3284,9 +3287,9 @@
   }
 
   .employee-bottom-nav-btn.active svg {
-    filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.6));
+    filter: drop-shadow(0 0 6px rgb(var(--portal-accent) / 0.6));
     transform: translateY(-1px);
-    color: #00e5ff;
+    color: rgb(var(--portal-accent));
   }
 
   .employee-bottom-nav-btn.active::after {
@@ -3298,8 +3301,8 @@
     width: 22px;
     height: 2px;
     border-radius: 99px;
-    background: #00e5ff;
-    box-shadow: 0 0 10px rgba(0, 229, 255, 0.7);
+    background: rgb(var(--portal-accent));
+    box-shadow: 0 0 10px rgb(var(--portal-accent) / 0.7);
   }
 }
 
@@ -3320,8 +3323,8 @@
 }
 
 @keyframes emp-avatar-pulse {
-  0%, 100% { box-shadow: 0 0 16px rgba(0, 229, 255, 0.20), 0 0 0 4px rgba(0, 229, 255, 0.06); }
-  50% { box-shadow: 0 0 22px rgba(0, 229, 255, 0.30), 0 0 0 6px rgba(0, 229, 255, 0.10); }
+  0%, 100% { box-shadow: 0 0 16px rgb(var(--portal-accent) / 0.20), 0 0 0 4px rgb(var(--portal-accent) / 0.06); }
+  50% { box-shadow: 0 0 22px rgb(var(--portal-accent) / 0.30), 0 0 0 6px rgb(var(--portal-accent) / 0.10); }
 }
 
 @keyframes emp-balance-shimmer {
@@ -3435,7 +3438,7 @@
 
   .settings-tab:hover,
   .settings-tab.active {
-    border-color: rgba(0, 229, 255, 0.34);
+    border-color: rgb(var(--portal-accent) / 0.34);
     background: rgb(var(--surface-panel-strong) / 0.94);
     color: hsl(var(--foreground));
     transform: translateY(-1px);
@@ -3502,7 +3505,7 @@
   }
 
   .settings-action-tile:hover {
-    border-color: rgba(0, 229, 255, 0.32);
+    border-color: rgb(var(--portal-accent) / 0.32);
     background: rgb(var(--surface-panel-strong) / 0.98);
     transform: translateY(-1px);
   }
@@ -3546,7 +3549,7 @@
   .settings-list-card.interactive:hover,
   .settings-list-card.selected,
   .settings-rule-row:hover {
-    border-color: rgba(0, 229, 255, 0.28);
+    border-color: rgb(var(--portal-accent) / 0.28);
     background: rgb(var(--surface-panel-strong) / 0.9);
     transform: translateY(-1px);
   }
@@ -4057,7 +4060,7 @@
       box-shadow: 
         0 35px 80px rgba(0, 0, 0, 0.65), 
         0 0 0 1px rgba(255, 255, 255, 0.08) inset,
-        0 0 50px rgba(0, 229, 255, 0.05); /* Soft primary cyan glow */
+        0 0 50px rgb(var(--portal-accent) / 0.05); /* Soft primary cyan glow */
     }
 
     .admin-modal-header {
@@ -4178,8 +4181,8 @@
   }
 
   .mini-stat-cyan {
-    border-color: rgba(0, 229, 255, 0.16);
-    background: rgba(0, 229, 255, 0.04);
+    border-color: rgb(var(--portal-accent) / 0.16);
+    background: rgb(var(--portal-accent) / 0.04);
   }
 
   .mini-stat-violet {
@@ -4488,7 +4491,7 @@
 
   .incident-list-item:hover,
   .incident-list-item.selected {
-    border-color: rgba(0, 229, 255, 0.34);
+    border-color: rgb(var(--portal-accent) / 0.34);
     background: rgb(var(--surface-panel-strong) / 0.92);
     transform: translateY(-1px);
   }
@@ -4723,8 +4726,8 @@
   }
 
   .incident-message.system {
-    border-color: rgba(0, 229, 255, 0.24);
-    background: rgba(0, 229, 255, 0.055);
+    border-color: rgb(var(--portal-accent) / 0.24);
+    background: rgb(var(--portal-accent) / 0.055);
   }
 
   .incident-message-meta {
