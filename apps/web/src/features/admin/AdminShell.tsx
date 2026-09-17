@@ -197,6 +197,16 @@ export function Shell({
             </div>
             <button
               className={touchOptimizedLayout ? "btn-icon" : "btn-icon lg:hidden"}
+              onClick={() => onViewChange("configuracion")}
+              type="button"
+              aria-label="Abrir configuración"
+              title="Configuración"
+              style={{ display: me.data?.role === "ADMINISTRADOR" ? undefined : "none" }}
+            >
+              <Settings style={{ width: 16, height: 16 }} />
+            </button>
+            <button
+              className={touchOptimizedLayout ? "btn-icon" : "btn-icon lg:hidden"}
               onClick={handleLogout}
               type="button"
               aria-label="Cerrar sesión"
@@ -206,7 +216,7 @@ export function Shell({
           </header>
           <div className={touchOptimizedLayout ? "mobile-page flex-1 p-3" : "mobile-page flex-1 p-3 lg:p-4"}>
             {activeView === "dashboard" && <Dashboard onOpen={onViewChange} />}
-            {activeView === "empleados" && <Employees user={me.data} onOpenJornadas={() => onViewChange("asistencia")} />}
+            {activeView === "empleados" && <Employees user={me.data} onOpenJornadas={() => onViewChange("asistencia")} onOpenConfiguration={() => { sessionStorage.setItem("fatboy-admin-settings-tab", "timeclock"); onViewChange("configuracion") }} />}
             {activeView === "pendientes" && <FinancialWorkspace user={me.data} initialTab="approval" />}
             {activeView === "adminMovements" && <FinancialWorkspace user={me.data} />}
             {activeView === "incidencias" && <IncidentsAdmin user={me.data} />}
@@ -347,6 +357,12 @@ function Dashboard({ onOpen }: { onOpen: (view: View) => void }) {
     queryFn: () => api.movements({ branchId: selectedBranchId }),
     enabled: selectedBranchId !== "all"
   })
+  const today = useMemo(() => toDateInput(new Date()), [])
+  const attendanceQuery = useQuery({
+    queryKey: ["dashboard", "attendance", today, selectedBranchId],
+    queryFn: () => api.adminTimeClock.attendance({ date: today, branchId: selectedBranchId === "all" ? "" : selectedBranchId })
+  })
+  const incidentsQuery = useQuery({ queryKey: ["dashboard", "incidents"], queryFn: () => api.incidents() })
 
   if (isLoading) return <StatusEmpty text="Cargando resumen..." />
   if (error) return <StatusEmpty text={(error as Error).message} />
@@ -399,6 +415,8 @@ function Dashboard({ onOpen }: { onOpen: (view: View) => void }) {
   const totalAuthorizedDetails = selectedBranchId === "all"
     ? data.cards.authorizedMovements
     : movements.filter((m) => m.employee?.branch?.id === selectedBranchId && m.status === "AUTHORIZED").length
+  const reviewJourneys = (attendanceQuery.data ?? []).filter((row) => row.status === "NO_SHOW" || row.status === "IN_SHIFT" || row.calculation.lateMinutes > 0 || row.calculation.earlyDepartureMinutes > 0 || row.overtimeAuthorization.status === "PENDING")
+  const openIncidents = (incidentsQuery.data ?? []).filter((incident) => incident.status !== "RESUELTA" && incident.status !== "CERRADA").length
 
   return (
     <div className="space-y-4">
@@ -490,9 +508,9 @@ function Dashboard({ onOpen }: { onOpen: (view: View) => void }) {
             </div>
           </div>
           <div className="grid gap-2 md:grid-cols-3 mt-3">
-            <button className="btn-secondary" type="button" onClick={() => onOpen("asistencia")}>Revisar jornadas</button>
+            <button className="btn-secondary" type="button" onClick={() => { sessionStorage.setItem("fatboy-admin-attendance-filter", "review"); onOpen("asistencia") }}>Revisar {reviewJourneys.length} jornada(s)</button>
             <button className="btn-secondary" type="button" onClick={() => { sessionStorage.setItem("fatboy-admin-financial-tab", "approval"); onOpen("adminMovements") }}>Resolver solicitudes pendientes</button>
-            <button className="btn-secondary" type="button" onClick={() => onOpen("incidencias")}>Atender incidencias</button>
+            <button className="btn-secondary" type="button" onClick={() => onOpen("incidencias")}>Atender {openIncidents} incidencia(s)</button>
           </div>
         </div>
       </div>
@@ -1081,7 +1099,6 @@ function IncidentsAdmin({ user }: { user?: User }) {
   const [comment, setComment] = useState("")
   const [statusMessage, setStatusMessage] = useState("")
   const [previewFile, setPreviewFile] = useState<FileAsset | null>(null)
-  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (user?.branch?.id && !branchId) setBranchId(user.branch.id)
@@ -1114,7 +1131,6 @@ function IncidentsAdmin({ user }: { user?: User }) {
   }, [branchId, branches.data, targetEmployeeId])
 
   const selectedIncident = incidentDetail.data ?? incidents.data?.find((incident) => incident.id === selectedIncidentId)
-  const isDeveloperAdmin = user?.role === "ADMINISTRADOR"
   const selectedIncidentIsFinal = selectedIncident ? ["RESUELTA", "CERRADA"].includes(selectedIncident.status) : false
 
   const resetCreateForm = () => {
@@ -1188,25 +1204,6 @@ function IncidentsAdmin({ user }: { user?: User }) {
       await queryClient.invalidateQueries({ queryKey: ["incident", incident.id] })
     }
   })
-
-  const purgeIncident = useMutation({
-    mutationFn: () => {
-      if (!selectedIncident) throw new Error("Selecciona una incidencia")
-      return api.purgeIncidentForDeveloper(selectedIncident.id)
-    },
-    onSuccess: async () => {
-      const purgedId = selectedIncidentId
-      setSelectedIncidentId("")
-      setPreviewFile(null)
-      await queryClient.invalidateQueries({ queryKey: ["incidents"] })
-      if (purgedId) await queryClient.removeQueries({ queryKey: ["incident", purgedId] })
-    }
-  })
-
-  const confirmIncidentPurge = () => {
-    if (!selectedIncident) return
-    setPurgeConfirmOpen(true)
-  }
 
   const onCreateFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setCreateFiles(Array.from(event.target.files ?? []))
@@ -1289,12 +1286,6 @@ function IncidentsAdmin({ user }: { user?: User }) {
             <div className="admin-card-title">Detalle</div>
             <div className="incident-detail-header-actions">
               {selectedIncident && <span className={getIncidentBadgeClass(selectedIncident.status)}>{incidentStatusLabels[selectedIncident.status]}</span>}
-              {selectedIncident && isDeveloperAdmin && (
-                <button className="btn-reject" type="button" disabled={purgeIncident.isPending} onClick={confirmIncidentPurge}>
-                  <Trash2 style={{ width: 13, height: 13 }} />
-                  Eliminar prueba
-                </button>
-              )}
             </div>
           </div>
           <div className="admin-card-body">
@@ -1333,16 +1324,16 @@ function IncidentsAdmin({ user }: { user?: User }) {
                 </div>
 
                 <div className="incident-actions">
-                  {incidentStatuses.map((item) => (
+                  {nextIncidentActions(selectedIncident.status).map((item) => (
                     <button
-                      key={item}
-                      className={selectedIncident.status === item ? "btn-primary" : "btn-secondary"}
+                      key={item.status}
+                      className="btn-primary"
                       type="button"
-                      disabled={updateStatus.isPending || selectedIncident.status === item}
-                      onClick={() => updateStatus.mutate(item)}
+                      disabled={updateStatus.isPending}
+                      onClick={() => updateStatus.mutate(item.status)}
                     >
-                      {item === "VISTA" && <Eye style={{ width: 14, height: 14 }} />}
-                      {incidentStatusLabels[item]}
+                      {item.status === "VISTA" && <Eye style={{ width: 14, height: 14 }} />}
+                      {item.label}
                     </button>
                   ))}
                 </div>
@@ -1412,9 +1403,9 @@ function IncidentsAdmin({ user }: { user?: User }) {
                   </div>
                 </section>
 
-                {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error || purgeIncident.error) && (
+                {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error) && (
                   <div className="status-empty" style={{ color: "#f87171", padding: "0.5rem" }}>
-                    {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error || purgeIncident.error)?.message}
+                    {(updateStatus.error || addMessage.error || addEvidence.error || incidentDetail.error)?.message}
                   </div>
                 )}
               </div>
@@ -1469,15 +1460,6 @@ function IncidentsAdmin({ user }: { user?: User }) {
       )}
 
       {previewFile && <EvidencePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />}
-      <ExecutiveConfirmDialog
-        open={purgeConfirmOpen}
-        title="Eliminar incidencia de prueba"
-        description={`Esta acción eliminará definitivamente ${selectedIncident?.folio ?? "la incidencia"} y sus evidencias.`}
-        confirmLabel="Eliminar definitivamente"
-        verificationText="BORRAR"
-        onCancel={() => setPurgeConfirmOpen(false)}
-        onConfirm={() => { setPurgeConfirmOpen(false); purgeIncident.mutate() }}
-      />
     </div>
   )
 }
@@ -2100,7 +2082,7 @@ function MovementEvidenceButton({ movement }: { movement: Movement }) {
   )
 }
 
-function Employees({ user, onOpenJornadas }: { user?: User; onOpenJornadas: () => void }) {
+function Employees({ user, onOpenJornadas, onOpenConfiguration }: { user?: User; onOpenJornadas: () => void; onOpenConfiguration: () => void }) {
   const queryClient = useQueryClient()
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
@@ -2191,7 +2173,7 @@ function Employees({ user, onOpenJornadas }: { user?: User; onOpenJornadas: () =
       </div>
 
       {selectedEmployee && (
-        <EmployeeRecord employee={selectedEmployee} onEdit={() => setEditOpen(true)} onOpenJornadas={onOpenJornadas} />
+        <EmployeeRecord employee={selectedEmployee} onEdit={() => setEditOpen(true)} onOpenJornadas={onOpenJornadas} onOpenConfiguration={onOpenConfiguration} />
       )}
 
       <div className="admin-card">
@@ -2319,7 +2301,17 @@ function Employees({ user, onOpenJornadas }: { user?: User; onOpenJornadas: () =
   )
 }
 
-function EmployeeRecord({ employee, onEdit, onOpenJornadas }: { employee: Employee; onEdit: () => void; onOpenJornadas: () => void }) {
+function nextIncidentActions(status: IncidentStatus): Array<{ status: IncidentStatus; label: string }> {
+  switch (status) {
+    case "REPORTADA": return [{ status: "VISTA", label: "Revisar" }]
+    case "VISTA": return [{ status: "EN_PROCESO", label: "Iniciar seguimiento" }]
+    case "EN_PROCESO": return [{ status: "RESUELTA", label: "Resolver" }]
+    case "RESUELTA": return [{ status: "CERRADA", label: "Cerrar" }]
+    default: return []
+  }
+}
+
+function EmployeeRecord({ employee, onEdit, onOpenJornadas, onOpenConfiguration }: { employee: Employee; onEdit: () => void; onOpenJornadas: () => void; onOpenConfiguration: () => void }) {
   const [tab, setTab] = useState<"summary" | "attendance" | "movements" | "incidents" | "payroll" | "data">("summary")
   const [from, setFrom] = useState(() => startOfCurrentMonth())
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10))
@@ -2395,7 +2387,7 @@ function EmployeeRecord({ employee, onEdit, onOpenJornadas }: { employee: Employ
         {tab === "data" && (
           <div className="grid gap-3 md:grid-cols-2">
             <div style={{ ...insetPanelStyle, padding: "0.875rem", borderRadius: "0.625rem" }}><DetailLine label="Teléfono" value={employee.phone} /><DetailLine label="Tipo de sueldo" value={`${salaryTypeLabels[employee.salaryType]} · ${money.format(Number(employee.salaryAmount))}`} /><DetailLine label="Ingreso" value={employee.hireDate ? formatDateLabel(employee.hireDate) : "Sin fecha registrada"} /></div>
-            <div style={{ ...insetPanelStyle, padding: "0.875rem", borderRadius: "0.625rem" }}><DetailLine label="Horario" value={schedule.data?.configured ? `${schedule.data.days.filter((day) => day.enabled).length} día(s) configurados` : "Sin horario configurado"} /><DetailLine label="Tolerancia" value={schedule.data ? `${schedule.data.lateGraceMinutes} minutos` : "—"} /><button className="btn-secondary mt-3" type="button" onClick={onOpenJornadas}>Administrar horario</button></div>
+            <div style={{ ...insetPanelStyle, padding: "0.875rem", borderRadius: "0.625rem" }}><DetailLine label="Horario" value={schedule.data?.configured ? `${schedule.data.days.filter((day) => day.enabled).length} día(s) configurados` : "Sin horario configurado"} /><DetailLine label="Tolerancia" value={schedule.data ? `${schedule.data.lateGraceMinutes} minutos` : "—"} /><button className="btn-secondary mt-3" type="button" onClick={onOpenConfiguration}>Administrar horario</button></div>
           </div>
         )}
       </div>
@@ -2410,7 +2402,11 @@ function Configuration({ user }: { user?: User }) {
   const [editBranchId, setEditBranchId] = useState("")
   const [branchDeactivateId, setBranchDeactivateId] = useState("")
   const [ruleDeleteId, setRuleDeleteId] = useState("")
-  const [settingsTab, setSettingsTab] = useState<"general" | "branches" | "users" | "rules" | "timeclock">("general")
+  const [settingsTab, setSettingsTab] = useState<"general" | "branches" | "users" | "rules" | "timeclock">(() => {
+    const pending = sessionStorage.getItem("fatboy-admin-settings-tab")
+    sessionStorage.removeItem("fatboy-admin-settings-tab")
+    return pending === "timeclock" ? "timeclock" : "general"
+  })
 
   const configuration = useQuery({ queryKey: ["configuration"], queryFn: api.configuration })
   const rules = useQuery({ queryKey: ["rules"], queryFn: api.rules })

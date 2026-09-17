@@ -39,7 +39,11 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
   const [setupToken, setSetupToken] = useState<string | null>(null)
   const [deviceToPurge, setDeviceToPurge] = useState<TimeClockDevice | null>(null)
   const [activePanel, setActivePanel] = useState<AttendancePanel>(() => mode === "configuration" ? "schedules" : "day")
-  const [reviewOnly, setReviewOnly] = useState(false)
+  const [reviewOnly, setReviewOnly] = useState(() => {
+    const pending = sessionStorage.getItem("fatboy-admin-attendance-filter")
+    sessionStorage.removeItem("fatboy-admin-attendance-filter")
+    return pending === "review"
+  })
   const [adjustment, setAdjustment] = useState({
     employeeId: "",
     branchId: "",
@@ -221,10 +225,10 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
               <History style={{ width: 13, height: 13 }} />
               Historial
             </button>}
-            <button className={`attendance-tab ${activePanel === "schedules" ? "active" : ""}`} type="button" onClick={() => setActivePanel("schedules")}>
+            {mode === "configuration" && <button className={`attendance-tab ${activePanel === "schedules" ? "active" : ""}`} type="button" onClick={() => setActivePanel("schedules")}>
               <CalendarDays style={{ width: 13, height: 13 }} />
               Turnos
-            </button>
+            </button>}
             {mode === "configuration" && <button className={`attendance-tab ${activePanel === "devices" ? "active" : ""}`} type="button" onClick={() => setActivePanel("devices")}>
               <KeyRound style={{ width: 13, height: 13 }} />
               Dispositivos
@@ -431,7 +435,7 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
       </div>
       )}
 
-      {activePanel === "schedules" && (
+      {mode === "configuration" && activePanel === "schedules" && (
         <div className="admin-card">
           <div className="admin-card-header">
             <div className="admin-card-title">
@@ -501,7 +505,7 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
         </div>
       )}
 
-      {activePanel === "devices" && (
+      {mode === "configuration" && activePanel === "devices" && (
         <div className="admin-card">
           <div className="admin-card-header">
             <div className="admin-card-title">
@@ -642,7 +646,7 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
         </div>
       )}
 
-      {activePanel === "adjustments" && (
+      {mode === "configuration" && activePanel === "adjustments" && (
         <div className="admin-card">
           <div className="admin-card-header">
             <div className="admin-card-title">
