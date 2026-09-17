@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { CalendarDays, Camera, CheckCircle2, Clock3, Copy, Download, History, KeyRound, Plus, RefreshCw, RotateCw, Save, Trash2, UserRound, Wrench, X } from "lucide-react"
+import { CalendarDays, Camera, CheckCircle2, Clock3, Copy, Download, History, KeyRound, Plus, RefreshCw, RotateCw, Save, UserRound, Wrench, X } from "lucide-react"
 import { api } from "@/lib/api"
-import { ExecutiveConfirmDialog, ExecutiveDatePicker } from "@/components/common/AdminPrimitives"
-import type { AttendanceRow, Branch, EmployeeTimeClockHistoryDay, TimeClockDevice, TimeClockEntry, TimeClockEventType, User, WorkScheduleDay } from "@/types/domain"
+import { ExecutiveDatePicker } from "@/components/common/AdminPrimitives"
+import type { AttendanceRow, Branch, EmployeeTimeClockHistoryDay, TimeClockEntry, TimeClockEventType, User, WorkScheduleDay } from "@/types/domain"
 
 const statusLabels: Record<AttendanceRow["status"], string> = {
   IN_SHIFT: "En turno",
@@ -37,7 +37,6 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
   const [deviceBranchId, setDeviceBranchId] = useState("")
   const [requestDrafts, setRequestDrafts] = useState<Record<string, { name: string; branchId: string }>>({})
   const [setupToken, setSetupToken] = useState<string | null>(null)
-  const [deviceToPurge, setDeviceToPurge] = useState<TimeClockDevice | null>(null)
   const [activePanel, setActivePanel] = useState<AttendancePanel>(() => mode === "configuration" ? "schedules" : "day")
   const [reviewOnly, setReviewOnly] = useState(() => {
     const pending = sessionStorage.getItem("fatboy-admin-attendance-filter")
@@ -128,17 +127,6 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
     onError: (error: Error) => setMessage(error.message)
   })
 
-  const purgeDevice = useMutation({
-    mutationFn: (device: TimeClockDevice) => api.adminTimeClock.purgeDeviceForDeveloper(device.id),
-    onSuccess: async (summary) => {
-      setMessage(`Dispositivo eliminado. Registros desvinculados: ${summary.entriesDetached + summary.sessionsDetached}`)
-      await queryClient.invalidateQueries({ queryKey: ["time-clock-devices"] })
-      await queryClient.invalidateQueries({ queryKey: ["time-clock-device-requests"] })
-      await queryClient.invalidateQueries({ queryKey: ["attendance"] })
-    },
-    onError: (error: Error) => setMessage(error.message)
-  })
-
   const approveRequest = useMutation({
     mutationFn: ({ id, name, branchId }: { id: string; name: string; branchId: string }) =>
       api.adminTimeClock.approveDeviceRequest(id, { name, branchId }),
@@ -200,10 +188,6 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
     anchor.download = `asistencia-${date}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
-  }
-
-  function confirmDevicePurge(device: TimeClockDevice) {
-    setDeviceToPurge(device)
   }
 
   return (
@@ -626,22 +610,10 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
                     <button className="btn-icon" type="button" title={device.active ? "Desactivar" : "Activar"} onClick={() => updateDevice.mutate({ id: device.id, active: !device.active })}>
                       <RefreshCw style={{ width: 13, height: 13 }} />
                     </button>
-                    {user?.role === "ADMINISTRADOR" && (
-                      <button
-                        className="btn-icon danger"
-                        type="button"
-                        title="Purga dev"
-                        disabled={purgeDevice.isPending}
-                        onClick={() => confirmDevicePurge(device)}
-                      >
-                        <Trash2 style={{ width: 13, height: 13 }} />
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}
             </div>
-            {purgeDevice.error && <div className="status-empty compact-error">{purgeDevice.error.message}</div>}
           </div>
         </div>
       )}
@@ -696,15 +668,6 @@ export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mo
           </div>
         </div>
       )}
-      <ExecutiveConfirmDialog
-        open={Boolean(deviceToPurge)}
-        title="Eliminar dispositivo de prueba"
-        description={`Se revocará y eliminará definitivamente ${deviceToPurge?.name ?? "el dispositivo"}.`}
-        confirmLabel="Eliminar definitivamente"
-        verificationText="BORRAR"
-        onCancel={() => setDeviceToPurge(null)}
-        onConfirm={() => { if (deviceToPurge) purgeDevice.mutate(deviceToPurge); setDeviceToPurge(null) }}
-      />
     </div>
   )
 }
