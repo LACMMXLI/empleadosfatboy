@@ -12,6 +12,7 @@ const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:3001").replac
 const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
 const KIOSK_PIN_LENGTH = 6
 const KIOSK_SESSION_TIMEOUT_MS = 20_000
+const KIOSK_SESSION_WARNING_MS = 5_000
 const CAPTURE_COUNTDOWN_SECONDS = 3
 const PIN_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const
 
@@ -130,6 +131,7 @@ export function TimeClockKiosk() {
   const [captureCountdown, setCaptureCountdown] = useState<number | null>(null)
   const [captureSubject, setCaptureSubject] = useState<string | null>(null)
   const [sessionActivityAt, setSessionActivityAt] = useState<number>(0)
+  const [sessionSecondsLeft, setSessionSecondsLeft] = useState<number | null>(null)
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [advanceAmount, setAdvanceAmount] = useState("")
   const [approverCode, setApproverCode] = useState("")
@@ -331,6 +333,18 @@ export function TimeClockKiosk() {
     }, KIOSK_SESSION_TIMEOUT_MS)
     return () => window.clearTimeout(timeout)
   }, [clearEmployeeSession, isProcessing, sessionActivityAt, verifiedEmployee])
+
+  useEffect(() => {
+    if (!verifiedEmployee || isProcessing) {
+      setSessionSecondsLeft(null)
+      return
+    }
+    const interval = window.setInterval(() => {
+      const remainingMs = KIOSK_SESSION_TIMEOUT_MS - (Date.now() - sessionActivityAt)
+      setSessionSecondsLeft(remainingMs <= KIOSK_SESSION_WARNING_MS ? Math.max(0, Math.ceil(remainingMs / 1000)) : null)
+    }, 250)
+    return () => window.clearInterval(interval)
+  }, [isProcessing, sessionActivityAt, verifiedEmployee])
 
   useEffect(() => {
     if (!verifiedEmployee) return
@@ -636,10 +650,10 @@ export function TimeClockKiosk() {
     }
   }
 
-  const handleSalaryAdvance = useCallback(async (trigger: "manual" | "auto" = "manual") => {
+  const handleSalaryAdvance = useCallback(async () => {
     if (salaryAdvanceSubmittingRef.current) return
     salaryAdvanceSubmittingRef.current = true
-    if (trigger === "manual") playClick()
+    playClick()
     markSessionActivity()
 
     try {
@@ -686,11 +700,6 @@ export function TimeClockKiosk() {
       salaryAdvanceSubmittingRef.current = false
     }
   }, [advanceAmount, approverCode, employeeCode, finishSuccessfulAction, markSessionActivity, playClick, playError, playSuccess, scheduleLastSuccessClear, scheduleStatusReset, verifiedEmployee])
-
-  useEffect(() => {
-    if (!advanceOpen || activeAdvanceField !== "code" || isProcessing || approverCode.length !== KIOSK_PIN_LENGTH) return
-    void handleSalaryAdvance("auto")
-  }, [activeAdvanceField, advanceOpen, approverCode, handleSalaryAdvance, isProcessing])
 
   function regenerateRequestCode() {
     playClick()
@@ -799,6 +808,18 @@ export function TimeClockKiosk() {
         </header>
 
         {device.error && <div className="timeclock-alert">{device.error.message}</div>}
+        {sessionSecondsLeft !== null && (
+          <div className="timeclock-warning-overlay" role="alertdialog" aria-live="assertive">
+            <div className="timeclock-warning-modal">
+              <ShieldAlert />
+              <strong>Tu sesión se cerrará en {sessionSecondsLeft}s</strong>
+              <span>Por inactividad. Toca "Seguir aquí" para continuar.</span>
+              <button type="button" onClick={() => { playClick(); markSessionActivity() }}>
+                Seguir aquí
+              </button>
+            </div>
+          </div>
+        )}
         {toastMessage && (
           <div className="timeclock-success-overlay" role="status" aria-live="polite">
             <div className="timeclock-success-modal">
@@ -973,7 +994,7 @@ export function TimeClockKiosk() {
                     <ShieldCheck />
                     <span>El adelanto se registrará autorizado, con folio y responsable.</span>
                   </div>
-                  <button className="timeclock-advance-submit" type="button" disabled={isProcessing || !advanceAmount || approverCode.length !== 6} onClick={() => handleSalaryAdvance("manual")}>
+                  <button className="timeclock-advance-submit" type="button" disabled={isProcessing || !advanceAmount || approverCode.length !== 6} onClick={() => handleSalaryAdvance()}>
                     {isProcessing ? "Registrando..." : "Autorizar y registrar adelanto"}
                   </button>
                 </div>

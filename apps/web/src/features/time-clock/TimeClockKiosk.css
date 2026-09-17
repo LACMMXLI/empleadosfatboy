@@ -539,6 +539,61 @@
   font-weight: 850;
 }
 
+.timeclock-warning-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  background: rgba(2, 8, 18, 0.52);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 1rem;
+}
+
+.timeclock-warning-modal {
+  width: min(92vw, 26rem);
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(251, 191, 36, 0.42);
+  border-radius: 1rem;
+  background: rgba(69, 26, 3, 0.96);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.52);
+  color: #fef3c7;
+  padding: 1.45rem;
+  text-align: center;
+}
+
+.timeclock-warning-modal svg {
+  width: 3.2rem;
+  height: 3.2rem;
+  color: #fbbf24;
+}
+
+.timeclock-warning-modal strong {
+  color: #fffbeb;
+  font-size: 1.3rem;
+  font-weight: 950;
+}
+
+.timeclock-warning-modal span {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.timeclock-warning-modal button {
+  margin-top: 0.35rem;
+  padding: 0.75rem 1.6rem;
+  border-radius: 0.7rem;
+  border: none;
+  background: #fbbf24;
+  color: #451a03;
+  font-weight: 900;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
 .timeclock-capture-overlay {
   position: fixed;
   inset: 0;
