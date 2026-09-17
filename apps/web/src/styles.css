@@ -91,6 +91,240 @@
   }
 }
 
+/*
+ * Administrative visual language
+ *
+ * Keep the existing administrative information architecture intact while
+ * applying the kiosk's navy, electric-blue and cyan treatment everywhere in
+ * the authenticated administration workspace.  This lives after the legacy
+ * executive skin so no warm colors can bleed back into a screen.
+ */
+@layer components {
+  .admin-shell {
+    --admin-deep: #06111f;
+    --admin-panel: #0a1a2c;
+    --admin-panel-raised: #102842;
+    --admin-line: rgba(87, 197, 241, 0.28);
+    --admin-cyan: #35d5ff;
+    --admin-blue: #287dff;
+    color: #eaf8ff;
+    background:
+      radial-gradient(circle at 84% -8%, rgba(40, 125, 255, 0.2), transparent 29rem),
+      radial-gradient(circle at 8% 31%, rgba(53, 213, 255, 0.09), transparent 25rem),
+      linear-gradient(145deg, #050d18 0%, var(--admin-deep) 49%, #081827 100%) !important;
+  }
+
+  .admin-shell .admin-sidebar,
+  .admin-shell .admin-header,
+  .admin-shell .bottom-nav {
+    background: linear-gradient(180deg, rgba(8, 25, 43, 0.98), rgba(5, 16, 30, 0.98)) !important;
+    border-color: var(--admin-line) !important;
+    box-shadow: none !important;
+  }
+
+  .admin-shell .admin-sidebar-brand,
+  .admin-shell .admin-card-header {
+    background: linear-gradient(90deg, rgba(16, 49, 76, 0.76), rgba(8, 25, 43, 0.18)) !important;
+    border-color: var(--admin-line) !important;
+  }
+
+  .admin-shell .admin-sidebar-logo {
+    filter: drop-shadow(0 0 7px rgba(53, 213, 255, 0.58)) !important;
+  }
+
+  .admin-shell .admin-sidebar-title,
+  .admin-shell .section-title,
+  .admin-shell .admin-card-title,
+  .admin-shell .admin-modal-title,
+  .admin-shell .executive-confirm h2 {
+    color: #effbff !important;
+  }
+
+  .admin-shell .admin-sidebar-subtitle,
+  .admin-shell .form-label,
+  .admin-shell .stat-label,
+  .admin-shell .admin-modal-subtitle,
+  .admin-shell .executive-confirm p,
+  .admin-shell .executive-confirm-verification > span {
+    color: #99b9cd !important;
+  }
+
+  .admin-shell .admin-header-role-inline,
+  .admin-shell .admin-header-view,
+  .admin-shell .section-title svg,
+  .admin-shell .admin-card-title svg,
+  .admin-shell .nav-icon,
+  .admin-shell .stat-icon,
+  .admin-shell .executive-date-trigger > svg {
+    color: var(--admin-cyan) !important;
+    filter: drop-shadow(0 0 6px rgba(53, 213, 255, 0.35)) !important;
+  }
+
+  .admin-shell .nav-item,
+  .admin-shell .bottom-nav-item {
+    color: #b7d2e5 !important;
+    border-color: transparent !important;
+    background: transparent !important;
+  }
+
+  .admin-shell .nav-item:hover,
+  .admin-shell .nav-item.active,
+  .admin-shell .bottom-nav-item.active {
+    color: #effbff !important;
+    border-color: rgba(53, 213, 255, 0.52) !important;
+    background: linear-gradient(110deg, rgba(19, 105, 160, 0.38), rgba(17, 47, 78, 0.52)) !important;
+    box-shadow: inset 0 1px rgba(184, 245, 255, 0.12), 0 0 22px rgba(31, 142, 255, 0.16) !important;
+  }
+
+  .admin-shell .nav-item.active::before {
+    background: linear-gradient(180deg, var(--admin-cyan), var(--admin-blue)) !important;
+    box-shadow: 0 0 13px rgba(53, 213, 255, 0.76) !important;
+  }
+
+  .admin-shell .admin-card,
+  .admin-shell .attendance-dashboard-shell,
+  .admin-shell .incident-preview-modal,
+  .admin-shell .admin-modal,
+  .admin-shell .executive-confirm {
+    border-color: var(--admin-line) !important;
+    background: linear-gradient(145deg, rgba(14, 37, 60, 0.97), rgba(7, 22, 38, 0.98)) !important;
+    box-shadow: 0 18px 42px rgba(0, 5, 15, 0.35), inset 0 1px rgba(184, 245, 255, 0.05) !important;
+  }
+
+  .admin-shell .admin-card::after,
+  .admin-shell .attendance-dashboard-shell::after,
+  .admin-shell .admin-modal::after,
+  .admin-shell .executive-confirm::before {
+    background: linear-gradient(90deg, transparent, var(--admin-cyan), transparent) !important;
+    box-shadow: 0 0 18px rgba(53, 213, 255, 0.45) !important;
+  }
+
+  .admin-shell .admin-card:hover,
+  .admin-shell .approval-card:hover,
+  .admin-shell .movement-row:hover,
+  .admin-shell .employee-card:hover,
+  .admin-shell .attendance-row:hover,
+  .admin-shell .settings-list-card:hover,
+  .admin-shell .incident-list-item:hover {
+    border-color: rgba(53, 213, 255, 0.54) !important;
+    box-shadow: 0 15px 32px rgba(0, 10, 25, 0.36), 0 0 19px rgba(40, 125, 255, 0.1) !important;
+  }
+
+  .admin-shell .stat-card,
+  .admin-shell .approval-card,
+  .admin-shell .movement-row,
+  .admin-shell .employee-card,
+  .admin-shell .attendance-row,
+  .admin-shell .settings-list-card,
+  .admin-shell .incident-list-item,
+  .admin-shell .mini-stat-card,
+  .admin-shell .token-stat,
+  .admin-shell .attendance-status-card,
+  .admin-shell .attendance-item,
+  .admin-shell .incident-detail-block {
+    border-color: var(--admin-line) !important;
+    background: linear-gradient(145deg, rgba(14, 39, 64, 0.94), rgba(7, 23, 39, 0.95)) !important;
+    box-shadow: inset 0 1px rgba(184, 245, 255, 0.045) !important;
+  }
+
+  .admin-shell .stat-card::before {
+    background: linear-gradient(180deg, var(--admin-cyan), var(--admin-blue)) !important;
+    box-shadow: 0 0 18px rgba(53, 213, 255, 0.6) !important;
+  }
+
+  .admin-shell .stat-value,
+  .admin-shell .stat-value-cyan,
+  .admin-shell .stat-value-blue,
+  .admin-shell .stat-value-green,
+  .admin-shell .stat-value-violet,
+  .admin-shell .stat-value-amber,
+  .admin-shell .mini-stat-value,
+  .admin-shell .approval-amount,
+  .admin-shell .attendance-extra-text,
+  .admin-shell .attendance-request-code,
+  .admin-shell .incident-folio,
+  .admin-shell .settings-list-meta.accent,
+  .admin-shell .executive-confirm-kicker,
+  .admin-shell .executive-confirm-verification strong {
+    color: #72e6ff !important;
+    text-shadow: 0 0 12px rgba(53, 213, 255, 0.2) !important;
+  }
+
+  .admin-shell .form-input,
+  .admin-shell .form-select,
+  .admin-shell .form-textarea,
+  .admin-shell .executive-date-trigger,
+  .admin-shell .admin-search-input,
+  .admin-shell .admin-search-select {
+    color: #eaf8ff !important;
+    border-color: rgba(87, 197, 241, 0.34) !important;
+    background: rgba(5, 20, 36, 0.82) !important;
+    box-shadow: inset 0 1px rgba(184, 245, 255, 0.04) !important;
+  }
+
+  .admin-shell .form-input:focus,
+  .admin-shell .form-select:focus,
+  .admin-shell .form-textarea:focus,
+  .admin-shell .executive-date-picker.open .executive-date-trigger {
+    border-color: var(--admin-cyan) !important;
+    box-shadow: 0 0 0 3px rgba(53, 213, 255, 0.12), 0 0 22px rgba(40, 125, 255, 0.16) !important;
+  }
+
+  .admin-shell .form-select option {
+    color: #eaf8ff;
+    background: #0a1a2c;
+  }
+
+  .admin-shell .btn-primary,
+  .admin-shell .attendance-tab.active {
+    color: #f1fcff !important;
+    border-color: rgba(106, 224, 255, 0.68) !important;
+    background: linear-gradient(135deg, #176edb, #189dce) !important;
+    box-shadow: 0 9px 20px rgba(15, 112, 222, 0.24), inset 0 1px rgba(227, 250, 255, 0.24) !important;
+  }
+
+  .admin-shell .btn-secondary,
+  .admin-shell .btn-ghost,
+  .admin-shell .btn-icon,
+  .admin-shell .attendance-tab {
+    color: #cceeff !important;
+    border-color: rgba(87, 197, 241, 0.33) !important;
+    background: linear-gradient(180deg, rgba(17, 47, 76, 0.92), rgba(8, 25, 43, 0.94)) !important;
+  }
+
+  .admin-shell .btn-secondary:hover,
+  .admin-shell .btn-ghost:hover,
+  .admin-shell .btn-icon:hover,
+  .admin-shell .attendance-tab:hover {
+    color: #effbff !important;
+    border-color: var(--admin-cyan) !important;
+    background: rgba(21, 87, 132, 0.6) !important;
+  }
+
+  .admin-shell .badge-pending,
+  .admin-shell .badge-partial,
+  .admin-shell .badge-discounted,
+  .admin-shell .badge-open,
+  .admin-shell .attendance-status-pending {
+    color: #bcefff !important;
+    border-color: rgba(53, 213, 255, 0.42) !important;
+    background: rgba(27, 127, 190, 0.18) !important;
+  }
+
+  .admin-shell .executive-date-indicator {
+    background: var(--admin-cyan) !important;
+    box-shadow: 0 0 14px rgba(53, 213, 255, 0.74) !important;
+  }
+
+  .admin-shell .executive-date-picker.open .executive-date-indicator {
+    box-shadow: 0 0 17px rgba(53, 213, 255, 0.9) !important;
+  }
+
+  .admin-shell .executive-confirm-backdrop {
+    background: radial-gradient(circle at 50% 45%, rgba(32, 125, 255, 0.16), transparent 28rem), rgba(1, 8, 17, 0.8) !important;
+  }
+}
+
 /* Administrative visual skin: shares the time-clock kiosk's deep navy and cyan light.
    It is deliberately scoped so layout, content, and the employee portal stay unchanged. */
 @layer components {
@@ -7063,4 +7297,129 @@
       border-radius: 0.9rem;
     }
   }
+}
+
+/* Final administrative theme override: prevents the retired warm skin from
+   reappearing after any page-specific administrative rule. */
+@layer components {
+  .admin-shell {
+    --admin-deep: #06111f;
+    --admin-panel: #0a1a2c;
+    --admin-panel-raised: #102842;
+    --admin-line: rgba(87, 197, 241, 0.28);
+    --admin-cyan: #35d5ff;
+    --admin-blue: #287dff;
+    color: #eaf8ff;
+    background:
+      radial-gradient(circle at 84% -8%, rgba(40, 125, 255, 0.2), transparent 29rem),
+      radial-gradient(circle at 8% 31%, rgba(53, 213, 255, 0.09), transparent 25rem),
+      linear-gradient(145deg, #050d18 0%, var(--admin-deep) 49%, #081827 100%) !important;
+  }
+
+  .admin-shell .admin-sidebar,
+  .admin-shell .admin-header,
+  .admin-shell .bottom-nav { background: linear-gradient(180deg, rgba(8, 25, 43, 0.98), rgba(5, 16, 30, 0.98)) !important; border-color: var(--admin-line) !important; box-shadow: none !important; }
+  .admin-shell .admin-sidebar-brand,
+  .admin-shell .admin-card-header { background: linear-gradient(90deg, rgba(16, 49, 76, 0.76), rgba(8, 25, 43, 0.18)) !important; border-color: var(--admin-line) !important; }
+  .admin-shell .admin-sidebar-logo { filter: drop-shadow(0 0 7px rgba(53, 213, 255, 0.58)) !important; }
+  .admin-shell .admin-sidebar-title,
+  .admin-shell .section-title,
+  .admin-shell .admin-card-title,
+  .admin-shell .admin-modal-title,
+  .admin-shell .executive-confirm h2 { color: #effbff !important; }
+  .admin-shell .admin-sidebar-subtitle,
+  .admin-shell .form-label,
+  .admin-shell .stat-label,
+  .admin-shell .admin-modal-subtitle,
+  .admin-shell .executive-confirm p,
+  .admin-shell .executive-confirm-verification > span { color: #99b9cd !important; }
+  .admin-shell .admin-header-role-inline,
+  .admin-shell .admin-header-view,
+  .admin-shell .section-title svg,
+  .admin-shell .admin-card-title svg,
+  .admin-shell .nav-icon,
+  .admin-shell .stat-icon,
+  .admin-shell .executive-date-trigger > svg { color: var(--admin-cyan) !important; filter: drop-shadow(0 0 6px rgba(53, 213, 255, 0.35)) !important; }
+
+  .admin-shell .nav-item,
+  .admin-shell .bottom-nav-item { color: #b7d2e5 !important; border-color: transparent !important; background: transparent !important; }
+  .admin-shell .nav-item:hover,
+  .admin-shell .nav-item.active,
+  .admin-shell .bottom-nav-item.active { color: #effbff !important; border-color: rgba(53, 213, 255, 0.52) !important; background: linear-gradient(110deg, rgba(19, 105, 160, 0.38), rgba(17, 47, 78, 0.52)) !important; box-shadow: inset 0 1px rgba(184, 245, 255, 0.12), 0 0 22px rgba(31, 142, 255, 0.16) !important; }
+  .admin-shell .nav-item.active::before { background: linear-gradient(180deg, var(--admin-cyan), var(--admin-blue)) !important; box-shadow: 0 0 13px rgba(53, 213, 255, 0.76) !important; }
+
+  .admin-shell .admin-card,
+  .admin-shell .attendance-dashboard-shell,
+  .admin-shell .incident-preview-modal,
+  .admin-shell .admin-modal,
+  .admin-shell .executive-confirm { border-color: var(--admin-line) !important; background: linear-gradient(145deg, rgba(14, 37, 60, 0.97), rgba(7, 22, 38, 0.98)) !important; box-shadow: 0 18px 42px rgba(0, 5, 15, 0.35), inset 0 1px rgba(184, 245, 255, 0.05) !important; }
+  .admin-shell .admin-card::after,
+  .admin-shell .attendance-dashboard-shell::after,
+  .admin-shell .admin-modal::after,
+  .admin-shell .executive-confirm::before { background: linear-gradient(90deg, transparent, var(--admin-cyan), transparent) !important; box-shadow: 0 0 18px rgba(53, 213, 255, 0.45) !important; }
+  .admin-shell .admin-card:hover,
+  .admin-shell .approval-card:hover,
+  .admin-shell .movement-row:hover,
+  .admin-shell .employee-card:hover,
+  .admin-shell .attendance-row:hover,
+  .admin-shell .settings-list-card:hover,
+  .admin-shell .incident-list-item:hover { border-color: rgba(53, 213, 255, 0.54) !important; box-shadow: 0 15px 32px rgba(0, 10, 25, 0.36), 0 0 19px rgba(40, 125, 255, 0.1) !important; }
+  .admin-shell .stat-card,
+  .admin-shell .approval-card,
+  .admin-shell .movement-row,
+  .admin-shell .employee-card,
+  .admin-shell .attendance-row,
+  .admin-shell .settings-list-card,
+  .admin-shell .incident-list-item,
+  .admin-shell .mini-stat-card,
+  .admin-shell .token-stat,
+  .admin-shell .attendance-status-card,
+  .admin-shell .attendance-item,
+  .admin-shell .incident-detail-block { border-color: var(--admin-line) !important; background: linear-gradient(145deg, rgba(14, 39, 64, 0.94), rgba(7, 23, 39, 0.95)) !important; box-shadow: inset 0 1px rgba(184, 245, 255, 0.045) !important; }
+  .admin-shell .stat-card::before { background: linear-gradient(180deg, var(--admin-cyan), var(--admin-blue)) !important; box-shadow: 0 0 18px rgba(53, 213, 255, 0.6) !important; }
+  .admin-shell .stat-value,
+  .admin-shell .stat-value-cyan,
+  .admin-shell .stat-value-blue,
+  .admin-shell .stat-value-green,
+  .admin-shell .stat-value-violet,
+  .admin-shell .stat-value-amber,
+  .admin-shell .mini-stat-value,
+  .admin-shell .approval-amount,
+  .admin-shell .attendance-extra-text,
+  .admin-shell .attendance-request-code,
+  .admin-shell .incident-folio,
+  .admin-shell .settings-list-meta.accent,
+  .admin-shell .executive-confirm-kicker,
+  .admin-shell .executive-confirm-verification strong { color: #72e6ff !important; text-shadow: 0 0 12px rgba(53, 213, 255, 0.2) !important; }
+
+  .admin-shell .form-input,
+  .admin-shell .form-select,
+  .admin-shell .form-textarea,
+  .admin-shell .executive-date-trigger,
+  .admin-shell .admin-search-input,
+  .admin-shell .admin-search-select { color: #eaf8ff !important; border-color: rgba(87, 197, 241, 0.34) !important; background: rgba(5, 20, 36, 0.82) !important; box-shadow: inset 0 1px rgba(184, 245, 255, 0.04) !important; }
+  .admin-shell .form-input:focus,
+  .admin-shell .form-select:focus,
+  .admin-shell .form-textarea:focus,
+  .admin-shell .executive-date-picker.open .executive-date-trigger { border-color: var(--admin-cyan) !important; box-shadow: 0 0 0 3px rgba(53, 213, 255, 0.12), 0 0 22px rgba(40, 125, 255, 0.16) !important; }
+  .admin-shell .form-select option { color: #eaf8ff; background: #0a1a2c; }
+
+  .admin-shell .btn-primary,
+  .admin-shell .attendance-tab.active { color: #f1fcff !important; border-color: rgba(106, 224, 255, 0.68) !important; background: linear-gradient(135deg, #176edb, #189dce) !important; box-shadow: 0 9px 20px rgba(15, 112, 222, 0.24), inset 0 1px rgba(227, 250, 255, 0.24) !important; }
+  .admin-shell .btn-secondary,
+  .admin-shell .btn-ghost,
+  .admin-shell .btn-icon,
+  .admin-shell .attendance-tab { color: #cceeff !important; border-color: rgba(87, 197, 241, 0.33) !important; background: linear-gradient(180deg, rgba(17, 47, 76, 0.92), rgba(8, 25, 43, 0.94)) !important; }
+  .admin-shell .btn-secondary:hover,
+  .admin-shell .btn-ghost:hover,
+  .admin-shell .btn-icon:hover,
+  .admin-shell .attendance-tab:hover { color: #effbff !important; border-color: var(--admin-cyan) !important; background: rgba(21, 87, 132, 0.6) !important; }
+  .admin-shell .badge-pending,
+  .admin-shell .badge-partial,
+  .admin-shell .badge-discounted,
+  .admin-shell .badge-open,
+  .admin-shell .attendance-status-pending { color: #bcefff !important; border-color: rgba(53, 213, 255, 0.42) !important; background: rgba(27, 127, 190, 0.18) !important; }
+  .admin-shell .executive-date-indicator { background: var(--admin-cyan) !important; box-shadow: 0 0 14px rgba(53, 213, 255, 0.74) !important; }
+  .admin-shell .executive-date-picker.open .executive-date-indicator { box-shadow: 0 0 17px rgba(53, 213, 255, 0.9) !important; }
+  .admin-shell .executive-confirm-backdrop { background: radial-gradient(circle at 50% 45%, rgba(32, 125, 255, 0.16), transparent 28rem), rgba(1, 8, 17, 0.8) !important; }
 }
