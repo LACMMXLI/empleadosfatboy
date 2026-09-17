@@ -23,7 +23,7 @@ const defaultScheduleDays: WorkScheduleDay[] = [1, 2, 3, 4, 5, 6, 0].map((dayOfW
   end: "17:00"
 }))
 
-export function AttendanceAdmin({ user }: { user?: User }) {
+export function AttendanceAdmin({ user, mode = "operations" }: { user?: User; mode?: "operations" | "configuration" }) {
   const queryClient = useQueryClient()
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
   const defaultHistoryFrom = useMemo(() => addDays(today, -29), [today])
@@ -38,7 +38,8 @@ export function AttendanceAdmin({ user }: { user?: User }) {
   const [requestDrafts, setRequestDrafts] = useState<Record<string, { name: string; branchId: string }>>({})
   const [setupToken, setSetupToken] = useState<string | null>(null)
   const [deviceToPurge, setDeviceToPurge] = useState<TimeClockDevice | null>(null)
-  const [activePanel, setActivePanel] = useState<AttendancePanel>("day")
+  const [activePanel, setActivePanel] = useState<AttendancePanel>(() => mode === "configuration" ? "schedules" : "day")
+  const [reviewOnly, setReviewOnly] = useState(false)
   const [adjustment, setAdjustment] = useState({
     employeeId: "",
     branchId: "",
@@ -99,6 +100,8 @@ export function AttendanceAdmin({ user }: { user?: User }) {
   const inShiftCount = attendanceRows.filter((row) => row.status === "IN_SHIFT").length
   const exitedCount = attendanceRows.filter((row) => row.status === "EXITED").length
   const noShowCount = attendanceRows.filter((row) => row.status === "NO_SHOW").length
+  const reviewRows = attendanceRows.filter((row) => row.status === "NO_SHOW" || row.status === "IN_SHIFT" || row.calculation.lateMinutes > 0 || row.calculation.earlyDepartureMinutes > 0 || row.overtimeAuthorization.status === "PENDING")
+  const visibleAttendanceRows = reviewOnly ? reviewRows : attendanceRows
 
   const createDevice = useMutation({
     mutationFn: () => api.adminTimeClock.createDevice({ name: deviceName, branchId: deviceBranchId }),
@@ -206,30 +209,30 @@ export function AttendanceAdmin({ user }: { user?: User }) {
           <div>
             <div className="admin-card-title">
               <Clock3 style={{ width: 15, height: 15, color: 'rgb(var(--portal-accent))' }} />
-              Dashboard de asistencia
+              {mode === "configuration" ? "Configuración del checador" : "Jornadas"}
             </div>
           </div>
           <div className="attendance-dashboard-tabs" role="tablist" aria-label="Vistas de asistencia">
-            <button className={`attendance-tab ${activePanel === "day" ? "active" : ""}`} type="button" onClick={() => setActivePanel("day")}>
+            {mode === "operations" && <button className={`attendance-tab ${activePanel === "day" ? "active" : ""}`} type="button" onClick={() => setActivePanel("day")}>
               <Clock3 style={{ width: 13, height: 13 }} />
               Dia
-            </button>
-            <button className={`attendance-tab ${activePanel === "history" ? "active" : ""}`} type="button" onClick={() => setActivePanel("history")}>
+            </button>}
+            {mode === "operations" && <button className={`attendance-tab ${activePanel === "history" ? "active" : ""}`} type="button" onClick={() => setActivePanel("history")}>
               <History style={{ width: 13, height: 13 }} />
               Historial
-            </button>
+            </button>}
             <button className={`attendance-tab ${activePanel === "schedules" ? "active" : ""}`} type="button" onClick={() => setActivePanel("schedules")}>
               <CalendarDays style={{ width: 13, height: 13 }} />
               Turnos
             </button>
-            <button className={`attendance-tab ${activePanel === "devices" ? "active" : ""}`} type="button" onClick={() => setActivePanel("devices")}>
+            {mode === "configuration" && <button className={`attendance-tab ${activePanel === "devices" ? "active" : ""}`} type="button" onClick={() => setActivePanel("devices")}>
               <KeyRound style={{ width: 13, height: 13 }} />
               Dispositivos
-            </button>
-            <button className={`attendance-tab ${activePanel === "adjustments" ? "active" : ""}`} type="button" onClick={() => setActivePanel("adjustments")}>
+            </button>}
+            {mode === "configuration" && <button className={`attendance-tab ${activePanel === "adjustments" ? "active" : ""}`} type="button" onClick={() => setActivePanel("adjustments")}>
               <Wrench style={{ width: 13, height: 13 }} />
               Correcciones
-            </button>
+            </button>}
           </div>
         </div>
         <div className="attendance-dashboard-metrics">
@@ -239,12 +242,12 @@ export function AttendanceAdmin({ user }: { user?: User }) {
           <HistoryMetric label="Sin checar" value={noShowCount} />
           <HistoryMetric label="Retardos" value={attendanceRows.filter((row) => row.calculation.lateStatus === "LATE").length} />
           <HistoryMetric label="Extra pendiente" value={attendanceRows.filter((row) => row.overtimeAuthorization.status === "PENDING").length} />
-          <HistoryMetric label="Tablets activas" value={(devices.data ?? []).filter((device) => device.active).length} />
-          <HistoryMetric label="Solicitudes" value={deviceRequests.data?.length ?? 0} />
+          {mode === "configuration" && <HistoryMetric label="Tablets activas" value={(devices.data ?? []).filter((device) => device.active).length} />}
+          {mode === "configuration" && <HistoryMetric label="Solicitudes" value={deviceRequests.data?.length ?? 0} />}
         </div>
       </div>
 
-      {activePanel === "day" && (
+      {mode === "operations" && activePanel === "day" && (
       <div className="admin-card">
         <div className="admin-card-header">
           <div className="admin-card-title">
@@ -272,9 +275,13 @@ export function AttendanceAdmin({ user }: { user?: User }) {
               ))}
             </select>
           </div>
+          <div className="flex gap-2 mb-3">
+            <button className={reviewOnly ? "btn-secondary" : "btn-primary"} type="button" onClick={() => { setDate(today); setReviewOnly(false) }}>Hoy</button>
+            <button className={reviewOnly ? "btn-primary" : "btn-secondary"} type="button" onClick={() => setReviewOnly((current) => !current)}>Con pendientes ({reviewRows.length})</button>
+          </div>
 
           <div className="attendance-table">
-            {(attendance.data ?? []).map((row) => (
+            {visibleAttendanceRows.map((row) => (
               <div key={row.employee.id} className="attendance-row">
                 <div className="attendance-main">
                   <strong>{row.employee.fullName}</strong>

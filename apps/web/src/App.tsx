@@ -78,7 +78,7 @@ function PwaUpdateNotice({
 function App() {
   const [tokenState, setTokenState] = useState(session.token)
   const [employeeTokenState, setEmployeeTokenState] = useState(employeeSession.token)
-  const [activeView, setActiveView] = useState<View>("pendientes")
+  const [activeView, setActiveView] = useState<View>("dashboard")
   const [route, setRoute] = useState<PortalRoute>(resolvePortalRoute())
   const { update, dismissUpdate } = usePwaUpdateNotification()
 
@@ -106,7 +106,7 @@ function App() {
     if (me.data?.role === "CAJERO" && activeView !== "entregas") {
       setActiveView("entregas")
     } else if (me.data && me.data.role !== "CAJERO" && activeView === "entregas") {
-      setActiveView("pendientes")
+      setActiveView("dashboard")
     }
   }, [me.data, activeView])
 

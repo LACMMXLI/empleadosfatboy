@@ -52,18 +52,20 @@ export const payrollStatusLabels: Record<string, string> = {
   CANCELADA: "Cancelada"
 }
 
+// The internal ids are retained while the administrator uses operational names.
+// This avoids breaking existing links and keeps the current API-backed screens reusable.
 export type View = "dashboard" | "empleados" | "pendientes" | "adminMovements" | "historial" | "incidencias" | "nomina" | "asistencia" | "configuracion" | "entregas"
 export type PortalRoute = "home" | "admin" | "employee" | "timeClock"
 
 export const viewTitles: Record<View, string> = {
-  dashboard: "Dashboard",
+  dashboard: "Inicio",
   empleados: "Empleados",
   pendientes: "Aprobaciones",
-  adminMovements: "Movimientos",
-  historial: "Historial",
+  adminMovements: "Adelantos y cargos",
+  historial: "Historial de movimientos",
   incidencias: "Incidencias",
   nomina: "Nómina",
-  asistencia: "Asistencia",
+  asistencia: "Jornadas",
   configuracion: "Configuración",
   entregas: "Entregas"
 }

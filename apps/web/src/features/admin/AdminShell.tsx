@@ -113,15 +113,12 @@ export function Shell({
       ]
     }
     return [
-      { id: "pendientes" as const, label: "Aprobaciones", icon: ShieldCheck },
-      { id: "historial" as const, label: "Historial", icon: ClipboardList },
+      { id: "dashboard" as const, label: "Inicio", icon: LayoutDashboard },
       { id: "empleados" as const, label: "Empleados", icon: UsersRound },
-      { id: "nomina" as const, label: "Nómina", icon: WalletCards },
-      { id: "asistencia" as const, label: "Asistencia", icon: Clock3 },
-      { id: "adminMovements" as const, label: "Movimientos", icon: Building2 },
+      { id: "asistencia" as const, label: "Jornadas", icon: Clock3 },
+      { id: "adminMovements" as const, label: "Adelantos y cargos", icon: Banknote },
       { id: "incidencias" as const, label: "Incidencias", icon: MessageSquareText },
-      { id: "dashboard" as const, label: "Resumen", icon: LayoutDashboard },
-      { id: "configuracion" as const, label: "Config", icon: Settings }
+      { id: "nomina" as const, label: "Nómina", icon: WalletCards }
     ]
   }, [me.data?.role])
 
@@ -150,11 +147,22 @@ export function Shell({
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 <span className="nav-icon-stage"><item.icon className="nav-icon" /></span>
-                <span className="nav-item-label">{item.id === "pendientes" ? "Aprobaciones" : (item.id === "entregas" ? "Entregas" : viewTitles[item.id])}</span>
+                <span className="nav-item-label">{item.label}</span>
               </button>
             ))}
           </nav>
           <div className="p-2 border-t border-white/5">
+            {me.data?.role === "ADMINISTRADOR" && (
+              <button
+                className={`nav-item w-full ${activeView === "configuracion" ? "active" : ""}`}
+                onClick={() => onViewChange("configuracion")}
+                type="button"
+                title={sidebarCollapsed ? "Configuración" : undefined}
+              >
+                <span className="nav-icon-stage"><Settings className="nav-icon" /></span>
+                <span className="nav-item-label">Configuración</span>
+              </button>
+            )}
             <button
               className="nav-item w-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-inset"
               onClick={handleLogout}
@@ -197,15 +205,15 @@ export function Shell({
             </button>
           </header>
           <div className={touchOptimizedLayout ? "mobile-page flex-1 p-3" : "mobile-page flex-1 p-3 lg:p-4"}>
-            {activeView === "dashboard" && <Dashboard />}
-            {activeView === "empleados" && <Employees user={me.data} />}
-            {activeView === "pendientes" && <PendingAuthorizations currentRole={me.data?.role} />}
-            {activeView === "adminMovements" && <AdministrativeMovements user={me.data} />}
+            {activeView === "dashboard" && <Dashboard onOpen={onViewChange} />}
+            {activeView === "empleados" && <Employees user={me.data} onOpenJornadas={() => onViewChange("asistencia")} />}
+            {activeView === "pendientes" && <FinancialWorkspace user={me.data} initialTab="approval" />}
+            {activeView === "adminMovements" && <FinancialWorkspace user={me.data} />}
             {activeView === "incidencias" && <IncidentsAdmin user={me.data} />}
-            {activeView === "historial" && <History />}
+            {activeView === "historial" && <FinancialWorkspace user={me.data} initialTab="history" />}
             {activeView === "nomina" && <PayrollAdmin />}
             {activeView === "asistencia" && <AttendanceAdmin user={me.data} />}
-            {activeView === "configuracion" && <Configuration />}
+            {activeView === "configuracion" && <Configuration user={me.data} />}
             {activeView === "entregas" && <Deliveries />}
           </div>
         </section>
@@ -314,7 +322,7 @@ function MobileBottomNav({
   )
 }
 
-function Dashboard() {
+function Dashboard({ onOpen }: { onOpen: (view: View) => void }) {
   const { data, isLoading, error } = useQuery({ queryKey: ["dashboard"], queryFn: api.dashboard })
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all")
   
@@ -398,7 +406,7 @@ function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="section-title mb-0">
             <LayoutDashboard style={{ width: 16, height: 16, color: 'hsl(var(--primary))' }} />
-            Resumen del periodo
+            Centro de trabajo
           </div>
           <div className="flex items-center gap-2">
             <label htmlFor="branch-select" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -459,7 +467,7 @@ function Dashboard() {
 
       <div className="admin-card">
         <div className="admin-card-header">
-          <div className="admin-card-title">Detalle del periodo</div>
+          <div className="admin-card-title">Pendientes que requieren atención</div>
           <span style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>
             Desde {formatDateLabel(periodStart)}
           </span>
@@ -481,6 +489,11 @@ function Dashboard() {
               </div>
             </div>
           </div>
+          <div className="grid gap-2 md:grid-cols-3 mt-3">
+            <button className="btn-secondary" type="button" onClick={() => onOpen("asistencia")}>Revisar jornadas</button>
+            <button className="btn-secondary" type="button" onClick={() => { sessionStorage.setItem("fatboy-admin-financial-tab", "approval"); onOpen("adminMovements") }}>Resolver solicitudes pendientes</button>
+            <button className="btn-secondary" type="button" onClick={() => onOpen("incidencias")}>Atender incidencias</button>
+          </div>
         </div>
       </div>
     </div>
@@ -500,6 +513,38 @@ function Metric({ label, value, tone = "neutral" }: { label: string; value: stri
     <div className={cardClass}>
       <div className="stat-label">{label}</div>
       <div className={valClass} style={{ fontSize: '1.35rem' }}>{value}</div>
+    </div>
+  )
+}
+
+function FinancialWorkspace({ user, initialTab = "advances" }: { user?: User; initialTab?: "advances" | "approval" | "delivery" | "history" }) {
+  const [tab, setTab] = useState<"advances" | "approval" | "delivery" | "history">(() => {
+    const pending = sessionStorage.getItem("fatboy-admin-financial-tab")
+    sessionStorage.removeItem("fatboy-admin-financial-tab")
+    return pending === "approval" || pending === "delivery" || pending === "history" ? pending : initialTab
+  })
+  const labels = [
+    { id: "advances", label: "Cargos y liquidación" },
+    { id: "approval", label: "Por aprobar" },
+    { id: "delivery", label: "Por entregar" },
+    { id: "history", label: "Historial" }
+  ] as const
+
+  return (
+    <div className="space-y-4">
+      <div className="section-header">
+        <div className="section-title"><Banknote style={{ width: 16, height: 16, color: "hsl(var(--primary))" }} />Adelantos y cargos</div>
+        <span className="section-count">Estados reales del movimiento</span>
+      </div>
+      <div className="attendance-dashboard-tabs" role="tablist" aria-label="Gestión de adelantos y cargos">
+        {labels.map((item) => (
+          <button key={item.id} className={`attendance-tab ${tab === item.id ? "active" : ""}`} type="button" onClick={() => setTab(item.id)}>{item.label}</button>
+        ))}
+      </div>
+      {tab === "advances" && <AdministrativeMovements user={user} />}
+      {tab === "approval" && <PendingAuthorizations currentRole={user?.role} />}
+      {tab === "delivery" && <Deliveries />}
+      {tab === "history" && <History />}
     </div>
   )
 }
@@ -2055,12 +2100,14 @@ function MovementEvidenceButton({ movement }: { movement: Movement }) {
   )
 }
 
-function Employees({ user }: { user?: User }) {
+function Employees({ user, onOpenJornadas }: { user?: User; onOpenJornadas: () => void }) {
   const queryClient = useQueryClient()
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("")
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [employeePurgeOpen, setEmployeePurgeOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const [branchFilter, setBranchFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active")
   const employees = useQuery({ queryKey: ["employees", "admin-all"], queryFn: () => api.employees(undefined, true) })
   const branches = useQuery({ queryKey: ["branches"], queryFn: () => api.branches() })
   const selectedEmployee = employees.data?.find((employee) => employee.id === selectedEmployeeId)
@@ -2106,19 +2153,6 @@ function Employees({ user }: { user?: User }) {
       await queryClient.invalidateQueries({ queryKey: ["employees"] })
     }
   })
-  const purgeDeveloperEmployee = useMutation({
-    mutationFn: (employee: Employee) => api.purgeEmployeeForDeveloper(employee.id),
-    onSuccess: async () => {
-      setSelectedEmployeeId("")
-      await queryClient.invalidateQueries({ queryKey: ["employees"] })
-    }
-  })
-
-  const confirmDeveloperPurge = (employee: Employee) => {
-    setSelectedEmployeeId(employee.id)
-    setEmployeePurgeOpen(true)
-  }
-
   useEffect(() => {
     if (!selectedEmployee) return
     editForm.reset({
@@ -2132,6 +2166,13 @@ function Employees({ user }: { user?: User }) {
       branchId: selectedEmployee.branch?.id || ""
     })
   }, [editForm, selectedEmployee])
+
+  const visibleEmployees = (employees.data ?? []).filter((employee) => {
+    const matchesSearch = `${employee.fullName} ${employee.position} ${employee.phone}`.toLowerCase().includes(search.trim().toLowerCase())
+    const matchesBranch = !branchFilter || employee.branch?.id === branchFilter
+    const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? employee.active : !employee.active)
+    return matchesSearch && matchesBranch && matchesStatus
+  })
 
   return (
     <div className="space-y-4">
@@ -2149,20 +2190,34 @@ function Employees({ user }: { user?: User }) {
         </div>
       </div>
 
+      {selectedEmployee && (
+        <EmployeeRecord employee={selectedEmployee} onEdit={() => setEditOpen(true)} onOpenJornadas={onOpenJornadas} />
+      )}
+
       <div className="admin-card">
         <div className="admin-card-header">
           <div className="admin-card-title">Directorio de empleados</div>
+          <span className="section-count">{visibleEmployees.length} visibles</span>
         </div>
         <div className="admin-card-body">
+          <div className="admin-form-row mb-3">
+            <input className="form-input" placeholder="Buscar por nombre, puesto o teléfono" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <select className="form-select" value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)}>
+              <option value="">Todas las sucursales</option>
+              {branches.data?.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+            <select className="form-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
+              <option value="active">Activos</option><option value="inactive">Inactivos</option><option value="all">Todos</option>
+            </select>
+          </div>
           <div className="employee-directory-grid">
-            {employees.data?.map((employee: Employee) => (
+            {visibleEmployees.map((employee: Employee) => (
               <button
                 key={employee.id}
                 className={`employee-card ${selectedEmployeeId === employee.id ? "selected" : ""}`}
                 type="button"
                 onClick={() => {
                   setSelectedEmployeeId(employee.id)
-                  setEditOpen(true)
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.375rem' }}>
@@ -2255,48 +2310,107 @@ function Employees({ user }: { user?: User }) {
                 {selectedEmployee.active ? "Desactivar" : "Activar"}
               </button>
             </div>
-            {user?.role === "ADMINISTRADOR" && (
-              <button
-                className="btn-reject modal-submit"
-                type="button"
-                disabled={purgeDeveloperEmployee.isPending}
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  confirmDeveloperPurge(selectedEmployee)
-                }}
-              >
-                <Trash2 style={{ width: 14, height: 14 }} />
-                Purga dev
-              </button>
-            )}
             {update.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))', padding: '0.5rem' }}>{update.error.message}</div>}
             {toggleActive.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))', padding: '0.5rem' }}>{toggleActive.error.message}</div>}
-            {purgeDeveloperEmployee.error && <div className="status-empty" style={{ color: 'hsl(var(--destructive))', padding: '0.5rem' }}>{purgeDeveloperEmployee.error.message}</div>}
           </form>
         </AdminModal>
       )}
-      <ExecutiveConfirmDialog
-        open={employeePurgeOpen}
-        title="Eliminar empleado de prueba"
-        description={`Se eliminará definitivamente a ${selectedEmployee?.fullName ?? "este empleado"} y su información relacionada.`}
-        confirmLabel="Eliminar definitivamente"
-        verificationText="BORRAR"
-        onCancel={() => setEmployeePurgeOpen(false)}
-        onConfirm={() => { if (selectedEmployee) purgeDeveloperEmployee.mutate(selectedEmployee); setEmployeePurgeOpen(false); setEditOpen(false) }}
-      />
     </div>
   )
 }
 
-function Configuration() {
+function EmployeeRecord({ employee, onEdit, onOpenJornadas }: { employee: Employee; onEdit: () => void; onOpenJornadas: () => void }) {
+  const [tab, setTab] = useState<"summary" | "attendance" | "movements" | "incidents" | "payroll" | "data">("summary")
+  const [from, setFrom] = useState(() => startOfCurrentMonth())
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const history = useQuery({
+    queryKey: ["employee-record", "attendance", employee.id, from, to],
+    queryFn: () => api.adminTimeClock.employeeHistory(employee.id, { from, to })
+  })
+  const schedule = useQuery({ queryKey: ["employee-record", "schedule", employee.id], queryFn: () => api.adminTimeClock.employeeSchedule(employee.id) })
+  const movements = useQuery({ queryKey: ["employee-record", "movements", employee.id, from, to], queryFn: () => api.movements({ employeeId: employee.id, from, to }) })
+  const incidents = useQuery({ queryKey: ["employee-record", "incidents", employee.id], queryFn: () => api.incidents({ employeeId: employee.id }) })
+  const payrolls = useQuery({ queryKey: ["employee-record", "payrolls"], queryFn: api.payrolls })
+  const pendingBalance = (movements.data ?? [])
+    .filter((item) => item.status === "AUTHORIZED" || item.status === "PARTIALLY_DISCOUNTED")
+    .reduce((total, item) => total + Number(item.amount), 0)
+  const openIncidents = (incidents.data ?? []).filter((item) => item.status !== "RESUELTA" && item.status !== "CERRADA").length
+  const tabs = [
+    ["summary", "Resumen"], ["attendance", "Jornadas"], ["movements", "Adelantos y cargos"],
+    ["incidents", "Incidencias"], ["payroll", "Nómina"], ["data", "Datos y horario"]
+  ] as const
+
+  return (
+    <section className="admin-card">
+      <div className="admin-card-header">
+        <div>
+          <div className="admin-card-title"><UsersRound style={{ width: 15, height: 15, color: "hsl(var(--primary))" }} />Expediente de {employee.fullName}</div>
+          <div className="text-xs text-muted-foreground mt-1">{employee.position} · {employee.branch.name} · Periodo: {formatDateLabel(from)} a {formatDateLabel(to)}</div>
+        </div>
+        <button className="btn-secondary" type="button" onClick={onEdit}>Editar datos</button>
+      </div>
+      <div className="admin-card-body space-y-4">
+        <div className="admin-form-row">
+          <ExecutiveDatePicker value={from} onChange={setFrom} title="Desde" />
+          <ExecutiveDatePicker value={to} onChange={setTo} title="Hasta" />
+        </div>
+        <div className="attendance-dashboard-tabs" role="tablist" aria-label="Expediente del empleado">
+          {tabs.map(([id, label]) => <button key={id} className={`attendance-tab ${tab === id ? "active" : ""}`} type="button" onClick={() => setTab(id)}>{label}</button>)}
+        </div>
+        {tab === "summary" && (
+          <div className="grid gap-2 md:grid-cols-4">
+            <Metric label="Saldo pendiente" value={money.format(pendingBalance)} tone="primary" />
+            <Metric label="Jornadas con registro" value={String(history.data?.summary.presentDays ?? 0)} tone="strong" />
+            <Metric label="Tiempo extra pendiente" value={String(history.data?.days.filter((day) => day.overtimeAuthorization.status === "PENDING").length ?? 0)} tone="accent" />
+            <Metric label="Incidencias abiertas" value={String(openIncidents)} tone="neutral" />
+          </div>
+        )}
+        {tab === "attendance" && (
+          <div className="space-y-3">
+            <div className="admin-inline-note">La asistencia y los retardos se calculan con las reglas actuales del servidor.</div>
+            {history.isLoading && <StatusEmpty text="Cargando jornadas del empleado..." />}
+            {history.data?.days.map((day) => (
+              <div key={day.date} className="attendance-row">
+                <div className="attendance-main"><strong>{formatDateLabel(day.date)}</strong><span>{day.calculation.scheduled ? `${day.calculation.scheduledStart}–${day.calculation.scheduledEnd}` : "Descanso"}</span></div>
+                <span className={`attendance-status ${day.status.toLowerCase()}`}>{day.status}</span>
+                <div className="attendance-times"><span>Trabajado: {Math.floor(day.calculation.workedMinutes / 60)}h {day.calculation.workedMinutes % 60}m</span><span>Retardo: {day.calculation.lateMinutes} min</span><span>Extra: {day.calculation.overtimeMinutes} min</span></div>
+              </div>
+            ))}
+            <button className="btn-secondary" type="button" onClick={onOpenJornadas}>Abrir Jornadas para revisar o corregir</button>
+          </div>
+        )}
+        {tab === "movements" && <MovementTable movements={movements.data ?? []} />}
+        {tab === "incidents" && (
+          <div className="space-y-2">
+            {(incidents.data ?? []).map((item) => <div className="attendance-row" key={item.id}><div className="attendance-main"><strong>{item.title}</strong><span>{item.folio} · {formatDateTime(item.createdAt)}</span></div><span className={getIncidentBadgeClass(item.status)}>{incidentStatusLabels[item.status]}</span></div>)}
+            {!incidents.isLoading && !incidents.data?.length && <StatusEmpty text="Sin incidencias relacionadas con este empleado." />}
+          </div>
+        )}
+        {tab === "payroll" && (
+          <div className="space-y-2">
+            {(payrolls.data ?? []).filter((payroll) => payroll.items?.some((item) => item.employeeId === employee.id)).map((payroll) => <div className="attendance-row" key={payroll.id}><div className="attendance-main"><strong>{formatDateLabel(payroll.periodStart)} a {formatDateLabel(payroll.periodEnd)}</strong><span>{payroll.itemCount ?? payroll.items?.length ?? 0} empleados</span></div><span className={getPayrollBadgeClass(payroll.status)}>{payrollStatusLabels[payroll.status]}</span></div>)}
+            {!payrolls.isLoading && !(payrolls.data ?? []).some((payroll) => payroll.items?.some((item) => item.employeeId === employee.id)) && <StatusEmpty text="No hay periodos de nómina cargados para este empleado." />}
+          </div>
+        )}
+        {tab === "data" && (
+          <div className="grid gap-3 md:grid-cols-2">
+            <div style={{ ...insetPanelStyle, padding: "0.875rem", borderRadius: "0.625rem" }}><DetailLine label="Teléfono" value={employee.phone} /><DetailLine label="Tipo de sueldo" value={`${salaryTypeLabels[employee.salaryType]} · ${money.format(Number(employee.salaryAmount))}`} /><DetailLine label="Ingreso" value={employee.hireDate ? formatDateLabel(employee.hireDate) : "Sin fecha registrada"} /></div>
+            <div style={{ ...insetPanelStyle, padding: "0.875rem", borderRadius: "0.625rem" }}><DetailLine label="Horario" value={schedule.data?.configured ? `${schedule.data.days.filter((day) => day.enabled).length} día(s) configurados` : "Sin horario configurado"} /><DetailLine label="Tolerancia" value={schedule.data ? `${schedule.data.lateGraceMinutes} minutos` : "—"} /><button className="btn-secondary mt-3" type="button" onClick={onOpenJornadas}>Administrar horario</button></div>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function Configuration({ user }: { user?: User }) {
   const queryClient = useQueryClient()
   const [selectedUserId, setSelectedUserId] = useState("")
   const [editRuleId, setEditRuleId] = useState("")
   const [editBranchId, setEditBranchId] = useState("")
   const [branchDeactivateId, setBranchDeactivateId] = useState("")
   const [ruleDeleteId, setRuleDeleteId] = useState("")
-  const [settingsTab, setSettingsTab] = useState<"general" | "branches" | "users" | "rules">("general")
+  const [settingsTab, setSettingsTab] = useState<"general" | "branches" | "users" | "rules" | "timeclock">("general")
 
   const configuration = useQuery({ queryKey: ["configuration"], queryFn: api.configuration })
   const rules = useQuery({ queryKey: ["rules"], queryFn: api.rules })
@@ -2480,7 +2594,8 @@ function Configuration() {
           { id: "general", label: "General", icon: Banknote, count: "Base" },
           { id: "branches", label: "Sucursales", icon: Building2, count: String(branches.data?.length ?? 0) },
           { id: "users", label: "Usuarios", icon: KeyRound, count: String(adminUsers.data?.length ?? 0) },
-          { id: "rules", label: "Reglas", icon: ShieldCheck, count: String(rules.data?.length ?? 0) }
+          { id: "rules", label: "Reglas", icon: ShieldCheck, count: String(rules.data?.length ?? 0) },
+          { id: "timeclock", label: "Checador", icon: Clock3, count: "Equipo" }
         ].map((item) => {
           const Icon = item.icon
           return (
@@ -2745,6 +2860,8 @@ function Configuration() {
           </div>
         </div>
       )}
+
+      {settingsTab === "timeclock" && <AttendanceAdmin user={user} mode="configuration" />}
 
       {/* Edit User Modal */}
       {selectedUser && (
