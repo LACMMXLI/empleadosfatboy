@@ -91,6 +91,126 @@
   }
 }
 
+/* Administrative visual skin: shares the time-clock kiosk's deep navy and cyan light.
+   It is deliberately scoped so layout, content, and the employee portal stay unchanged. */
+@layer components {
+  .admin-shell {
+    --admin-night: #07111f;
+    --admin-panel: #0c1a2b;
+    --admin-panel-raised: #10253a;
+    --admin-line: rgba(104, 192, 232, 0.22);
+    --admin-cyan: #35d5ff;
+    --admin-blue: #2387ff;
+    background:
+      radial-gradient(circle at 82% -10%, rgba(35, 135, 255, 0.18), transparent 28rem),
+      radial-gradient(circle at 6% 25%, rgba(53, 213, 255, 0.08), transparent 25rem),
+      linear-gradient(145deg, #06101d 0%, var(--admin-night) 48%, #081727 100%);
+  }
+
+  .admin-shell .admin-sidebar,
+  .admin-shell .admin-header {
+    border-color: var(--admin-line);
+    background:
+      linear-gradient(180deg, rgba(53, 213, 255, 0.055), transparent 34%),
+      rgba(7, 18, 32, 0.9);
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.055), 0 14px 40px rgba(0, 5, 14, 0.24);
+  }
+
+  .admin-shell .nav-item {
+    color: #a8bacd;
+  }
+
+  .admin-shell .nav-item:hover,
+  .admin-shell .nav-item.active {
+    border-color: rgba(53, 213, 255, 0.26);
+    color: #e8fbff;
+    background: linear-gradient(90deg, rgba(35, 135, 255, 0.18), rgba(53, 213, 255, 0.065));
+    box-shadow: inset 2px 0 var(--admin-cyan), 0 0 22px rgba(35, 135, 255, 0.1);
+  }
+
+  .admin-shell .admin-card,
+  .admin-shell .attendance-dashboard-shell,
+  .admin-shell .stat-card,
+  .admin-shell .approval-card,
+  .admin-shell .movement-row,
+  .admin-shell .employee-card,
+  .admin-shell .attendance-row,
+  .admin-shell .settings-list-card,
+  .admin-shell .incident-list-item {
+    border-color: var(--admin-line);
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 26%),
+      linear-gradient(160deg, rgba(16, 37, 58, 0.94), rgba(7, 18, 32, 0.96));
+    box-shadow: 0 18px 44px rgba(0, 4, 13, 0.3), inset 0 1px rgba(255, 255, 255, 0.06);
+  }
+
+  .admin-shell .admin-card:hover,
+  .admin-shell .employee-card:hover,
+  .admin-shell .attendance-row:hover,
+  .admin-shell .incident-list-item:hover,
+  .admin-shell .settings-list-card:hover {
+    border-color: rgba(53, 213, 255, 0.42);
+    box-shadow: 0 20px 50px rgba(0, 4, 13, 0.38), 0 0 24px rgba(35, 135, 255, 0.08), inset 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .admin-shell .form-input,
+  .admin-shell .form-select,
+  .admin-shell .form-textarea,
+  .admin-shell .filter-bar input,
+  .admin-shell .filter-bar select {
+    border-color: rgba(104, 192, 232, 0.25);
+    background: rgba(4, 15, 27, 0.72);
+    color: #e7f5ff;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
+  }
+
+  .admin-shell .form-input:focus,
+  .admin-shell .form-select:focus,
+  .admin-shell .form-textarea:focus,
+  .admin-shell .filter-bar input:focus,
+  .admin-shell .filter-bar select:focus {
+    border-color: var(--admin-cyan);
+    box-shadow: 0 0 0 3px rgba(53, 213, 255, 0.11), 0 0 22px rgba(35, 135, 255, 0.14);
+  }
+
+  .admin-shell .btn-primary,
+  .admin-shell .attendance-tab.active {
+    border-color: rgba(91, 218, 255, 0.56);
+    background: linear-gradient(135deg, #1675e8, #20c6f2);
+    color: #f4fdff;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.3), 0 8px 22px rgba(16, 131, 237, 0.25), 0 0 18px rgba(53, 213, 255, 0.12);
+  }
+
+  .admin-shell .btn-secondary,
+  .admin-shell .attendance-tab {
+    border-color: rgba(104, 192, 232, 0.24);
+    background: rgba(13, 32, 51, 0.84);
+    color: #c0d7e9;
+  }
+
+  .admin-shell .btn-secondary:hover,
+  .admin-shell .attendance-tab:hover {
+    border-color: rgba(53, 213, 255, 0.48);
+    color: #effcff;
+    background: rgba(24, 74, 108, 0.76);
+    box-shadow: 0 0 18px rgba(53, 213, 255, 0.1);
+  }
+
+  .admin-shell .section-title,
+  .admin-shell .admin-card-title,
+  .admin-shell .stat-value,
+  .admin-shell .stat-value-cyan,
+  .admin-shell .stat-value-blue {
+    color: #eafaff;
+  }
+
+  .admin-shell .bottom-nav {
+    border-color: var(--admin-line);
+    background: rgba(7, 18, 32, 0.94);
+    box-shadow: 0 -12px 38px rgba(0, 4, 13, 0.36), inset 0 1px rgba(255, 255, 255, 0.05);
+  }
+}
+
 @layer components {
   .timeclock-shell-kiosk .timeclock-panel-kiosk {
     grid-template-rows: auto minmax(0, 1fr);
