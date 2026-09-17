@@ -30,6 +30,7 @@ function usePWAInstall() {
   const [promptEvent, setPromptEvent] = useState<any>(null)
   const [isInstalled, setIsInstalled] = useState(false)
   const [showIOSInstructions, setShowIOSInstructions] = useState(false)
+  const [showDesktopInstructions, setShowDesktopInstructions] = useState(false)
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -68,7 +69,7 @@ function usePWAInstall() {
       if (isIOS) {
         setShowIOSInstructions(true)
       } else {
-        alert("Para instalar esta aplicación, haz clic en el icono de instalación (pantalla con flecha hacia abajo) en la barra de direcciones de tu navegador (Chrome/Edge).")
+        setShowDesktopInstructions(true)
       }
     }
   }
@@ -78,8 +79,39 @@ function usePWAInstall() {
     isInstalled,
     install,
     showIOSInstructions,
-    setShowIOSInstructions
+    setShowIOSInstructions,
+    showDesktopInstructions,
+    setShowDesktopInstructions
   }
+}
+
+function InstallInstructionsPanel({ title, children, onDismiss }: { title: string; children: ReactNode; onDismiss: () => void }) {
+  return (
+    <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-blue-300 mt-2 space-y-1 text-left animate-in fade-in slide-in-from-top-1">
+      <p className="font-semibold">{title}</p>
+      {children}
+      <button className="text-blue-400 font-bold block pt-1 hover:underline text-left" onClick={onDismiss} type="button">
+        Entendido, cerrar
+      </button>
+    </div>
+  )
+}
+
+function EmployeeInstallInstructionsPanel({ title, children, onDismiss }: { title: string; children: ReactNode; onDismiss: () => void }) {
+  return (
+    <div className="rounded-xl p-4 text-xs mt-1 space-y-2 text-left animate-in fade-in slide-in-from-top-2" style={{ borderColor: 'rgba(0, 229, 255, 0.2)', border: '1px solid rgba(0, 229, 255, 0.2)', background: 'rgba(0, 229, 255, 0.04)', color: 'rgba(0, 229, 255, 0.7)' }}>
+      <p className="font-bold text-sm" style={{ color: 'rgba(0, 229, 255, 0.85)' }}>{title}</p>
+      {children}
+      <button
+        className="font-bold block pt-2 hover:underline text-left focus-visible:outline-none focus-visible:ring-2 rounded px-1 -mx-1 cursor-pointer border-none bg-transparent"
+        style={{ color: 'rgba(0, 229, 255, 0.85)' }}
+        onClick={onDismiss}
+        type="button"
+      >
+        Entendido, cerrar
+      </button>
+    </div>
+  )
 }
 
 function goToPortal(route: PortalRoute, onNavigate: (route: PortalRoute) => void) {
@@ -150,7 +182,7 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
     onError: (err: Error) => setError(err.message)
   })
 
-  const { isInstalled, install, showIOSInstructions, setShowIOSInstructions } = usePWAInstall()
+  const { isInstalled, install, showIOSInstructions, setShowIOSInstructions, showDesktopInstructions, setShowDesktopInstructions } = usePWAInstall()
 
   return (
     <LoginFrame variant="admin">
@@ -204,16 +236,18 @@ export function AdminLogin({ onLoggedIn }: { onLoggedIn: (token: string) => void
             )}
 
             {showIOSInstructions && (
-              <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3 text-xs text-blue-300 mt-2 space-y-1 text-left">
-                <p className="font-semibold">Instrucciones para iOS:</p>
+              <InstallInstructionsPanel title="Instrucciones para iOS:" onDismiss={() => setShowIOSInstructions(false)}>
                 <ol className="list-decimal pl-4 space-y-0.5">
                   <li>Pulsa el botón <strong>Compartir</strong> en Safari (abajo en el centro).</li>
                   <li>Selecciona <strong>Agregar a inicio</strong> en la lista de opciones.</li>
                 </ol>
-                <button className="text-blue-400 font-bold block pt-1 hover:underline text-left" onClick={() => setShowIOSInstructions(false)} type="button">
-                  Entendido, cerrar
-                </button>
-              </div>
+              </InstallInstructionsPanel>
+            )}
+
+            {showDesktopInstructions && (
+              <InstallInstructionsPanel title="Instrucciones para instalar:" onDismiss={() => setShowDesktopInstructions(false)}>
+                <p>Haz clic en el icono de instalación (pantalla con flecha hacia abajo) en la barra de direcciones de tu navegador (Chrome/Edge).</p>
+              </InstallInstructionsPanel>
             )}
           </form>
         </CardContent>
@@ -235,7 +269,7 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
     onError: (err: Error) => setEmployeeError(err.message)
   })
 
-  const { isInstalled, install, showIOSInstructions, setShowIOSInstructions } = usePWAInstall()
+  const { isInstalled, install, showIOSInstructions, setShowIOSInstructions, showDesktopInstructions, setShowDesktopInstructions } = usePWAInstall()
 
   return (
     <LoginFrame variant="employee">
@@ -303,21 +337,18 @@ export function EmployeeLogin({ onLoggedIn }: { onLoggedIn: (token: string) => v
             )}
 
             {showIOSInstructions && (
-              <div className="rounded-xl p-4 text-xs mt-1 space-y-2 text-left animate-in fade-in slide-in-from-top-2" style={{ borderColor: 'rgba(0, 229, 255, 0.2)', border: '1px solid rgba(0, 229, 255, 0.2)', background: 'rgba(0, 229, 255, 0.04)', color: 'rgba(0, 229, 255, 0.7)' }}>
-                <p className="font-bold text-sm" style={{ color: 'rgba(0, 229, 255, 0.85)' }}>Instrucciones para iOS:</p>
+              <EmployeeInstallInstructionsPanel title="Instrucciones para iOS:" onDismiss={() => setShowIOSInstructions(false)}>
                 <ol className="list-decimal pl-4 space-y-1">
                   <li>Pulsa el botón <strong>Compartir</strong> en Safari (abajo en el centro).</li>
                   <li>Selecciona <strong>Agregar a inicio</strong> en la lista de opciones.</li>
                 </ol>
-                <button 
-                  className="font-bold block pt-2 hover:underline text-left focus-visible:outline-none focus-visible:ring-2 rounded px-1 -mx-1 cursor-pointer border-none bg-transparent" 
-                  style={{ color: 'rgba(0, 229, 255, 0.85)' }}
-                  onClick={() => setShowIOSInstructions(false)} 
-                  type="button"
-                >
-                  Entendido, cerrar
-                </button>
-              </div>
+              </EmployeeInstallInstructionsPanel>
+            )}
+
+            {showDesktopInstructions && (
+              <EmployeeInstallInstructionsPanel title="Instrucciones para instalar:" onDismiss={() => setShowDesktopInstructions(false)}>
+                <p>Haz clic en el icono de instalación (pantalla con flecha hacia abajo) en la barra de direcciones de tu navegador (Chrome/Edge).</p>
+              </EmployeeInstallInstructionsPanel>
             )}
           </form>
         </CardContent>
