@@ -13,7 +13,6 @@ const money = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN
 const KIOSK_PIN_LENGTH = 6
 const KIOSK_SESSION_TIMEOUT_MS = 20_000
 const KIOSK_SESSION_WARNING_MS = 5_000
-const CAPTURE_COUNTDOWN_SECONDS = 3
 const PIN_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const
 
 type KioskStatus = "idle" | "validating_pin" | "capturing_photo" | "registering" | "success" | "error"
@@ -128,8 +127,6 @@ export function TimeClockKiosk() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [lastSuccess, setLastSuccess] = useState<LastKioskSuccess | null>(null)
   const [verifiedEmployee, setVerifiedEmployee] = useState<VerifiedEmployee | null>(null)
-  const [captureCountdown, setCaptureCountdown] = useState<number | null>(null)
-  const [captureSubject, setCaptureSubject] = useState<string | null>(null)
   const [sessionActivityAt, setSessionActivityAt] = useState<number>(0)
   const [sessionSecondsLeft, setSessionSecondsLeft] = useState<number | null>(null)
   const [advanceOpen, setAdvanceOpen] = useState(false)
@@ -363,18 +360,13 @@ export function TimeClockKiosk() {
     }
   }, [getCameraStream, verifiedEmployee?.id])
 
-  async function capturePhotoOnce(employeeName: string) {
+  async function capturePhotoOnce() {
     setStatus("capturing_photo")
-    setCaptureSubject(employeeName)
-    setStatusMessage(`Prepara tu rostro para la foto, ${employeeName}.`)
+    setStatusMessage("Tomando fotografía de evidencia...")
     try {
       const stream = await getCameraStream()
-      for (let i = 0; i < 8 && !capturePreviewRef.current; i += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 30))
-      }
-
       const video = capturePreviewRef.current
-      if (!video) throw new Error("La vista de cámara no está lista.")
+      if (!video) throw new Error("La cámara no está lista.")
 
       if (video.srcObject !== stream) {
         video.srcObject = stream
@@ -382,13 +374,6 @@ export function TimeClockKiosk() {
         video.playsInline = true
       }
       await video.play()
-
-      for (let count = CAPTURE_COUNTDOWN_SECONDS; count > 0; count -= 1) {
-        setCaptureCountdown(count)
-        setStatusMessage(`Foto en ${count}...`)
-        await new Promise((resolve) => window.setTimeout(resolve, 1000))
-      }
-      setCaptureCountdown(0)
 
       if (video.readyState < 2) {
         await new Promise((resolve) => window.setTimeout(resolve, 180))
@@ -405,8 +390,6 @@ export function TimeClockKiosk() {
       if (!blob) throw new Error("No se pudo procesar la fotografía de evidencia.")
       return blob
     } finally {
-      setCaptureSubject(null)
-      setCaptureCountdown(null)
       const preview = capturePreviewRef.current
       if (preview) {
         preview.pause()
@@ -561,7 +544,7 @@ export function TimeClockKiosk() {
             return current
           })()
         : null
-      const photo = await capturePhotoOnce(employee.fullName)
+      const photo = await capturePhotoOnce()
 
       setStatus("registering")
       setStatusMessage(useMobileGeolocation ? "Validando zona y guardando asistencia..." : "Guardando registro de asistencia...")
@@ -612,7 +595,7 @@ export function TimeClockKiosk() {
         throw new Error("La bebida requiere una jornada activa.")
       }
 
-      const photo = await capturePhotoOnce(employee.fullName)
+      const photo = await capturePhotoOnce()
 
       setStatus("registering")
       setStatusMessage("Guardando bebida...")
@@ -829,19 +812,7 @@ export function TimeClockKiosk() {
             </div>
           </div>
         )}
-        {captureSubject && (
-          <div className="timeclock-capture-overlay" role="dialog" aria-modal="true" aria-label="Captura de foto">
-            <div className="timeclock-capture-modal">
-              <div className="timeclock-live-frame timeclock-capture-frame">
-                <video ref={capturePreviewRef} autoPlay muted playsInline />
-                <div className="timeclock-face-oval" aria-hidden="true" />
-                <div className="timeclock-capture-count">{captureCountdown ?? CAPTURE_COUNTDOWN_SECONDS}</div>
-              </div>
-              <strong>{captureSubject}</strong>
-              <span>Centra el rostro. La foto se toma automática.</span>
-            </div>
-          </div>
-        )}
+        <video ref={capturePreviewRef} className="timeclock-camera-capture-source" autoPlay muted playsInline aria-hidden="true" />
 
         {!verifiedEmployee ? (
           <div className="timeclock-access-view">
