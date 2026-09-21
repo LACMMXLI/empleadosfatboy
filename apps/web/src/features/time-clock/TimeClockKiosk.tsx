@@ -131,6 +131,7 @@ export function TimeClockKiosk() {
   const [advanceOpen, setAdvanceOpen] = useState(false)
   const [advanceAmount, setAdvanceAmount] = useState("")
   const [approverCode, setApproverCode] = useState("")
+  const [advanceError, setAdvanceError] = useState<string | null>(null)
   const [activeAdvanceField, setActiveAdvanceField] = useState<"amount" | "code">("amount")
   const [useMobileGeolocation, setUseMobileGeolocation] = useState(startsInMobileMode)
   const isProcessing = status === "validating_pin" || status === "capturing_photo" || status === "registering"
@@ -256,6 +257,7 @@ export function TimeClockKiosk() {
     setAdvanceOpen(false)
     setAdvanceAmount("")
     setApproverCode("")
+    setAdvanceError(null)
     releaseCamera()
   }, [releaseCamera])
 
@@ -637,6 +639,7 @@ export function TimeClockKiosk() {
     salaryAdvanceSubmittingRef.current = true
     playClick()
     markSessionActivity()
+    setAdvanceError(null)
 
     try {
       const amount = Number(advanceAmount)
@@ -667,6 +670,7 @@ export function TimeClockKiosk() {
       setAdvanceOpen(false)
       setAdvanceAmount("")
       setApproverCode("")
+      setAdvanceError(null)
       setActiveAdvanceField("amount")
       playSuccess()
       finishSuccessfulAction(`Adelanto registrado - ${money.format(registeredAmount)}`)
@@ -675,6 +679,7 @@ export function TimeClockKiosk() {
       const errorMessage = error instanceof Error ? error.message : "No se pudo registrar el adelanto"
       setStatus("error")
       setStatusMessage(errorMessage)
+      setAdvanceError(errorMessage)
       setApproverCode("")
       playError()
       scheduleStatusReset(5000)
@@ -898,7 +903,7 @@ export function TimeClockKiosk() {
                     type="button"
                     className="timeclock-utility-action advance"
                     disabled={!canRequestAdvance}
-                    onClick={() => { playClick(); markSessionActivity(); setAdvanceAmount(""); setApproverCode(""); setActiveAdvanceField("amount"); setAdvanceOpen(true) }}
+                    onClick={() => { playClick(); markSessionActivity(); setAdvanceAmount(""); setApproverCode(""); setAdvanceError(null); setActiveAdvanceField("amount"); setAdvanceOpen(true) }}
                   >
                     <span className="timeclock-utility-icon"><Banknote /></span>
                     <span><strong>Adelanto de sueldo</strong><small>Ingresa una cantidad personalizada</small></span>
@@ -935,6 +940,7 @@ export function TimeClockKiosk() {
                         value={advanceAmount}
                         onChange={(event) => {
                           setAdvanceAmount(event.target.value)
+                          setAdvanceError(null)
                           markSessionActivity()
                         }}
                         onFocus={() => setActiveAdvanceField("amount")}
@@ -953,6 +959,7 @@ export function TimeClockKiosk() {
                       value={approverCode}
                       onChange={(event) => {
                         setApproverCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                        setAdvanceError(null)
                         markSessionActivity()
                       }}
                       onFocus={() => setActiveAdvanceField("code")}
@@ -962,6 +969,7 @@ export function TimeClockKiosk() {
                     <ShieldCheck />
                     <span>El adelanto se registrará autorizado, con folio y responsable.</span>
                   </div>
+                  {advanceError && <div className="timeclock-modal-error" role="alert">{advanceError}</div>}
                   <button className="timeclock-advance-submit" type="button" disabled={isProcessing || !advanceAmount || approverCode.length !== 6} onClick={() => handleSalaryAdvance()}>
                     {isProcessing ? "Registrando..." : "Autorizar y registrar adelanto"}
                   </button>
@@ -971,6 +979,7 @@ export function TimeClockKiosk() {
                   maxLength={activeAdvanceField === "amount" ? 8 : KIOSK_PIN_LENGTH}
                   disabled={isProcessing}
                   onKeyPress={(key) => {
+                    setAdvanceError(null)
                     if (activeAdvanceField === "amount") {
                       if (isProcessing) return
                       playClick()
