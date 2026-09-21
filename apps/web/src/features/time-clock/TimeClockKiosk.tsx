@@ -3,7 +3,6 @@ import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from "reac
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, Banknote, CheckCircle2, Clock3, Coffee, Copy, LogIn, LogOut, MapPin, Maximize, Minimize, RefreshCw, ShieldAlert, ShieldCheck, Utensils, UserRound, X } from "lucide-react"
 import { api, timeClockDeviceRequestSession, timeClockDeviceSession } from "@/lib/api"
-import { movementLabels, statusLabels } from "@/lib/ledger-ui"
 import type { TimeClockEmployeeVerification, TimeClockEventType } from "@/types/domain"
 import fatboyLogo from "@/assets/logo.png"
 import "./TimeClockKiosk.css"
@@ -886,8 +885,8 @@ export function TimeClockKiosk() {
 
               <aside className="timeclock-financial-panel">
                 <div className="timeclock-section-heading">
-                  <span>Movimientos financieros</span>
-                  <strong>Últimos {verifiedEmployee.recentMovements.length}</strong>
+                  <span>Acciones de turno</span>
+                  <strong>Opciones disponibles</strong>
                 </div>
 
                 <div className="timeclock-secondary-actions">
@@ -905,8 +904,6 @@ export function TimeClockKiosk() {
                     <span><strong>Adelanto de sueldo</strong><small>Ingresa una cantidad personalizada</small></span>
                   </button>
                 </div>
-
-                <FinancialMovementHistory movements={verifiedEmployee.recentMovements} />
               </aside>
             </div>
           </div>
@@ -1187,49 +1184,6 @@ function ShiftSequence({ attendance }: { attendance: TimeClockEmployeeVerificati
       ))}
     </div>
   )
-}
-
-function FinancialMovementHistory({ movements }: { movements: VerifiedEmployee["recentMovements"] }) {
-  return (
-    <div className="timeclock-financial-history">
-      <div className="timeclock-financial-history-head">
-        <span>Concepto</span><span>Cargo</span>
-      </div>
-      <div className="timeclock-financial-list">
-        {movements.length ? movements.map((movement) => {
-          const isConsumption = movement.kind === "DRINK" || movement.kind === "FOOD" || movement.kind === "INTERNAL_CONSUMPTION"
-          const isCanceled = movement.status === "CANCELED" || movement.status === "REJECTED"
-          return (
-            <div className={`timeclock-financial-row ${isConsumption ? "consumption" : "cash"} ${isCanceled ? "canceled" : ""}`} key={movement.id}>
-              <span className="timeclock-financial-icon">{isConsumption ? <Coffee /> : <Banknote />}</span>
-              <span className="timeclock-financial-detail">
-                <strong>{movement.productName || movementLabels[movement.kind]}</strong>
-                <small>{formatFinancialDate(movement.createdAt)} · {statusLabels[movement.status]}</small>
-                <small className="folio">{movement.folio}</small>
-              </span>
-              <strong className="timeclock-financial-amount">{isCanceled ? "" : "−"}{money.format(movement.amount)}</strong>
-            </div>
-          )
-        }) : (
-          <div className="timeclock-financial-empty">
-            <Banknote />
-            <strong>Sin movimientos financieros</strong>
-            <span>Los consumos y adelantos aparecerán aquí.</span>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function formatFinancialDate(value: string) {
-  return new Intl.DateTimeFormat("es-MX", {
-    timeZone: "America/Tijuana",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(value))
 }
 
 function entryTypeLabel(type: TimeClockEventType) {
