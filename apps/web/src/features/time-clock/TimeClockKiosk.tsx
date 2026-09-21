@@ -1034,12 +1034,12 @@ function useKioskTime() {
 
   const timeString = useMemo(() => {
     try {
-      return new Intl.DateTimeFormat("es-MX", {
+      return new Intl.DateTimeFormat("en-US", {
         timeZone: "America/Tijuana",
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
-        hour12: false
+        hour12: true
       }).format(serverNow)
     } catch {
       return serverNow.toTimeString().split(" ")[0]
