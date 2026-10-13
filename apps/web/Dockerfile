@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS build
+FROM node:22.22.3-bookworm-slim AS build
 WORKDIR /app
 
 ARG VITE_API_URL=/api

@@ -1,11 +1,11 @@
 {
     "schema_version": 2,
-    "commit": "62b80d3f28d85b478fe3cbea512a9567433bd100",
-    "indexed_at": "2026-09-21T05:41:33Z",
+    "commit": "aaf1233b29913c3a2a8430c5192805be4ff4f678",
+    "indexed_at": "2026-09-21T20:05:42Z",
     "project": "C-Sistema-de-adelantos-y-reloj-checador-de-fatboy",
-    "nodes": 1808,
-    "edges": 4793,
-    "original_size": 6291456,
-    "compressed_size": 490810,
+    "nodes": 1819,
+    "edges": 4876,
+    "original_size": 7929856,
+    "compressed_size": 1172647,
     "compression_level": 3
 }

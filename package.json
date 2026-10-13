@@ -2,6 +2,11 @@
   "name": "fatboy-employee-ledger",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@10.9.8",
+  "engines": {
+    "node": "22.22.3",
+    "npm": "10.9.8"
+  },
   "workspaces": [
     "apps/api",
     "apps/web"

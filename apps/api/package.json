@@ -2,6 +2,10 @@
   "name": "@fatboy/employee-ledger-api",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "22.22.3",
+    "npm": "10.9.8"
+  },
   "type": "commonjs",
   "scripts": {
     "dev": "node --require ts-node/register src/main.ts",
