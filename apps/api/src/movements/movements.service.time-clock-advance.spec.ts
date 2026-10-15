@@ -6,6 +6,8 @@ async function registersAuthorizedAdvanceWithBranchManager() {
   let createdData: Record<string, unknown> | undefined
   let shiftCheck: Record<string, unknown> | undefined
   const prisma = {
+    sequenceCounter: { findUnique: async () => ({ key: "seq" }) },
+    $queryRaw: async () => [{ value: 1 }],
     movement: {
       findFirst: async () => null,
       count: async () => 0,

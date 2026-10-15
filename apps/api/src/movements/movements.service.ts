@@ -6,6 +6,7 @@ import { AuditService } from "../audit/audit.service"
 import { roleMeets } from "../auth/role-rank"
 import { TimeClockService } from "../time-clock/time-clock.service"
 import type { AuthUser } from "../auth/auth.types"
+import { dailySequenceKey, dayBounds, formatSequence, nextSequenceValue } from "../prisma/sequence"
 
 type CreateMovementInput = {
   employeeId: string
@@ -733,32 +734,19 @@ export class MovementsService {
   }
 
   private async nextFolio() {
-    const now = new Date()
-    const prefix = `MOV-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
-    const count = await this.prisma.movement.count({
-      where: {
-        createdAt: {
-          gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-          lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-        }
-      }
-    })
-    return `${prefix}-${String(count + 1).padStart(4, "0")}`
+    const key = dailySequenceKey("MOV")
+    const value = await nextSequenceValue(this.prisma, key, () =>
+      this.prisma.movement.count({ where: { createdAt: dayBounds() } })
+    )
+    return formatSequence(key, value)
   }
 
   private async nextSettlementTicketNumber() {
-    const now = new Date()
-    const prefix = `LIQ-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
-    const count = await this.prisma.auditLog.count({
-      where: {
-        entity: "MovementSettlement",
-        createdAt: {
-          gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-          lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-        }
-      }
-    })
-    return `${prefix}-${String(count + 1).padStart(4, "0")}`
+    const key = dailySequenceKey("LIQ")
+    const value = await nextSequenceValue(this.prisma, key, () =>
+      this.prisma.auditLog.count({ where: { entity: "MovementSettlement", createdAt: dayBounds() } })
+    )
+    return formatSequence(key, value)
   }
 
   private summarizeMovementsByKind(movements: Array<{ kind: MovementKind; amount: Prisma.Decimal | number }>) {

@@ -371,6 +371,12 @@ model LoginThrottle {
   @@index([updatedAt])
 }
 
+model SequenceCounter {
+  key       String   @id
+  value     Int
+  updatedAt DateTime @updatedAt
+}
+
 model AuditLog {
   id          String      @id @default(cuid())
   userId      String?
