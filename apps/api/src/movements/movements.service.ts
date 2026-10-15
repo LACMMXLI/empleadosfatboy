@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common"
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common"
 import { AuditAction, Employee, MovementKind, MovementOrigin, MovementStatus, Prisma, Role } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { PrismaService } from "../prisma/prisma.service"
@@ -446,14 +446,18 @@ export class MovementsService {
       throw new ForbiddenException(`Este movimiento requiere rol ${rule.requiredRole}`)
     }
 
-    const updated = await this.prisma.movement.update({
-      where: { id },
+    const claimed = await this.prisma.movement.updateMany({
+      where: { id, status: MovementStatus.PENDING },
       data: {
         status: MovementStatus.AUTHORIZED,
         authorizedById: user.sub,
         authorizedAt: new Date()
       }
     })
+    if (claimed.count === 0) {
+      throw new ConflictException("El movimiento ya fue procesado por otro usuario")
+    }
+    const updated = await this.prisma.movement.findUniqueOrThrow({ where: { id } })
     await this.audit.log({
       userId: user.sub,
       action: AuditAction.STATUS_CHANGE,
@@ -477,13 +481,17 @@ export class MovementsService {
       throw new BadRequestException("Este movimiento ya fue entregado")
     }
 
-    const updated = await this.prisma.movement.update({
-      where: { id },
+    const claimed = await this.prisma.movement.updateMany({
+      where: { id, status: MovementStatus.AUTHORIZED, deliveredAt: null },
       data: {
         deliveredById: user.sub,
         deliveredAt: new Date()
       }
     })
+    if (claimed.count === 0) {
+      throw new ConflictException("El movimiento ya fue entregado o cambio de estado")
+    }
+    const updated = await this.prisma.movement.findUniqueOrThrow({ where: { id } })
 
     await this.audit.log({
       userId: user.sub,
@@ -508,10 +516,14 @@ export class MovementsService {
     if (!movement) throw new NotFoundException("Movimiento no encontrado")
     if (movement.status === MovementStatus.CANCELED) return movement
 
-    const updated = await this.prisma.movement.update({
-      where: { id },
+    const claimed = await this.prisma.movement.updateMany({
+      where: { id, status: movement.status },
       data: { status: MovementStatus.CANCELED, canceledAt: new Date() }
     })
+    if (claimed.count === 0) {
+      throw new ConflictException("El movimiento cambio de estado mientras se procesaba")
+    }
+    const updated = await this.prisma.movement.findUniqueOrThrow({ where: { id } })
     await this.audit.log({
       userId: user.sub,
       action: AuditAction.CANCEL,
@@ -561,10 +573,14 @@ export class MovementsService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const discounted = await tx.movement.update({
-        where: { id },
+      const claimed = await tx.movement.updateMany({
+        where: { id, status: movement.status },
         data: { status: MovementStatus.DISCOUNTED }
       })
+      if (claimed.count === 0) {
+        throw new ConflictException("El movimiento cambio de estado mientras se procesaba")
+      }
+      const discounted = await tx.movement.findUniqueOrThrow({ where: { id } })
       await tx.auditLog.create({
         data: {
           userId: user.sub,
@@ -675,12 +691,15 @@ export class MovementsService {
       }))
     }
 
-    await this.prisma.$transaction([
-      this.prisma.movement.updateMany({
-        where: { id: { in: ids } },
+    await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.movement.updateMany({
+        where: { id: { in: ids }, status: { in: settlementStatuses } },
         data: { status: MovementStatus.DISCOUNTED }
-      }),
-      this.prisma.auditLog.create({
+      })
+      if (claimed.count !== ids.length) {
+        throw new ConflictException("Algunos movimientos ya fueron liquidados; vuelve a consultar el resumen")
+      }
+      await tx.auditLog.create({
         data: {
           userId: user.sub,
           action: AuditAction.STATUS_CHANGE,
@@ -695,7 +714,7 @@ export class MovementsService {
           ipAddress
         }
       })
-    ])
+    })
 
     return {
       employeeId: input.employeeId,
@@ -719,7 +738,14 @@ export class MovementsService {
   ) {
     const movement = await this.findVisibleMovementForWrite(id, user)
     if (!movement) throw new NotFoundException("Movimiento no encontrado")
-    const updated = await this.prisma.movement.update({ where: { id }, data: { status } })
+    const claimed = await this.prisma.movement.updateMany({
+      where: { id, status: movement.status },
+      data: { status }
+    })
+    if (claimed.count === 0) {
+      throw new ConflictException("El movimiento cambio de estado mientras se procesaba")
+    }
+    const updated = await this.prisma.movement.findUniqueOrThrow({ where: { id } })
     await this.audit.log({
       userId: user.sub,
       action,
@@ -823,8 +849,8 @@ export class MovementsService {
       createdAt:
         filters.from || filters.to
           ? {
-               gte: filters.from ? new Date(filters.from) : undefined,
-               lte: filters.to ? new Date(filters.to) : undefined
+               gte: filters.from ? this.parseDate(filters.from) : undefined,
+               lte: filters.to ? this.parseDate(filters.to) : undefined
             }
           : undefined,
       OR: filters.q
@@ -896,8 +922,14 @@ export class MovementsService {
     return range
   }
 
-  private startOfDay(value: string) {
+  private parseDate(value: string) {
     const date = new Date(value)
+    if (Number.isNaN(date.getTime())) throw new BadRequestException("Fecha invalida")
+    return date
+  }
+
+  private startOfDay(value: string) {
+    const date = this.parseDate(value)
     date.setHours(0, 0, 0, 0)
     return date
   }

@@ -355,9 +355,14 @@ export class IncidentsService {
 
   private dateRange(from?: string, to?: string): Prisma.DateTimeFilter | undefined {
     if (!from && !to) return undefined
+    const parse = (value: string) => {
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) throw new BadRequestException("Fecha invalida")
+      return date
+    }
     return {
-      ...(from ? { gte: new Date(`${from}T00:00:00`) } : {}),
-      ...(to ? { lte: new Date(`${to}T23:59:59`) } : {})
+      ...(from ? { gte: parse(`${from}T00:00:00`) } : {}),
+      ...(to ? { lte: parse(`${to}T23:59:59`) } : {})
     }
   }
 

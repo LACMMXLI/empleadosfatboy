@@ -69,7 +69,9 @@ function createWriteService() {
           status: MovementStatus.PENDING
         }
       },
-      update: async (args: { data?: Record<string, unknown> }) => ({ id: "movement-any", ...args.data })
+      update: async (args: { data?: Record<string, unknown> }) => ({ id: "movement-any", ...args.data }),
+      updateMany: async () => ({ count: 1 }),
+      findUniqueOrThrow: async () => ({ id: "movement-any", status: MovementStatus.AUTHORIZED })
     },
     systemConfig: {
       upsert: async () => ({
