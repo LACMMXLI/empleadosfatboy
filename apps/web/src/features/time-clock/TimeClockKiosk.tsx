@@ -148,7 +148,11 @@ export function TimeClockKiosk() {
     verifiedEmployee.attendance.mealBreak.status === "NOT_STARTED" &&
     verifiedEmployee.attendance.allowedActions.includes("EXIT")
   )
-  const canUseFinancialActions = Boolean(canUseActions && verifiedEmployee?.attendance.activeSession && !useMobileGeolocation)
+  const canUseFinancialActions = Boolean(
+    canUseActions &&
+    (verifiedEmployee?.attendance.activeSession || verifiedEmployee?.attendance.canRegisterMovements) &&
+    !useMobileGeolocation
+  )
   const canRegisterDrink = canUseFinancialActions
   const canRequestAdvance = canUseFinancialActions
   const { playClick, playError, playSuccess } = useKioskSounds()
@@ -592,8 +596,8 @@ export function TimeClockKiosk() {
 
     try {
       const employee = verifiedEmployee ?? await validateEmployeeCode()
-      if (!employee.attendance.activeSession) {
-        throw new Error("La bebida requiere una jornada activa.")
+      if (!employee.attendance.activeSession && !employee.attendance.canRegisterMovements) {
+        throw new Error("La bebida requiere una jornada activa o cerrada recientemente.")
       }
 
       const photo = await capturePhotoOnce()

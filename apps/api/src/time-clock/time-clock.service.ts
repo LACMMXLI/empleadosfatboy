@@ -107,6 +107,9 @@ const deviceRequestMinutes = 30
 const minimumTimeClockGapMs = 2 * 60 * 1000
 const minimumDrinkGapMs = 2 * 60 * 1000
 const defaultMaxGpsAccuracyMeters = 100
+// Minutes after closing a shift during which drinks, consumptions and salary advances
+// can still be registered. Override with POST_SHIFT_MOVEMENT_WINDOW_MINUTES (0 disables).
+const defaultPostShiftMovementWindowMinutes = 120
 const movementKindsThatRequireActiveShift = new Set<MovementKind>([
   MovementKind.SALARY_ADVANCE,
   MovementKind.ADMIN_SALARY_ADVANCE,
@@ -1361,6 +1364,8 @@ export class TimeClockService {
 
     if (active) return
 
+    if (await this.findRecentlyClosedSession(employeeId)) return
+
     await this.audit.log({
       userId: metadata.userId,
       action: AuditAction.BLOCKED,
@@ -1376,7 +1381,27 @@ export class TimeClockService {
       }),
       ipAddress: metadata.ipAddress
     })
-    throw new ForbiddenException("El empleado no tiene turno activo registrado.")
+    throw new ForbiddenException("El empleado no tiene turno activo registrado ni cerrado recientemente.")
+  }
+
+  private postShiftMovementWindowMinutes() {
+    const raw = Number(this.config?.get?.<string>("POST_SHIFT_MOVEMENT_WINDOW_MINUTES"))
+    return Number.isFinite(raw) && raw >= 0 ? raw : defaultPostShiftMovementWindowMinutes
+  }
+
+  private async findRecentlyClosedSession(employeeId: string, now = new Date()) {
+    const windowMinutes = this.postShiftMovementWindowMinutes()
+    if (windowMinutes <= 0) return null
+
+    return this.prisma.workSession.findFirst({
+      where: {
+        employeeId,
+        status: { in: [WorkSessionStatus.CLOSED, WorkSessionStatus.ADJUSTED] },
+        endedAt: { gte: new Date(now.getTime() - windowMinutes * 60_000), lte: now }
+      },
+      orderBy: { endedAt: "desc" },
+      select: { id: true, endedAt: true }
+    })
   }
 
   private async assertEntryAllowed(employeeId: string, type: TimeClockEventType) {
@@ -1587,7 +1612,7 @@ export class TimeClockService {
   }
 
   private async employeeVerificationPayload(employee: Prisma.EmployeeGetPayload<{ include: { branch: true } }>) {
-    const [activeSession, lastEntry, recentMovements] = await Promise.all([
+    const [activeSession, lastEntry, recentMovements, recentlyClosedSession] = await Promise.all([
       this.prisma.workSession.findFirst({
         where: { employeeId: employee.id, status: WorkSessionStatus.ACTIVE },
         include: {
@@ -1643,6 +1668,8 @@ export class TimeClockService {
           createdAt: true
         }
       })
+      ,
+      this.findRecentlyClosedSession(employee.id)
     ])
     const mealBreak = activeSession
       ? await this.mealBreakState(employee.id, activeSession.startedAt)
@@ -1677,6 +1704,7 @@ export class TimeClockService {
         nextAction: allowedActions[0],
         allowedActions,
         exitRequiresApproval: false,
+        canRegisterMovements: Boolean(activeSession || recentlyClosedSession),
         mealBreak,
         activeSession: activeSession
           ? {
