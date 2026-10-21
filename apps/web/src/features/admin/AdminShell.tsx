@@ -1829,17 +1829,27 @@ function PayrollAdmin() {
               totalNet={detail.totalNet}
             />
             <PayrollItemsTable items={detail.items ?? []} onSelect={setSelectedItem} />
-            {detail.status === "GENERADA" && (
+            {(detail.status === "GENERADA" || detail.status === "PAGADA") && (
               <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
                 <input
                   className="form-input"
-                  placeholder="Motivo de cancelación"
+                  placeholder={detail.status === "PAGADA" ? "Motivo para deshacer la nómina pagada" : "Motivo de cancelación"}
                   style={{ flex: 1, minWidth: 180 }}
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                 />
-                <button className="btn-reject" disabled={!cancelReason.trim() || cancel.isPending} onClick={() => cancel.mutate(detail.id)} type="button">
-                  Cancelar nómina
+                <button
+                  className="btn-reject"
+                  disabled={!cancelReason.trim() || cancel.isPending}
+                  onClick={() => {
+                    const message = detail.status === "PAGADA"
+                      ? "Esta nómina ya está pagada. Al deshacerla, sus movimientos volverán a quedar pendientes de descuento y podrás generar el periodo de nuevo. ¿Continuar?"
+                      : "¿Cancelar esta nómina y liberar el periodo para generarla de nuevo?"
+                    if (window.confirm(message)) cancel.mutate(detail.id)
+                  }}
+                  type="button"
+                >
+                  {detail.status === "PAGADA" ? "Deshacer nómina pagada" : "Cancelar nómina"}
                 </button>
               </div>
             )}

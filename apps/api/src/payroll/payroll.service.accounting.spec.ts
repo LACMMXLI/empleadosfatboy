@@ -67,7 +67,7 @@ function payrollRecord(status: PayrollStatus = PayrollStatus.GENERADA, withMovem
   }
 }
 
-function createService() {
+function createService(status: PayrollStatus = PayrollStatus.GENERADA) {
   const captured: Captured = {}
   const tx = {
     payroll: {
@@ -82,6 +82,7 @@ function createService() {
       }
     },
     movement: {
+      findMany: async () => [{ id: "movement-1" }],
       updateMany: async (args: { where?: unknown; data?: unknown }) => {
         captured.movementUpdateMany = args
         return { count: 1 }
@@ -102,7 +103,7 @@ function createService() {
     payroll: {
       findUnique: async (args: { select?: unknown; include?: unknown }) => {
         if (args.select) return null
-        return payrollRecord()
+        return payrollRecord(status)
       }
     },
     employee: {
@@ -173,10 +174,34 @@ async function cancelReleasesMovementLinksAndPeriodKey() {
   assert.equal(captured.payrollUpdate?.data?.periodKey, "2026-06-01_2026-06-07__CANCELADA__payroll-1")
 }
 
+async function cancelPaidPayrollRestoresMovements() {
+  const { service, captured } = createService(PayrollStatus.PAGADA)
+
+  await service.cancel("payroll-1", "Fechas mal", "admin-1")
+
+  assert.deepEqual(captured.movementUpdateMany, {
+    where: { id: { in: ["movement-1"] }, status: MovementStatus.DISCOUNTED },
+    data: { status: MovementStatus.AUTHORIZED }
+  })
+  assert.equal(captured.payrollUpdate?.data?.status, PayrollStatus.CANCELADA)
+  assert.equal(captured.payrollUpdate?.data?.periodKey, "2026-06-01_2026-06-07__CANCELADA__payroll-1")
+  assert.match(String(captured.payrollUpdate?.data?.cancelReason), /Fechas mal/)
+}
+
+async function cancelUnpaidPayrollDoesNotTouchMovementStatus() {
+  const { service, captured } = createService(PayrollStatus.GENERADA)
+
+  await service.cancel("payroll-1", "Error", "admin-1")
+
+  assert.equal(captured.movementUpdateMany, undefined)
+}
+
 async function run() {
   await generateCreatesPayrollMovementLinks()
   await markPaidDiscountsLinkedMovements()
   await cancelReleasesMovementLinksAndPeriodKey()
+  await cancelPaidPayrollRestoresMovements()
+  await cancelUnpaidPayrollDoesNotTouchMovementStatus()
   console.log("Payroll accounting tests passed")
 }
 

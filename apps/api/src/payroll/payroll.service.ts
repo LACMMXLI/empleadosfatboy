@@ -219,11 +219,28 @@ export class PayrollService {
       include: this.payrollInclude()
     })
     if (!payroll) throw new NotFoundException("Nómina no encontrada")
-    if (payroll.status === PayrollStatus.PAGADA) throw new BadRequestException("No se puede cancelar una nómina pagada")
     if (payroll.status === PayrollStatus.CANCELADA) return this.get(id)
 
+    // A paid payroll marked its movements as DISCOUNTED; undoing it must give them back so
+    // a regenerated payroll for the same dates picks them up again.
+    const wasPaid = payroll.status === PayrollStatus.PAGADA
     const movementIds = this.payrollMovementIds(payroll)
     const updated = await this.prisma.$transaction(async (tx) => {
+      let restoredMovementIds: string[] = []
+      if (wasPaid && movementIds.length > 0) {
+        const discounted = await tx.movement.findMany({
+          where: { id: { in: movementIds }, status: MovementStatus.DISCOUNTED },
+          select: { id: true }
+        })
+        restoredMovementIds = discounted.map((movement) => movement.id)
+        if (restoredMovementIds.length > 0) {
+          await tx.movement.updateMany({
+            where: { id: { in: restoredMovementIds }, status: MovementStatus.DISCOUNTED },
+            data: { status: MovementStatus.AUTHORIZED }
+          })
+        }
+      }
+
       await tx.payrollItemMovement.deleteMany({
         where: { payrollItem: { payrollId: id } }
       })
@@ -233,7 +250,7 @@ export class PayrollService {
         data: {
           status: PayrollStatus.CANCELADA,
           cancelledAt: new Date(),
-          cancelReason: reason.trim(),
+          cancelReason: wasPaid ? `[Deshecha tras pago] ${reason.trim()}` : reason.trim(),
           periodKey: this.cancelledPeriodKey(payroll.periodKey, payroll.id)
         },
         include: this.payrollInclude()
@@ -245,13 +262,14 @@ export class PayrollService {
           action: AuditAction.CANCEL,
           entity: "Payroll",
           entityId: id,
-          oldValue: this.toJson({ status: payroll.status, periodKey: payroll.periodKey, movementIds }),
+          oldValue: this.toJson({ status: payroll.status, paidAt: payroll.paidAt, periodKey: payroll.periodKey, movementIds }),
           newValue: this.toJson({
             status: cancelled.status,
             cancelledAt: cancelled.cancelledAt,
             cancelReason: cancelled.cancelReason,
             periodKey: cancelled.periodKey,
-            releasedMovementIds: movementIds
+            releasedMovementIds: movementIds,
+            restoredToAuthorizedMovementIds: restoredMovementIds
           }),
           ipAddress
         }
@@ -464,7 +482,9 @@ export class PayrollService {
   }
 
   private dateKey(date: Date) {
-    return date.toISOString().slice(0, 10)
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+    return `${date.getFullYear()}-${month}-${day}`
   }
 
   private round(value: number) {
