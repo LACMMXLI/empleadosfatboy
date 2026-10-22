@@ -5,6 +5,7 @@ import { AuditService } from "../audit/audit.service"
 import type { AuthUser } from "../auth/auth.types"
 import { FilesService } from "../files/files.service"
 import { PrismaService } from "../prisma/prisma.service"
+import { dailySequenceKey, dayBounds, formatSequence, nextSequenceValue } from "../prisma/sequence"
 
 type CreateIncidentInput = {
   title: string
@@ -354,9 +355,14 @@ export class IncidentsService {
 
   private dateRange(from?: string, to?: string): Prisma.DateTimeFilter | undefined {
     if (!from && !to) return undefined
+    const parse = (value: string) => {
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) throw new BadRequestException("Fecha invalida")
+      return date
+    }
     return {
-      ...(from ? { gte: new Date(`${from}T00:00:00`) } : {}),
-      ...(to ? { lte: new Date(`${to}T23:59:59`) } : {})
+      ...(from ? { gte: parse(`${from}T00:00:00`) } : {}),
+      ...(to ? { lte: parse(`${to}T23:59:59`) } : {})
     }
   }
 
@@ -382,17 +388,11 @@ export class IncidentsService {
   }
 
   private async nextFolio() {
-    const now = new Date()
-    const prefix = `INC-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
-    const count = await this.prisma.incident.count({
-      where: {
-        createdAt: {
-          gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-          lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-        }
-      }
-    })
-    return `${prefix}-${String(count + 1).padStart(4, "0")}`
+    const key = dailySequenceKey("INC")
+    const value = await nextSequenceValue(this.prisma, key, () =>
+      this.prisma.incident.count({ where: { createdAt: dayBounds() } })
+    )
+    return formatSequence(key, value)
   }
 
   private toFileResponse(asset: {

@@ -47,6 +47,8 @@ function createWriteService() {
         }
       }
     },
+    sequenceCounter: { findUnique: async () => ({ key: "seq" }) },
+    $queryRaw: async () => [{ value: 1 }],
     movement: {
       count: async () => 0,
       create: async (args: { data?: Record<string, unknown> }) => {
@@ -67,7 +69,9 @@ function createWriteService() {
           status: MovementStatus.PENDING
         }
       },
-      update: async (args: { data?: Record<string, unknown> }) => ({ id: "movement-any", ...args.data })
+      update: async (args: { data?: Record<string, unknown> }) => ({ id: "movement-any", ...args.data }),
+      updateMany: async () => ({ count: 1 }),
+      findUniqueOrThrow: async () => ({ id: "movement-any", status: MovementStatus.AUTHORIZED })
     },
     systemConfig: {
       upsert: async () => ({

@@ -315,6 +315,7 @@ export type TimeClockEmployeeVerification = {
     nextAction: TimeClockEventType
     allowedActions: TimeClockEventType[]
     exitRequiresApproval: boolean
+    canRegisterMovements?: boolean
     mealBreak: {
       status: "NOT_STARTED" | "ON_BREAK" | "COMPLETED"
       startedAt: {
