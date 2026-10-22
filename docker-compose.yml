@@ -32,6 +32,7 @@ services:
       DATABASE_URL: postgresql://postgres:${DATABASE_PASSWORD:-cacl691015}@db:5432/postgres?schema=public
       JWT_SECRET: ${JWT_SECRET:-change-this-secret-for-production-security}
       POST_SHIFT_MOVEMENT_WINDOW_MINUTES: "${POST_SHIFT_MOVEMENT_WINDOW_MINUTES:-120}"
+      REQUIRE_ACTIVE_SHIFT_FOR_MOVEMENTS: "${REQUIRE_ACTIVE_SHIFT_FOR_MOVEMENTS:-false}"
       WEB_ORIGIN: ${WEB_ORIGIN:-}
       COOLIFY_DB_WAIT_TIMEOUT: ${COOLIFY_DB_WAIT_TIMEOUT:-60000}
       S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
