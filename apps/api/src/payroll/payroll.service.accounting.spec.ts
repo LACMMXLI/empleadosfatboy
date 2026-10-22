@@ -3,6 +3,9 @@ import { MovementKind, MovementStatus, PayrollStatus, Role, SalaryType } from "@
 import { PayrollService } from "./payroll.service"
 
 type Captured = {
+  overlapExists?: boolean
+  overlapQuery?: unknown
+  employeeQuery?: unknown
   payrollCreateData?: Record<string, unknown>
   movementUpdateMany?: { where?: unknown; data?: unknown }
   payrollUpdate?: { where?: unknown; data?: Record<string, unknown> }
@@ -106,8 +109,16 @@ function createService(status: PayrollStatus = PayrollStatus.GENERADA) {
         return payrollRecord(status)
       }
     },
+    payrollItem: {
+      findFirst: async (args: unknown) => {
+        captured.overlapQuery = args
+        return captured.overlapExists ? { id: "item-x" } : null
+      }
+    },
     employee: {
-      findMany: async () => [
+      findMany: async (args: unknown) => {
+        captured.employeeQuery = args
+        return [
         {
           id: "employee-1",
           fullName: "Ana Lopez",
@@ -125,7 +136,8 @@ function createService(status: PayrollStatus = PayrollStatus.GENERADA) {
             }
           ]
         }
-      ]
+        ]
+      }
     },
     $transaction: async (callback: (transactionClient: typeof tx) => unknown) => callback(tx)
   }
@@ -139,7 +151,7 @@ function createService(status: PayrollStatus = PayrollStatus.GENERADA) {
 async function generateCreatesPayrollMovementLinks() {
   const { service, captured } = createService()
 
-  await service.generate({ periodStart: "2026-06-01", periodEnd: "2026-06-07" }, "admin-1")
+  await service.generate({ employeeId: "employee-1", periodStart: "2026-06-01", periodEnd: "2026-06-07" }, "admin-1")
 
   const items = (captured.payrollCreateData?.items as { create?: Array<{ movements?: { create?: unknown[] } }> }).create
   assert.ok(Array.isArray(items))
@@ -196,7 +208,41 @@ async function cancelUnpaidPayrollDoesNotTouchMovementStatus() {
   assert.equal(captured.movementUpdateMany, undefined)
 }
 
+async function generateIsPerEmployee() {
+  const { service, captured } = createService()
+
+  await service.generate({ employeeId: "employee-1", periodStart: "2026-06-01", periodEnd: "2026-06-07" }, "admin-1")
+
+  assert.deepEqual(captured.employeeQuery && (captured.employeeQuery as { where: unknown }).where, { id: "employee-1", active: true })
+  assert.equal(captured.payrollCreateData?.periodKey, "employee-1_2026-06-01_2026-06-07")
+  const items = (captured.payrollCreateData?.items as { create?: unknown[] }).create
+  assert.equal(items?.length, 1)
+}
+
+async function generateRequiresEmployee() {
+  const { service } = createService()
+  await assert.rejects(
+    () => service.generate({ employeeId: "", periodStart: "2026-06-01", periodEnd: "2026-06-07" }, "admin-1"),
+    /empleado/i
+  )
+}
+
+async function generateRejectsOverlappingPayrollForSameEmployee() {
+  const { service, captured } = createService()
+  captured.overlapExists = true
+  await assert.rejects(
+    () => service.generate({ employeeId: "employee-1", periodStart: "2026-06-05", periodEnd: "2026-06-12" }, "admin-1"),
+    /cruza esas fechas/
+  )
+  const where = (captured.overlapQuery as { where: { employeeId: string; payroll: Record<string, unknown> } }).where
+  assert.equal(where.employeeId, "employee-1")
+  assert.deepEqual(where.payroll.status, { not: PayrollStatus.CANCELADA })
+}
+
 async function run() {
+  await generateIsPerEmployee()
+  await generateRequiresEmployee()
+  await generateRejectsOverlappingPayrollForSameEmployee()
   await generateCreatesPayrollMovementLinks()
   await markPaidDiscountsLinkedMovements()
   await cancelReleasesMovementLinksAndPeriodKey()

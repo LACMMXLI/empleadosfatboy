@@ -277,11 +277,11 @@ export const api = {
   createAdministrativeMovement(payload: Record<string, unknown>) {
     return request<Movement>("/movements/administrative", { method: "POST", body: JSON.stringify(payload) })
   },
-  payrollPreview(start: string, end: string) {
-    const query = new URLSearchParams({ start, end }).toString()
+  payrollPreview(employeeId: string, start: string, end: string) {
+    const query = new URLSearchParams({ employeeId, start, end }).toString()
     return request<PayrollPreview>(`/admin/payroll/preview?${query}`)
   },
-  generatePayroll(payload: { period_start: string; period_end: string }) {
+  generatePayroll(payload: { employee_id: string; period_start: string; period_end: string }) {
     return request<Payroll>("/admin/payroll/generate", { method: "POST", body: JSON.stringify(payload) })
   },
   payrolls() {

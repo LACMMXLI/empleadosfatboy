@@ -8,6 +8,10 @@ import { PayrollService } from "./payroll.service"
 class GeneratePayrollDto {
   @IsString()
   @IsNotEmpty()
+  employee_id!: string
+
+  @IsString()
+  @IsNotEmpty()
   period_start!: string
 
   @IsString()
@@ -27,14 +31,14 @@ export class PayrollController {
   constructor(private readonly payroll: PayrollService) {}
 
   @Get("preview")
-  preview(@Query("start") start: string, @Query("end") end: string) {
-    return this.payroll.preview({ periodStart: start, periodEnd: end, rejectDuplicate: true })
+  preview(@Query("employeeId") employeeId: string, @Query("start") start: string, @Query("end") end: string) {
+    return this.payroll.preview({ employeeId, periodStart: start, periodEnd: end, rejectDuplicate: true })
   }
 
   @Post("generate")
   generate(@Body() dto: GeneratePayrollDto, @Req() request: RequestWithUser) {
     return this.payroll.generate(
-      { periodStart: dto.period_start, periodEnd: dto.period_end },
+      { employeeId: dto.employee_id, periodStart: dto.period_start, periodEnd: dto.period_end },
       request.user.sub,
       request.ip
     )

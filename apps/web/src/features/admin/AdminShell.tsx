@@ -1669,6 +1669,8 @@ function PayrollAdmin() {
   const queryClient = useQueryClient()
   const [periodStart, setPeriodStart] = useState(() => defaultPeriodStart())
   const [periodEnd, setPeriodEnd] = useState(() => defaultPeriodEnd())
+  const [payrollEmployeeId, setPayrollEmployeeId] = useState("")
+  const employees = useQuery({ queryKey: ["employees"], queryFn: () => api.employees() })
   const [selectedItem, setSelectedItem] = useState<PayrollItem | null>(null)
   const [selectedPayrollId, setSelectedPayrollId] = useState("")
   const [cancelReason, setCancelReason] = useState("")
@@ -1679,11 +1681,11 @@ function PayrollAdmin() {
     enabled: Boolean(selectedPayrollId)
   })
   const preview = useMutation({
-    mutationFn: () => api.payrollPreview(periodStart, periodEnd),
+    mutationFn: () => api.payrollPreview(payrollEmployeeId, periodStart, periodEnd),
     onSuccess: () => setSelectedItem(null)
   })
   const generate = useMutation({
-    mutationFn: () => api.generatePayroll({ period_start: periodStart, period_end: periodEnd }),
+    mutationFn: () => api.generatePayroll({ employee_id: payrollEmployeeId, period_start: periodStart, period_end: periodEnd }),
     onSuccess: async (payroll) => {
       setSelectedPayrollId(payroll.id)
       await queryClient.invalidateQueries({ queryKey: ["payrolls"] })
@@ -1710,7 +1712,7 @@ function PayrollAdmin() {
   })
 
   const detail = payrollDetail.data
-  const canGenerate = Boolean(preview.data?.items.length && !generate.isPending)
+  const canGenerate = Boolean(payrollEmployeeId && preview.data?.items.length && !generate.isPending)
 
   return (
     <div className="space-y-4">
@@ -1727,6 +1729,22 @@ function PayrollAdmin() {
         <div className="admin-card-body">
           <div className="payroll-period-row">
             <label className="payroll-date-field">
+              <span>Empleado</span>
+              <select
+                className="form-input"
+                value={payrollEmployeeId}
+                onChange={(e) => {
+                  setPayrollEmployeeId(e.target.value)
+                  preview.reset()
+                }}
+              >
+                <option value="">Selecciona un empleado</option>
+                {employees.data?.map((emp) => (
+                  <option key={emp.id} value={emp.id}>{emp.fullName}</option>
+                ))}
+              </select>
+            </label>
+            <label className="payroll-date-field">
               <span>Desde</span>
               <ExecutiveDatePicker value={periodStart} onChange={setPeriodStart} title="Desde" />
             </label>
@@ -1734,7 +1752,7 @@ function PayrollAdmin() {
               <span>Hasta</span>
               <ExecutiveDatePicker value={periodEnd} onChange={setPeriodEnd} title="Hasta" />
             </label>
-            <button className="btn-secondary payroll-action-btn" type="button" onClick={() => preview.mutate()} disabled={preview.isPending}>
+            <button className="btn-secondary payroll-action-btn" type="button" onClick={() => preview.mutate()} disabled={preview.isPending || !payrollEmployeeId}>
               Previsualizar
             </button>
             <button className="btn-primary payroll-action-btn" type="button" disabled={!canGenerate} onClick={() => generate.mutate()}>
@@ -1754,7 +1772,7 @@ function PayrollAdmin() {
               <PayrollItemsTable items={preview.data.items} onSelect={setSelectedItem} />
             </div>
           )}
-          {!preview.data && <StatusEmpty text="Selecciona un periodo y previsualiza para calcular la nómina." />}
+          {!preview.data && <StatusEmpty text="Selecciona un empleado y su periodo, y previsualiza para calcular su nómina." />}
         </div>
       </div>
 
@@ -1784,7 +1802,9 @@ function PayrollAdmin() {
                 }}
               >
                 <div style={{ flex: 1, minWidth: 160 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'hsl(var(--foreground))' }}>{formatPayrollPeriod(payroll)}</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'hsl(var(--foreground))' }}>
+                    {payroll.employeeNames?.length === 1 ? `${payroll.employeeNames[0]} · ` : ""}{formatPayrollPeriod(payroll)}
+                  </div>
                   <div style={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))' }}>Generada: {formatDateTime(payroll.generatedAt)}</div>
                 </div>
                 <span className={getPayrollBadgeClass(payroll.status)}>{payrollStatusLabels[payroll.status]}</span>
