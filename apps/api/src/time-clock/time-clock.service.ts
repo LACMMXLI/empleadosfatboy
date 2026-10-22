@@ -107,6 +107,8 @@ const deviceRequestMinutes = 30
 const minimumTimeClockGapMs = 2 * 60 * 1000
 const minimumDrinkGapMs = 2 * 60 * 1000
 const defaultMaxGpsAccuracyMeters = 100
+// When false (default) drinks, consumptions and salary advances do not need an open shift.
+// Set REQUIRE_ACTIVE_SHIFT_FOR_MOVEMENTS=true to enforce it again (see the window below).
 // Minutes after closing a shift during which drinks, consumptions and salary advances
 // can still be registered. Override with POST_SHIFT_MOVEMENT_WINDOW_MINUTES (0 disables).
 const defaultPostShiftMovementWindowMinutes = 120
@@ -1353,6 +1355,7 @@ export class TimeClockService {
     metadata: RequestMetadata & { userId?: string; device?: string; context?: string }
   ) {
     if (!movementKindsThatRequireActiveShift.has(kind)) return
+    if (!this.requireActiveShiftForMovements()) return
 
     const active = await this.prisma.workSession.findFirst({
       where: {
@@ -1382,6 +1385,10 @@ export class TimeClockService {
       ipAddress: metadata.ipAddress
     })
     throw new ForbiddenException("El empleado no tiene turno activo registrado ni cerrado recientemente.")
+  }
+
+  private requireActiveShiftForMovements() {
+    return this.config?.get?.<string>("REQUIRE_ACTIVE_SHIFT_FOR_MOVEMENTS")?.trim().toLowerCase() === "true"
   }
 
   private postShiftMovementWindowMinutes() {
@@ -1419,9 +1426,8 @@ export class TimeClockService {
     if (type === TimeClockEventType.EXIT && !activeSession) {
       throw new BadRequestException("No existe entrada activa para registrar salida")
     }
-    if (type === TimeClockEventType.EXIT && mealBreak.status === "ON_BREAK") {
-      throw new BadRequestException("Registra la entrada de comida antes de finalizar la jornada")
-    }
+    // EXIT is allowed at any meal state: the employee may close the shift without taking
+    // a break or without clocking back in from it.
     if (type === TimeClockEventType.BREAK_START && !activeSession) {
       throw new BadRequestException("Debes registrar entrada antes de salir a comida")
     }
@@ -1679,7 +1685,7 @@ export class TimeClockService {
     const allowedActions = !activeSession
       ? [TimeClockEventType.ENTRY]
       : isOnBreak
-        ? [TimeClockEventType.BREAK_END]
+        ? [TimeClockEventType.BREAK_END, TimeClockEventType.EXIT]
         : mealBreak.status === "COMPLETED"
           ? [TimeClockEventType.EXIT]
           : [TimeClockEventType.BREAK_START, TimeClockEventType.EXIT]
@@ -1704,7 +1710,7 @@ export class TimeClockService {
         nextAction: allowedActions[0],
         allowedActions,
         exitRequiresApproval: false,
-        canRegisterMovements: Boolean(activeSession || recentlyClosedSession),
+        canRegisterMovements: !this.requireActiveShiftForMovements() || Boolean(activeSession || recentlyClosedSession),
         mealBreak,
         activeSession: activeSession
           ? {

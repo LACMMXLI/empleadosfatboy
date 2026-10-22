@@ -214,6 +214,7 @@ export type PayrollItem = {
 }
 
 export type PayrollPreview = {
+  employeeId?: string
   periodStart: string
   periodEnd: string
   periodKey: string
@@ -232,6 +233,7 @@ export type Payroll = {
   periodStart: string
   periodEnd: string
   periodKey: string
+  employeeNames?: string[]
   status: PayrollStatus
   totalGross: number
   totalDeductions: number

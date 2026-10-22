@@ -142,15 +142,17 @@ export function TimeClockKiosk() {
     nextShiftAction &&
     verifiedEmployee?.attendance.allowedActions.includes(nextShiftAction.type)
   )
+  // Closing the shift is always possible while it is open, even without taking the meal
+  // break or without clocking back in from it.
   const canCloseShiftWithoutMeal = Boolean(
     canUseActions &&
     verifiedEmployee?.attendance.activeSession &&
-    verifiedEmployee.attendance.mealBreak.status === "NOT_STARTED" &&
+    nextShiftAction?.type !== "EXIT" &&
     verifiedEmployee.attendance.allowedActions.includes("EXIT")
   )
   const canUseFinancialActions = Boolean(
     canUseActions &&
-    (verifiedEmployee?.attendance.activeSession || verifiedEmployee?.attendance.canRegisterMovements) &&
+    (verifiedEmployee?.attendance.activeSession || verifiedEmployee?.attendance.canRegisterMovements !== false) &&
     !useMobileGeolocation
   )
   const canRegisterDrink = canUseFinancialActions
@@ -412,9 +414,7 @@ export function TimeClockKiosk() {
   const actionUnavailableMessage = useCallback((type: TimeClockEventType, employee: VerifiedEmployee) => {
     if (type === "ENTRY") return "El empleado ya tiene una jornada activa."
     if (type === "EXIT") {
-      return employee.attendance.state === "ON_BREAK"
-        ? "Primero debe registrar el regreso de comida."
-        : "No existe una entrada activa para registrar salida."
+      return "No existe una entrada activa para registrar salida."
     }
     if (type === "BREAK_START") return "No se puede iniciar comida en este momento."
     return "No se puede regresar de comida en este momento."
@@ -596,7 +596,7 @@ export function TimeClockKiosk() {
 
     try {
       const employee = verifiedEmployee ?? await validateEmployeeCode()
-      if (!employee.attendance.activeSession && !employee.attendance.canRegisterMovements) {
+      if (!employee.attendance.activeSession && employee.attendance.canRegisterMovements === false) {
         throw new Error("La bebida requiere una jornada activa o cerrada recientemente.")
       }
 

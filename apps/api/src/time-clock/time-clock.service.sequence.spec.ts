@@ -38,12 +38,11 @@ async function validatesShiftSequence() {
   assert.equal(noMealRule.requiresManagerApproval, false)
 
   const onBreakService = createService([entry(TimeClockEventType.BREAK_START, 1)])
-  await assert.rejects(
-    () => (onBreakService as unknown as {
-      assertEntryAllowed: (employeeId: string, type: TimeClockEventType) => Promise<unknown>
-    }).assertEntryAllowed("employee-1", TimeClockEventType.EXIT),
-    /Registra la entrada de comida/
-  )
+  // Closing the shift while still on the meal break (never clocked back in) is allowed.
+  const onBreakExitRule = await (onBreakService as unknown as {
+    assertEntryAllowed: (employeeId: string, type: TimeClockEventType) => Promise<{ requiresManagerApproval: boolean }>
+  }).assertEntryAllowed("employee-1", TimeClockEventType.EXIT)
+  assert.equal(onBreakExitRule.requiresManagerApproval, false)
 
   const completedService = createService([
     entry(TimeClockEventType.BREAK_START, 1),

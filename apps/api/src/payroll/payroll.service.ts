@@ -4,6 +4,7 @@ import { PrismaService } from "../prisma/prisma.service"
 import { AuditService } from "../audit/audit.service"
 
 type PayrollPeriodInput = {
+  employeeId: string
   periodStart: string
   periodEnd: string
   rejectDuplicate?: boolean
@@ -66,13 +67,13 @@ export class PayrollService {
 
   async preview(input: PayrollPeriodInput) {
     const period = await this.resolvePeriod(input)
-    const calculations = await this.calculate(period.start, period.end)
+    const calculations = await this.calculate(period.employeeId, period.start, period.end)
     return this.buildPreview(period, calculations)
   }
 
   async generate(input: PayrollPeriodInput, adminId: string, ipAddress?: string) {
     const period = await this.resolvePeriod({ ...input, rejectDuplicate: true })
-    const calculations = await this.calculate(period.start, period.end)
+    const calculations = await this.calculate(period.employeeId, period.start, period.end)
     const preview = this.buildPreview(period, calculations)
 
     const payroll = await this.prisma.$transaction(async (tx) => {
@@ -126,7 +127,7 @@ export class PayrollService {
       return created
     }).catch((error) => {
       if (this.isUniqueError(error)) {
-        throw new ConflictException("Ya existe una nómina o movimiento relacionado para este periodo")
+        throw new ConflictException("Ya existe una nómina o movimiento relacionado para este empleado y periodo")
       }
       throw error
     })
@@ -136,9 +137,12 @@ export class PayrollService {
 
   async list() {
     const payrolls = await this.prisma.payroll.findMany({
-      include: { generatedByAdmin: { select: { id: true, fullName: true, role: true } }, items: true },
+      include: {
+        generatedByAdmin: { select: { id: true, fullName: true, role: true } },
+        items: { include: { employee: { select: { id: true, fullName: true } } } }
+      },
       orderBy: { createdAt: "desc" },
-      take: 50
+      take: 100
     })
     return payrolls.map((payroll) => ({
       id: payroll.id,
@@ -155,7 +159,9 @@ export class PayrollService {
       cancelledAt: payroll.cancelledAt,
       cancelReason: payroll.cancelReason,
       generatedByAdmin: payroll.generatedByAdmin,
-      itemCount: payroll.items.length
+      itemCount: payroll.items.length,
+      // Payrolls are generated per employee; legacy batch payrolls list every employee.
+      employeeNames: payroll.items.map((item) => item.employee.fullName)
     }))
   }
 
@@ -281,22 +287,39 @@ export class PayrollService {
   }
 
   private async resolvePeriod(input: PayrollPeriodInput) {
+    const employeeId = input.employeeId?.trim()
+    if (!employeeId) throw new BadRequestException("Selecciona el empleado para la nómina")
     const start = this.parseDate(input.periodStart, "fecha_inicio")
     const end = this.parseDate(input.periodEnd, "fecha_fin")
     if (start.getTime() > end.getTime()) {
       throw new BadRequestException("fecha_inicio debe ser menor o igual a fecha_fin")
     }
-    const key = `${this.dateKey(start)}_${this.dateKey(end)}`
+    const key = `${employeeId}_${this.dateKey(start)}_${this.dateKey(end)}`
     if (input.rejectDuplicate) {
       const existing = await this.prisma.payroll.findUnique({ where: { periodKey: key }, select: { id: true } })
-      if (existing) throw new ConflictException("Ya existe una nómina para este periodo")
+      if (existing) throw new ConflictException("Ya existe una nómina de este empleado para este periodo")
+      // Also covers legacy batch payrolls, which contain an item for every employee.
+      const overlapping = await this.prisma.payrollItem.findFirst({
+        where: {
+          employeeId,
+          payroll: {
+            status: { not: PayrollStatus.CANCELADA },
+            periodStart: { lte: end },
+            periodEnd: { gte: start }
+          }
+        },
+        select: { id: true }
+      })
+      if (overlapping) {
+        throw new ConflictException("El empleado ya tiene una nómina que cruza esas fechas. Deshazla primero si necesitas regenerarla")
+      }
     }
-    return { start, end, key }
+    return { employeeId, start, end, key }
   }
 
-  private async calculate(periodStart: Date, periodEnd: Date): Promise<PayrollEmployeeCalculation[]> {
+  private async calculate(employeeId: string, periodStart: Date, periodEnd: Date): Promise<PayrollEmployeeCalculation[]> {
     const employees = await this.prisma.employee.findMany({
-      where: { active: true },
+      where: { id: employeeId, active: true },
       include: {
         movements: {
           where: {
@@ -310,7 +333,7 @@ export class PayrollService {
       },
       orderBy: { fullName: "asc" }
     })
-    if (!employees.length) throw new BadRequestException("No hay empleados activos para generar nómina")
+    if (!employees.length) throw new NotFoundException("Empleado activo no encontrado para generar nómina")
 
     return employees.map((employee) => {
       const baseSalary = this.resolveBaseSalary(Number(employee.salaryAmount), employee.salaryType, periodStart, periodEnd)
@@ -365,7 +388,7 @@ export class PayrollService {
     })
   }
 
-  private buildPreview(period: { start: Date; end: Date; key: string }, items: PayrollEmployeeCalculation[]) {
+  private buildPreview(period: { employeeId: string; start: Date; end: Date; key: string }, items: PayrollEmployeeCalculation[]) {
     const totals = items.reduce(
       (acc, item) => {
         acc.totalGross += item.baseSalary
@@ -380,6 +403,7 @@ export class PayrollService {
       periodStart: period.start,
       periodEnd: period.end,
       periodKey: period.key,
+      employeeId: period.employeeId,
       status: "BORRADOR" as const,
       totals: this.roundTotals(totals),
       items
